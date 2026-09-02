@@ -1,6 +1,6 @@
-# family_emergency_app
+# Apps
 
-A new Flutter project.
+Family emergency Flutter app.
 
 ## Getting Started
 
