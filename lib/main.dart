@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'dart:async';
 
 import 'screens/login_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const FamilyEmergencyApp());
 }
 
@@ -25,7 +28,6 @@ class FamilyEmergencyApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      // App start hote hi Login Screen dikhegi
       home: const LoginScreen(),
     );
   }
@@ -72,7 +74,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _isCountingDown = false;
           _alertSent = true;
 
-          // Success Pop-up
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Row(
@@ -170,7 +171,6 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         child: Column(
           children: [
-            // Family Status
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -217,10 +217,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-
             const Spacer(),
-
-            // SOS Section
             if (!_alertSent) ...[
               if (_isCountingDown)
                 Column(
@@ -310,11 +307,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _alertSent = false;
-                      });
-                    },
+                    onPressed: () => setState(() => _alertSent = false),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.redAccent,
                       padding: const EdgeInsets.symmetric(
@@ -333,7 +326,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ],
-
             const Spacer(),
             const Text(
               'Press the SOS button in real emergency',
