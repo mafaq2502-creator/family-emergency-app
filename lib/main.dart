@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'dart:async';
 
@@ -33,7 +34,7 @@ class FamilyEmergencyApp extends StatelessWidget {
   }
 }
 
-// ====================== HOME SCREEN (SOS) ======================
+// ====================== HOME SCREEN ======================
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -48,6 +49,11 @@ class _HomeScreenState extends State<HomeScreen> {
   int _countdown = 3;
   bool _alertSent = false;
   Timer? _timer;
+
+  final String _appOpenTime = DateTime.now().toString().substring(
+    11,
+    16,
+  ); // HH:MM
 
   final List<Map<String, dynamic>> familyMembers = [
     {'name': 'Father', 'status': 'Online'},
@@ -80,15 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Icon(Icons.check_circle, color: Colors.white),
                   SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Emergency Alert Sent to Family!',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
+                  Expanded(child: Text('Emergency Alert Sent to Family!')),
                 ],
               ),
               backgroundColor: Colors.green.shade700,
@@ -114,6 +112,201 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _logout() async {
+    await FirebaseAuth.instance.signOut();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  void _showAddMemberDialog() {
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    String? selectedRelation;
+    bool locationAccess = true;
+    bool batteryAccess = true;
+
+    final List<String> relations = [
+      'Father',
+      'Mother',
+      'Husband',
+      'Wife',
+      'Son',
+      'Daughter',
+      'Grandfather',
+      'Grandmother',
+      'Grandson',
+      'Granddaughter',
+      'Brother',
+      'Sister',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1A1A1A),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text(
+                'Add Family Member',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Name',
+                        labelStyle: const TextStyle(color: Colors.white54),
+                        filled: true,
+                        fillColor: const Color(0xFF0F0F0F),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: emailController,
+                      style: const TextStyle(color: Colors.white),
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        labelStyle: const TextStyle(color: Colors.white54),
+                        filled: true,
+                        fillColor: const Color(0xFF0F0F0F),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedRelation,
+                      dropdownColor: const Color(0xFF1A1A1A),
+                      decoration: InputDecoration(
+                        labelText: 'Relationship',
+                        labelStyle: const TextStyle(color: Colors.white54),
+                        filled: true,
+                        fillColor: const Color(0xFF0F0F0F),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      style: const TextStyle(color: Colors.white),
+                      items: relations
+                          .map(
+                            (r) => DropdownMenuItem(value: r, child: Text(r)),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        setDialogState(() => selectedRelation = value);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Access Permissions',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                    ),
+                    SwitchListTile(
+                      title: const Text(
+                        'Location',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      value: locationAccess,
+                      activeColor: Colors.redAccent,
+                      onChanged: (value) {
+                        setDialogState(() => locationAccess = value);
+                      },
+                    ),
+                    SwitchListTile(
+                      title: const Text(
+                        'Battery Status',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      value: batteryAccess,
+                      activeColor: Colors.redAccent,
+                      onChanged: (value) {
+                        setDialogState(() => batteryAccess = value);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (nameController.text.trim().isEmpty ||
+                        emailController.text.trim().isEmpty ||
+                        selectedRelation == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please fill all fields'),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                      return;
+                    }
+
+                    // Abhi ke liye sirf list mein add kar rahe hain
+                    setState(() {
+                      familyMembers.add({
+                        'name': nameController.text.trim(),
+                        'status': 'Pending',
+                        'email': emailController.text.trim(),
+                        'relation': selectedRelation,
+                        'locationAccess': locationAccess,
+                        'batteryAccess': batteryAccess,
+                      });
+                    });
+
+                    Navigator.pop(context);
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '${nameController.text.trim()} added successfully',
+                        ),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                  ),
+                  child: const Text(
+                    'Add Member',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -126,24 +319,23 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text(
           'Family Emergency',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {},
-          ),
+      ),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          _buildHomeTab(),
+          _buildFamilyTab(),
+          _buildLocationTab(),
+          _buildProfileTab(),
         ],
       ),
-      body: _currentIndex == 0 ? _buildHomeTab() : _buildPlaceholderTab(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: (index) => setState(() => _currentIndex = index),
+        type: BottomNavigationBarType.fixed,
         backgroundColor: const Color(0xFF1A1A1A),
         selectedItemColor: Colors.redAccent,
         unselectedItemColor: Colors.grey,
@@ -157,6 +349,10 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Family',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.location_on_rounded),
+            label: 'Location',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.person_rounded),
             label: 'Profile',
           ),
@@ -165,12 +361,39 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ================= HOME TAB =================
   Widget _buildHomeTab() {
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
         child: Column(
           children: [
+            // Status Cards
+            Row(
+              children: [
+                Expanded(
+                  child: _infoCard(
+                    Icons.access_time,
+                    'App Opened',
+                    _appOpenTime,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _infoCard(Icons.battery_full, 'Battery', '84%'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _infoCard(
+              Icons.location_on,
+              'Location',
+              'Lahore, Pakistan (Mock)',
+              fullWidth: true,
+            ),
+            const SizedBox(height: 20),
+
+            // Family Status
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -190,12 +413,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 12,
-                    children: familyMembers.map((member) {
-                      return Row(
-                        mainAxisSize: MainAxisSize.min,
+                  ...familyMembers.map((member) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
                         children: [
                           Container(
                             width: 10,
@@ -205,19 +426,29 @@ class _HomeScreenState extends State<HomeScreen> {
                               shape: BoxShape.circle,
                             ),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 10),
                           Text(
                             member['name'],
-                            style: const TextStyle(fontSize: 14),
+                            style: const TextStyle(fontSize: 15),
+                          ),
+                          const Spacer(),
+                          Text(
+                            member['status'],
+                            style: const TextStyle(
+                              color: Colors.greenAccent,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
-                      );
-                    }).toList(),
-                  ),
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),
-            const Spacer(),
+            const SizedBox(height: 40),
+
+            // SOS Button
             if (!_alertSent) ...[
               if (_isCountingDown)
                 Column(
@@ -233,14 +464,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 8),
                     const Text(
                       'Emergency alert will be sent...',
-                      style: TextStyle(fontSize: 16, color: Colors.white70),
+                      style: TextStyle(color: Colors.white70),
                     ),
-                    const SizedBox(height: 20),
                     TextButton(
                       onPressed: _cancelSOS,
                       child: const Text(
                         'Cancel',
-                        style: TextStyle(color: Colors.grey, fontSize: 16),
+                        style: TextStyle(color: Colors.grey),
                       ),
                     ),
                   ],
@@ -249,16 +479,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 GestureDetector(
                   onTap: _startSOS,
                   child: Container(
-                    width: 180,
-                    height: 180,
+                    width: 170,
+                    height: 170,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.redAccent,
                       boxShadow: [
                         BoxShadow(
                           color: Colors.redAccent.withOpacity(0.5),
-                          blurRadius: 30,
-                          spreadRadius: 8,
+                          blurRadius: 25,
+                          spreadRadius: 6,
                         ),
                       ],
                     ),
@@ -266,7 +496,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Text(
                         'SOS',
                         style: TextStyle(
-                          fontSize: 42,
+                          fontSize: 40,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                           letterSpacing: 2,
@@ -279,74 +509,224 @@ class _HomeScreenState extends State<HomeScreen> {
               Column(
                 children: [
                   Container(
-                    width: 100,
-                    height: 100,
+                    width: 90,
+                    height: 90,
                     decoration: const BoxDecoration(
                       color: Colors.green,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.check,
-                      size: 60,
+                      size: 50,
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                   const Text(
                     'Emergency Alert Sent!',
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: Colors.greenAccent,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Your family has been notified',
-                    style: TextStyle(fontSize: 15, color: Colors.white70),
-                  ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () => setState(() => _alertSent = false),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.redAccent,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 14,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
                     ),
                     child: const Text(
                       'Back to Home',
-                      style: TextStyle(fontSize: 16, color: Colors.white),
+                      style: TextStyle(color: Colors.white),
                     ),
                   ),
                 ],
               ),
             ],
-            const Spacer(),
-            const Text(
-              'Press the SOS button in real emergency',
-              style: TextStyle(fontSize: 12, color: Colors.white38),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPlaceholderTab() {
-    return Center(
+  Widget _infoCard(
+    IconData icon,
+    String title,
+    String value, {
+    bool fullWidth = false,
+  }) {
+    return Container(
+      width: fullWidth ? double.infinity : null,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.redAccent, size: 22),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ================= FAMILY TAB =================
+  Widget _buildFamilyTab() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Family Members',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // Add Member popup baad mein
+                    _showAddMemberDialog();
+                  },
+                  icon: const Icon(Icons.person_add, size: 18),
+                  label: const Text('Add'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: ListView.builder(
+                itemCount: familyMembers.length,
+                itemBuilder: (context, index) {
+                  final member = familyMembers[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: Colors.redAccent.withOpacity(0.2),
+                          child: Text(
+                            member['name'][0],
+                            style: const TextStyle(color: Colors.redAccent),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              member['name'],
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              member['status'],
+                              style: const TextStyle(
+                                color: Colors.greenAccent,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ================= LOCATION TAB =================
+  Widget _buildLocationTab() {
+    return const Center(
       child: Text(
-        _currentIndex == 1
-            ? 'Family Members Screen\n(Coming Soon)'
-            : 'Profile Screen\n(Coming Soon)',
+        'Access Location Screen\n(Coming Soon)',
         textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 18, color: Colors.white54),
+        style: TextStyle(fontSize: 18, color: Colors.white54),
+      ),
+    );
+  }
+
+  // ================= PROFILE TAB =================
+  Widget _buildProfileTab() {
+    final user = FirebaseAuth.instance.currentUser;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+            CircleAvatar(
+              radius: 45,
+              backgroundColor: Colors.redAccent.withOpacity(0.2),
+              child: const Icon(
+                Icons.person,
+                size: 50,
+                color: Colors.redAccent,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              user?.email ?? 'User',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 40),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _logout,
+                icon: const Icon(Icons.logout, color: Colors.white),
+                label: const Text(
+                  'Logout',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }

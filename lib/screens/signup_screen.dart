@@ -27,6 +27,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
     'Mother',
     'Son',
     'Daughter',
+    'Husband',
+    'Wife',
     'Grandfather',
     'Grandmother',
     'Grandson',
