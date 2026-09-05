@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'dart:async';
 
@@ -12,24 +13,46 @@ void main() async {
   runApp(const FamilyEmergencyApp());
 }
 
+final ValueNotifier<ThemeMode> appThemeMode = ValueNotifier(ThemeMode.dark);
+
 class FamilyEmergencyApp extends StatelessWidget {
   const FamilyEmergencyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Family Emergency',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: Colors.redAccent,
-        scaffoldBackgroundColor: const Color(0xFF0F0F0F),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF1A1A1A),
-          elevation: 0,
-        ),
-      ),
-      home: const LoginScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: appThemeMode,
+      builder: (context, themeMode, child) {
+        return MaterialApp(
+          title: 'Family Emergency',
+          debugShowCheckedModeBanner: false,
+          themeMode: themeMode,
+          theme: ThemeData(
+            brightness: Brightness.light,
+            primaryColor: Colors.redAccent,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.redAccent,
+              brightness: Brightness.light,
+            ),
+            scaffoldBackgroundColor: const Color(0xFFF7F7F9),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Colors.white,
+              foregroundColor: Color(0xFF202124),
+              elevation: 0,
+            ),
+          ),
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            primaryColor: Colors.redAccent,
+            scaffoldBackgroundColor: const Color(0xFF0F0F0F),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFF1A1A1A),
+              elevation: 0,
+            ),
+          ),
+          home: const LoginScreen(),
+        );
+      },
     );
   }
 }
@@ -50,6 +73,22 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _alertSent = false;
   Timer? _timer;
 
+  final _profileNameController = TextEditingController();
+  String? _profileRole;
+  String _initialProfileName = '';
+  String? _initialProfileRole;
+  String _profileEmail = '';
+  String _profilePhone = '';
+  bool _isProfileLoading = true;
+  bool _isSavingProfile = false;
+  bool _isProfileDirty = false;
+
+  static const List<String> _roles = [
+    'Father', 'Mother', 'Son', 'Daughter', 'Husband', 'Wife',
+    'Grandfather', 'Grandmother', 'Grandson', 'Granddaughter',
+    'Brother', 'Sister',
+  ];
+
   final String _appOpenTime = DateTime.now().toString().substring(
     11,
     16,
@@ -61,6 +100,112 @@ class _HomeScreenState extends State<HomeScreen> {
     {'name': 'Brother', 'status': 'Online'},
     {'name': 'Sister', 'status': 'Online'},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _profileNameController.addListener(_updateProfileDirtyState);
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _isProfileLoading = false);
+      return;
+    }
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users').doc(user.uid).get();
+      final data = snapshot.data();
+      if (!mounted) return;
+      setState(() {
+        _initialProfileName = data?['name'] as String? ?? '';
+        _profileRole = data?['role'] as String?;
+        _initialProfileRole = _profileRole;
+        _profileNameController.text = _initialProfileName;
+        _profileEmail = data?['email'] as String? ?? user.email ?? '';
+        _profilePhone = data?['phone'] as String? ?? '';
+        _isProfileLoading = false;
+        _isProfileDirty = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _profileEmail = user.email ?? '';
+          _isProfileLoading = false;
+        });
+      }
+    }
+  }
+
+  void _updateProfileDirtyState() {
+    final changed = _profileNameController.text.trim() != _initialProfileName ||
+        _profileRole != _initialProfileRole;
+    if (mounted && changed != _isProfileDirty) {
+      setState(() => _isProfileDirty = changed);
+    }
+  }
+
+  void _changeProfileRole(String? value) {
+    setState(() => _profileRole = value);
+    _updateProfileDirtyState();
+  }
+
+  Future<void> _saveProfile() async {
+    if (!_isProfileDirty || _isSavingProfile) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    setState(() => _isSavingProfile = true);
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'name': _profileNameController.text.trim(),
+        'role': _profileRole,
+      }, SetOptions(merge: true));
+      if (!mounted) return;
+      setState(() {
+        _initialProfileName = _profileNameController.text.trim();
+        _initialProfileRole = _profileRole;
+        _isProfileDirty = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile saved'), backgroundColor: Colors.green),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save profile. Please try again.'), backgroundColor: Colors.redAccent),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingProfile = false);
+    }
+  }
+
+  Future<bool> _confirmProfileExit() async {
+    if (!_isProfileDirty) return true;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Save changes?'),
+        content: const Text('You have unsaved profile changes.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Keep editing')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Discard')),
+          ElevatedButton(
+            onPressed: () async {
+              await _saveProfile();
+              if (dialogContext.mounted && !_isProfileDirty) {
+                Navigator.pop(dialogContext, true);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
 
   void _startSOS() {
     if (_isCountingDown || _alertSent) return;
@@ -310,20 +455,43 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _profileNameController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
+    return WillPopScope(
+      onWillPop: _currentIndex == 3 ? _confirmProfileExit : () async => true,
+      child: Scaffold(
+        appBar: AppBar(
         title: const Text(
           'Family Emergency',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-      ),
-      body: IndexedStack(
+        actions: _currentIndex == 3
+            ? [
+                TextButton(
+                  onPressed: _isProfileDirty && !_isSavingProfile ? _saveProfile : null,
+                  child: _isSavingProfile
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          'Save',
+                          style: TextStyle(
+                            color: _isProfileDirty ? Colors.redAccent : Colors.grey,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ]
+            : null,
+        ),
+        body: IndexedStack(
         index: _currentIndex,
         children: [
           _buildHomeTab(),
@@ -332,7 +500,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _buildProfileTab(),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
+        bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
         type: BottomNavigationBarType.fixed,
@@ -357,6 +525,7 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Profile',
           ),
         ],
+        ),
       ),
     );
   }
@@ -682,51 +851,105 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ================= PROFILE TAB =================
   Widget _buildProfileTab() {
-    final user = FirebaseAuth.instance.currentUser;
+    if (_isProfileLoading) {
+      return const Center(child: CircularProgressIndicator(color: Colors.redAccent));
+    }
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final mutedText = isDark ? Colors.white54 : Colors.black54;
+    final enabledText = isDark ? Colors.white : Colors.black87;
 
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             CircleAvatar(
               radius: 45,
               backgroundColor: Colors.redAccent.withOpacity(0.2),
-              child: const Icon(
-                Icons.person,
-                size: 50,
-                color: Colors.redAccent,
+              child: const Icon(Icons.person, size: 50, color: Colors.redAccent),
+            ),
+            const SizedBox(height: 28),
+            TextField(
+              controller: _profileNameController,
+              style: TextStyle(color: enabledText),
+              decoration: _profileInputDecoration('Full Name', Icons.person, cardColor, mutedText),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _profileRole,
+              dropdownColor: cardColor,
+              style: TextStyle(color: enabledText),
+              decoration: _profileInputDecoration('Relation', Icons.family_restroom, cardColor, mutedText),
+              items: _roles.map((role) => DropdownMenuItem(value: role, child: Text(role))).toList(),
+              onChanged: _changeProfileRole,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              initialValue: _profileEmail,
+              readOnly: true,
+              style: TextStyle(color: mutedText),
+              decoration: _profileInputDecoration('Email', Icons.email, cardColor, mutedText).copyWith(
+                suffixIcon: Icon(Icons.lock_outline, color: mutedText),
               ),
             ),
             const SizedBox(height: 16),
-            Text(
-              user?.email ?? 'User',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+            TextFormField(
+              initialValue: _profilePhone,
+              readOnly: true,
+              style: TextStyle(color: mutedText),
+              decoration: _profileInputDecoration('Phone Number', Icons.phone, cardColor, mutedText).copyWith(
+                suffixIcon: Icon(Icons.lock_outline, color: mutedText),
+              ),
             ),
-            const SizedBox(height: 40),
-            const Spacer(),
+            const SizedBox(height: 18),
+            Container(
+              decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(12)),
+              child: SwitchListTile(
+                title: Text('Dark mode', style: TextStyle(color: enabledText)),
+                secondary: Icon(isDark ? Icons.dark_mode : Icons.light_mode, color: Colors.redAccent),
+                value: isDark,
+                activeColor: Colors.redAccent,
+                onChanged: (value) => appThemeMode.value = value ? ThemeMode.dark : ThemeMode.light,
+              ),
+            ),
+            const SizedBox(height: 36),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
                 onPressed: _logout,
                 icon: const Icon(Icons.logout, color: Colors.white),
-                label: const Text(
-                  'Logout',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
-                ),
+                label: const Text('Logout', style: TextStyle(color: Colors.white, fontSize: 16)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.redAccent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  InputDecoration _profileInputDecoration(
+    String label,
+    IconData icon,
+    Color backgroundColor,
+    Color mutedText,
+  ) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(color: mutedText),
+      prefixIcon: Icon(icon, color: mutedText),
+      filled: true,
+      fillColor: backgroundColor,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
       ),
     );
   }
