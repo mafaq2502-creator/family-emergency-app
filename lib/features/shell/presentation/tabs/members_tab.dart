@@ -5,15 +5,24 @@ extension _MembersTab on _HomeScreenState {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark ? Colors.white : kNavy;
     final mutedColor = isDark ? Colors.white60 : const Color(0xFF64748B);
-    return SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(24, 22, 24, 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return SafeArea(child: ListView(padding: const EdgeInsets.fromLTRB(24, 22, 24, 12), children: [
       Text('Family Members', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: titleColor)),
       const SizedBox(height: 4),
       Text('Add and manage your family members.', style: TextStyle(fontSize: 12, color: mutedColor)),
       const SizedBox(height: 12),
-      SizedBox(width: double.infinity, height: 38, child: ElevatedButton.icon(onPressed: _showAddMemberDialog, icon: const Icon(Icons.add_rounded, size: 24), label: const Text('Add Member', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)), style: ElevatedButton.styleFrom(backgroundColor: kEmerald, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))))),
-      const SizedBox(height: 13),
-      Expanded(child: ListView.builder(padding: EdgeInsets.zero, itemCount: familyMembers.length, itemBuilder: (context, index) => _memberListCard(familyMembers[index], index, isDark))),
-    ])));
+      _groupSelector(),
+      const SizedBox(height: 10),
+      Row(children: [
+        Expanded(child: SizedBox(height: 40, child: OutlinedButton.icon(onPressed: _createGroup, icon: const Icon(Icons.group_add_outlined, size: 19), label: const Text('Add Group'), style: OutlinedButton.styleFrom(foregroundColor: kEmerald, side: const BorderSide(color: kEmerald), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)))))),
+        const SizedBox(width: 10),
+        Expanded(child: SizedBox(height: 40, child: ElevatedButton.icon(onPressed: _selectedGroup?.canManage == true ? _showAddMemberDialog : null, icon: const Icon(Icons.person_add_alt_1_rounded, size: 19), label: const Text('Add Member'), style: ElevatedButton.styleFrom(backgroundColor: kEmerald, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)))))),
+      ]),
+      if (_selectedGroup?.canManage == true) Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: _openGroupSettings, icon: const Icon(Icons.settings_outlined, size: 17), label: const Text('Group Settings'))),
+      const SizedBox(height: 10),
+      Text(_selectedGroup == null ? 'Create a group first, then add members to it.' : '${_selectedGroup!.name} Members', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: titleColor)),
+      const SizedBox(height: 9),
+      ...List.generate(familyMembers.length, (index) => _memberListCard(familyMembers[index], index, isDark)),
+    ]));
   }
 
   Widget _memberListCard(FamilyMember member, int index, bool isDark) {

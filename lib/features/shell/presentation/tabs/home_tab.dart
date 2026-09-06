@@ -17,32 +17,95 @@ extension _HomeTab on _HomeScreenState {
                 const SizedBox(height: 6),
                 Row(children: [Text('Your family is safe', style: TextStyle(fontSize: 12, color: mutedColor)), const SizedBox(width: 5), const Icon(Icons.favorite, size: 15, color: kEmergency)]),
               ])),
-              Stack(clipBehavior: Clip.none, children: [
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                _notificationBell(),
+                Stack(clipBehavior: Clip.none, children: [
                 const Icon(Icons.groups_rounded, color: kEmerald, size: 37),
                 Positioned(right: -2, top: -2, child: Container(width: 10, height: 10, decoration: BoxDecoration(color: kEmergency, shape: BoxShape.circle, border: Border.all(color: isDark ? const Color(0xFF101916) : const Color(0xFFF8FBFA), width: 1.5)))),
-              ]),
+              ]),]),
             ]),
             const SizedBox(height: 15),
-            GridView.builder(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: familyMembers.length.clamp(0, 4), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: .93), itemBuilder: (_, index) => _homeMemberCard(familyMembers[index], index, isDark)),
-            const SizedBox(height: 13),
-            Center(child: Column(children: [
-              SizedBox(width: 156, height: 38, child: OutlinedButton.icon(
-                onPressed: _isMarkingAlive ? null : _markAlive,
-                icon: _isMarkingAlive ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: kEmerald)) : Icon(_checkedInToday ? Icons.check_circle_rounded : Icons.favorite_rounded, size: 18),
-                label: const Text("I'm Alive", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
-                style: OutlinedButton.styleFrom(foregroundColor: _checkedInToday ? kEmerald : (isDark ? const Color(0xFF9FE8D2) : const Color(0xFF087F6C)), side: BorderSide(color: _checkedInToday ? kEmerald : (isDark ? const Color(0xFF2D806E) : const Color(0xFF9DDCCB))), backgroundColor: _checkedInToday ? (isDark ? const Color(0xFF123A31) : const Color(0xFFE8F8F1)) : Colors.transparent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22))),
-              )),
-              const SizedBox(height: 4),
-              Text(_checkedInToday ? 'Checked in today' : 'Tap once each day', style: TextStyle(fontSize: 10, color: mutedColor)),
-            ])),
-            const SizedBox(height: 10),
-            Center(child: SizedBox(width: 143, height: 43, child: ElevatedButton.icon(onPressed: _startSOS, icon: const Icon(Icons.warning_amber_rounded, size: 19), label: const Text('Emergency', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), style: ElevatedButton.styleFrom(backgroundColor: kEmergency, foregroundColor: Colors.white, elevation: 6, shadowColor: kEmergency.withValues(alpha: .45), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)))))),
+            Text('Your Groups', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: titleColor)),
+            if (_groups.isEmpty)
+              SizedBox(height: 285, child: Center(child: _homeActions(isDark, mutedColor)))
+            else ...[
+              const SizedBox(height: 10),
+              // A Wrap is deliberately used here instead of a nested GridView.
+              // This tab lives inside a SingleChildScrollView; a nested viewport
+              // can receive an unbounded height after authentication and crash.
+              LayoutBuilder(builder: (context, constraints) {
+                final cardWidth = (constraints.maxWidth - 10) / 2;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final group in _groups)
+                      SizedBox(
+                        width: cardWidth,
+                        height: cardWidth / 1.25,
+                        child: _groupHomeCard(group, isDark),
+                      ),
+                  ],
+                );
+              }),
+              const SizedBox(height: 13),
+              _homeActions(isDark, mutedColor),
+            ],
           ],
         ),
       ),
     );
   }
 
+  Widget _homeActions(bool isDark, Color mutedColor) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 156,
+            height: 38,
+            child: OutlinedButton.icon(
+              onPressed: _isMarkingAlive ? null : _markAlive,
+              icon: _isMarkingAlive
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: kEmerald))
+                  : Icon(_checkedInToday ? Icons.check_circle_rounded : Icons.favorite_rounded, size: 18),
+              label: const Text("I'm Alive", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _checkedInToday ? kEmerald : (isDark ? const Color(0xFF9FE8D2) : const Color(0xFF087F6C)),
+                side: BorderSide(color: _checkedInToday ? kEmerald : (isDark ? const Color(0xFF2D806E) : const Color(0xFF9DDCCB))),
+                backgroundColor: _checkedInToday ? (isDark ? const Color(0xFF123A31) : const Color(0xFFE8F8F1)) : Colors.transparent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(_checkedInToday ? 'Checked in today' : 'Tap once each day', style: TextStyle(fontSize: 10, color: mutedColor)),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: 143,
+            height: 43,
+            child: ElevatedButton.icon(
+              onPressed: _startSOS,
+              icon: const Icon(Icons.warning_amber_rounded, size: 19),
+              label: const Text('Emergency', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kEmergency,
+                foregroundColor: Colors.white,
+                elevation: 6,
+                shadowColor: kEmergency.withValues(alpha: .45),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _groupHomeCard(FamilyGroup group, bool isDark) => InkWell(onTap: () => _openGroupHome(group), borderRadius: BorderRadius.circular(15), child: Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: isDark ? kDarkCard : Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE9EDF0))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.groups_rounded, color: kEmerald, size: 30), const Spacer(), Text(group.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : kNavy)), const SizedBox(height: 3), Text(group.canManage ? 'Owner/Admin' : 'Member', style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : const Color(0xFF64748B)))])));
+
+  // ignore: unused_element
   Widget _homeMemberCard(FamilyMember member, int index, bool isDark) {
     final name = member.name;
     final titleColor = isDark ? Colors.white : kNavy;

@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function group(groupId) { return get(/databases/$(database)/documents/groups/$(groupId)); }
+    function isMember(groupId) { return signedIn() && request.auth.uid in group(groupId).data.memberIds; }
+    function isAdmin(groupId) { return isMember(groupId) && group(groupId).data.roles[request.auth.uid] in ['owner', 'admin']; }
+
+    match /users/{userId} { allow read, update: if signedIn() && request.auth.uid == userId; allow create: if signedIn() && request.auth.uid == userId; }
+    // Temporary read access for the one-time legacy-member migration.
+    match /users/{userId}/members/{memberId} { allow read: if signedIn() && request.auth.uid == userId; }
+    match /users/{userId}/notifications/{notificationId} { allow read, update: if signedIn() && request.auth.uid == userId; }
+    match /groups/{groupId} { allow read: if isMember(groupId); allow create: if signedIn() && request.auth.uid == request.resource.data.ownerId; allow update: if isAdmin(groupId); }
+    match /groups/{groupId}/members/{memberId} { allow read: if isMember(groupId); allow create, update, delete: if isAdmin(groupId); }
+    match /groups/{groupId}/emergencies/{emergencyId} { allow read: if isMember(groupId); allow create: if isMember(groupId) && request.resource.data.senderId == request.auth.uid; allow update: if isMember(groupId); }
+  }
+}

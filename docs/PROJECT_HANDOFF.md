@@ -60,6 +60,12 @@ cupertino_icons: ^1.0.8
 - Before testing it, enable Firestore and deploy rules that allow an authenticated owner to manage only their own `members` subcollection.
 - Enable Google and Apple in Firebase Authentication. Google needs Android/iOS/web client configuration; Apple needs an Apple Developer Team, Service ID, return URL, and iOS capability configuration. The app code alone cannot enable either provider.
 
+### Multi-group / SOS backend contracts
+
+- `firestore.rules` contains the starting group/member/emergency access controls; review and deploy them with the Firebase CLI before production use.
+- `functions/src/index.ts` contains deployable Firebase Function triggers to create in-app emergency notifications and acknowledgement notifications. FCM token registration and sender delivery must be enabled before it can deliver device push notifications.
+- `GroupMigrationService` moves the original `users/{uid}/members` documents into the owner's first group (creating `My Family` when needed) and records a one-time migration marker.
+
 Do **not** claim any of the above work as complete until it is actually added, configured, and tested.
 
 ### Required Firebase Console action before profile/member persistence can work

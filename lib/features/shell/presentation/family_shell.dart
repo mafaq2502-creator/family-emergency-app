@@ -8,12 +8,21 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_mode_controller.dart';
 import '../../../models/family_member.dart';
 import '../../../models/notification_settings.dart';
+import '../../../models/family_group.dart';
+import '../../../models/app_notification.dart';
 import '../../../services/profile_service.dart';
 import '../../../services/family_member_service.dart';
+import '../../../services/group_service.dart';
+import '../../../services/group_migration_service.dart';
+import '../../../services/emergency_service.dart';
+import '../../../services/app_notification_service.dart';
 import '../../auth/presentation/login_screen.dart';
 import '../../members/presentation/member_profile_screen.dart';
 import '../../members/presentation/member_notification_settings_editor.dart';
+import '../../groups/presentation/group_settings_screen.dart';
+import '../../groups/presentation/group_members_screen.dart';
 import '../../notifications/presentation/notification_settings_screen.dart';
+import '../../notifications/presentation/notification_center_screen.dart';
 import '../../profile/presentation/profile_settings_screen.dart';
 
 part 'tabs/home_tab.dart';
@@ -32,7 +41,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
+  int _currentIndex = 2;
   bool _isCountingDown = false;
   int _countdown = 3;
   bool _alertSent = false;
@@ -54,6 +63,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic> _notificationSettings = {};
   final ProfileService _profileService = ProfileService();
   final FamilyMemberService _memberService = FamilyMemberService();
+  final GroupService _groupService = GroupService();
+  final GroupMigrationService _migrationService = GroupMigrationService();
+  final EmergencyService _emergencyService = EmergencyService();
+  final AppNotificationService _appNotificationService = AppNotificationService();
+  List<FamilyGroup> _groups = const [];
+  FamilyGroup? _selectedGroup;
 
   static const List<String> _roles = [
     'Self', 'Father', 'Mother', 'Son', 'Daughter', 'Husband', 'Wife',
@@ -75,12 +90,43 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadDeviceTimeZone();
     _loadProfile();
     _watchMembers();
+    _prepareGroups();
   }
 
-  void _watchMembers() {
+  Future<void> _prepareGroups() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    _memberService.watchMembers(user).listen((members) {
+    try { await _migrationService.migrateLegacyMembers(user); } catch (_) {}
+    _watchGroups();
+  }
+
+  void _watchGroups() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    _groupService.watchGroups(user).listen((groups) { if (mounted) setState(() { _groups = groups; _selectedGroup ??= groups.isEmpty ? null : groups.first; }); _watchMembers(); }, onError: (_) {});
+  }
+
+  Future<void> _createGroup() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(context: context, builder: (context) => AlertDialog(title: const Text('Create group'), content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(labelText: 'Group name')), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')), ElevatedButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('Create'))]));
+    if (name == null || name.isEmpty) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try { await _groupService.createGroup(user, name); } catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not create group.'), backgroundColor: kEmergency)); }
+  }
+
+  Widget _groupSelector() => Row(children: [Expanded(child: DropdownButtonHideUnderline(child: DropdownButton<FamilyGroup>(value: _selectedGroup, hint: const Text('Select group'), isExpanded: true, items: _groups.map((group) => DropdownMenuItem(value: group, child: Text(group.name))).toList(), onChanged: (group) { setState(() => _selectedGroup = group); _watchMembers(); }))), IconButton(onPressed: _createGroup, icon: const Icon(Icons.add_circle_outline_rounded, color: kEmerald), tooltip: 'Add group')]);
+
+  void _openGroupSettings() { final group = _selectedGroup; if (group == null || !group.canManage) return; Navigator.push(context, MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group, members: familyMembers))); }
+
+  void _openGroupHome(FamilyGroup group) { setState(() => _selectedGroup = group); Navigator.push(context, MaterialPageRoute(builder: (_) => GroupMembersScreen(group: group))); }
+
+  Widget _notificationBell() { final user = FirebaseAuth.instance.currentUser; if (user == null) return const SizedBox(); return StreamBuilder<List<AppNotification>>(stream: _appNotificationService.watch(user), builder: (context, snapshot) { final unread = (snapshot.data ?? []).where((item) => !item.isRead).length; return IconButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationCenterScreen(groups: _groups))), icon: Badge(isLabelVisible: unread > 0, label: Text('$unread'), child: const Icon(Icons.notifications_none_rounded, color: kEmerald))); }); }
+
+  void _watchMembers() {
+    final group = _selectedGroup;
+    if (group == null) return;
+    _memberService.watchGroupMembers(group.id).listen((members) {
       if (mounted) setState(() => familyMembers = members);
     }, onError: (_) {});
   }
@@ -193,6 +239,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _startSOS() {
     if (_isCountingDown || _alertSent) return;
+    final group = _selectedGroup;
+    if (group == null || group.emergencyRecipientIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Configure emergency recipients in Group Settings first.'), backgroundColor: kEmergency));
+      return;
+    }
 
     setState(() {
       _isCountingDown = true;
@@ -207,26 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
         } else {
           timer.cancel();
           _isCountingDown = false;
-          _alertSent = true;
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.white),
-                  SizedBox(width: 12),
-                  Expanded(child: Text('Emergency Alert Sent to Family!')),
-                ],
-              ),
-              backgroundColor: Colors.green.shade700,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              margin: const EdgeInsets.all(16),
-              duration: const Duration(seconds: 4),
-            ),
-          );
+          _sendEmergency(group);
         }
       });
     });
@@ -391,10 +423,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
 
                     final member = FamilyMember(name: nameController.text.trim(), status: 'Pending', email: emailController.text.trim(), relation: selectedRelation, locationAccess: locationAccess, batteryAccess: batteryAccess, notificationSettings: memberNotifications);
-                    final user = FirebaseAuth.instance.currentUser;
-                    if (user == null) return;
+                    final group = _selectedGroup;
+                    if (group == null || !group.canManage) return;
                     try {
-                      await _memberService.create(user, member);
+                      await _memberService.createInGroup(group.id, member);
                     } catch (_) {
                       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not save member. Check your connection and Firestore setup.'), backgroundColor: kEmergency));
                       return;
@@ -461,22 +493,35 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _sendEmergency(FamilyGroup group) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      await _emergencyService.create(groupId: group.id, sender: user, senderName: _profileNameController.text.trim().isEmpty ? 'A group member' : _profileNameController.text.trim(), recipientIds: group.emergencyRecipientIds);
+      if (!mounted) return;
+      setState(() => _alertSent = true);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('SOS sent to ${group.name} emergency recipients.'), backgroundColor: kEmergency));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not send SOS. Please try again.'), backgroundColor: kEmergency));
+    }
+  }
+
   void _removeFamilyMember(int index) {
     final member = familyMembers[index];
-    final user = FirebaseAuth.instance.currentUser;
-    if (member.id == null || user == null) {
+    final group = _selectedGroup;
+    if (member.id == null || group == null || !group.canManage) {
       setState(() => familyMembers.removeAt(index));
       return;
     }
-    _memberService.delete(user, member.id!).catchError((_) {
+    _memberService.deleteInGroup(group.id, member.id!).catchError((_) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not remove member.'), backgroundColor: kEmergency));
     });
   }
 
   Future<void> _updateFamilyMember(FamilyMember member) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || member.id == null) return;
-    await _memberService.update(user, member);
+    final group = _selectedGroup;
+    if (group == null || member.id == null || !group.canManage) return;
+    await _memberService.updateInGroup(group.id, member);
   }
 
   Future<void> _openMemberProfile(FamilyMember member, int index) => Navigator.push(context, MaterialPageRoute(builder: (_) => MemberProfileScreen(member: member, onDelete: () async => _removeFamilyMember(index), onSave: _updateFamilyMember)));
