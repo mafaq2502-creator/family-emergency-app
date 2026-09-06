@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:family_emergency_app/main.dart';
+import 'package:family_emergency_app/app/family_emergency_app.dart';
 
 void main() {
   testWidgets('App starts successfully', (WidgetTester tester) async {

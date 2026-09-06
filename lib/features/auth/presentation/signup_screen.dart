@@ -1,9 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../services/auth_service.dart';
+import '../../shell/presentation/family_shell.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -23,6 +24,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _hideConfirmation = true;
   bool _acceptedTerms = false;
   bool _loading = false;
+  final _authService = AuthService();
   Country _selectedCountry = CountryService().findByCode('PK')!;
 
   @override
@@ -53,30 +55,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
     setState(() => _loading = true);
     try {
-      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: _email.text.trim(), password: _password.text);
-      await credential.user!.updateDisplayName(_name.text.trim());
       final normalizedNumber = _phone.text.replaceAll(RegExp(r'[^0-9]'), '');
       final phoneE164 = normalizedNumber.isEmpty ? '' : '+${_selectedCountry.phoneCode}$normalizedNumber';
-      await FirebaseFirestore.instance.collection('users').doc(credential.user!.uid).set({
-        'uid': credential.user!.uid,
-        'name': _name.text.trim(),
-        'email': _email.text.trim(),
-        'phone': phoneE164,
-        'phoneCountryIso': _selectedCountry.countryCode,
-        'phoneCountryCode': '+${_selectedCountry.phoneCode}',
-        'isFamilyOwner': true,
-        'notificationSettings': {
-          'missedCheckInAlerts': true,
-          'emergencyAlerts': true,
-          'batteryAlerts': false,
-          'offlineAlerts': false,
-          'locationSharing': false,
-          'ownerMissedCheckInAlerts': true,
-        },
-        // The supplied sign-up design has no relationship input; Profile can change it later.
-        'role': 'Self',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      await _authService.signUp(name: _name.text.trim(), email: _email.text.trim(), password: _password.text, phone: phoneE164, countryIso: _selectedCountry.countryCode, countryCode: '+${_selectedCountry.phoneCode}');
       if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
     } on FirebaseAuthException catch (error) {
       if (mounted) {
@@ -85,6 +66,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
           backgroundColor: kEmergency,
         ));
       }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _socialSignUp({required bool apple}) async {
+    setState(() => _loading = true);
+    try {
+      await (apple ? _authService.signInWithApple() : _authService.signInWithGoogle());
+      if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${apple ? 'Apple' : 'Google'} sign-up could not be completed.'), backgroundColor: kEmergency));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -141,6 +134,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             child: _loading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Sign Up', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                           ),
                         ),
+                        const SizedBox(height: 12),
+                        const Row(
+                          children: [
+                            Expanded(child: Divider()),
+                            Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('OR', style: TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+                            Expanded(child: Divider()),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(width: double.infinity, height: 45, child: OutlinedButton.icon(onPressed: _loading ? null : () => _socialSignUp(apple: false), icon: const Text('G', style: TextStyle(color: Colors.red, fontSize: 21, fontWeight: FontWeight.bold)), label: const Text('Sign up with Google'), style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
+                        const SizedBox(height: 8),
+                        SizedBox(width: double.infinity, height: 45, child: OutlinedButton.icon(onPressed: _loading ? null : () => _socialSignUp(apple: true), icon: const Icon(Icons.apple_rounded), label: const Text('Sign up with Apple'), style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
                         const SizedBox(height: 16),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,

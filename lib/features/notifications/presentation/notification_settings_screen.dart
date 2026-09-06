@@ -1,12 +1,15 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-const _emerald = Color(0xFF10B981);
-const _navy = Color(0xFF112A55);
-const _darkBackground = Color(0xFF07131D);
-const _darkCard = Color(0xFF132431);
-const _darkMuted = Color(0xFFAFC0CF);
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_surface_card.dart';
+import '../../../models/notification_settings.dart';
+import '../../../services/notification_settings_service.dart';
+
+const _emerald = kEmerald;
+const _navy = kNavy;
+const _darkBackground = kDarkBackground;
+const _darkMuted = kDarkMuted;
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key, required this.initialSettings, required this.isFamilyOwner});
@@ -26,6 +29,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   late bool _locationSharing;
   late bool _ownerMissedCheckInAlerts;
   bool _saving = false;
+  final _settingsService = NotificationSettingsService();
 
   @override
   void initState() {
@@ -44,17 +48,14 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     if (user == null) return;
     setState(() => _saving = true);
     try {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'notificationSettings': {
-          'missedCheckInAlerts': _missedCheckInAlerts,
-          'emergencyAlerts': _emergencyAlerts,
-          'batteryAlerts': _batteryAlerts,
-          'offlineAlerts': _offlineAlerts,
-          'locationSharing': _locationSharing,
-          // Server scheduling must respect this owner-only family-wide preference.
-          'ownerMissedCheckInAlerts': widget.isFamilyOwner ? _ownerMissedCheckInAlerts : false,
-        },
-      }, SetOptions(merge: true));
+      await _settingsService.save(user, NotificationSettings(
+        missedCheckInAlerts: _missedCheckInAlerts,
+        emergencyAlerts: _emergencyAlerts,
+        batteryAlerts: _batteryAlerts,
+        offlineAlerts: _offlineAlerts,
+        locationSharing: _locationSharing,
+        ownerMissedCheckInAlerts: widget.isFamilyOwner ? _ownerMissedCheckInAlerts : false,
+      ));
       if (!mounted) return;
       Navigator.pop(context, true);
     } catch (_) {
@@ -111,10 +112,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     );
   }
 
-  Widget _settingsCard(bool isDark, List<Widget> children) => Container(
-        decoration: BoxDecoration(color: isDark ? _darkCard : Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: isDark ? const Color(0xFF233846) : const Color(0xFFE7EDF0))),
-        child: Column(children: children),
-      );
+  Widget _settingsCard(bool isDark, List<Widget> children) => AppSurfaceCard(child: Column(children: children));
 
   Widget _settingTile(String title, String detail, IconData icon, bool value, ValueChanged<bool>? onChanged) => SwitchListTile.adaptive(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),

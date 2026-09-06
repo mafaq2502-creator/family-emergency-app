@@ -1,7 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../services/auth_service.dart';
+import '../../shell/presentation/family_shell.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -16,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _password = TextEditingController();
   bool _hidePassword = true;
   bool _loading = false;
+  final _authService = AuthService();
 
   @override
   void dispose() { _email.dispose(); _password.dispose(); super.dispose(); }
@@ -24,11 +27,37 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(email: _email.text.trim(), password: _password.text.trim());
+      await _authService.signIn(email: _email.text.trim(), password: _password.text.trim());
       if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
-    } on FirebaseAuthException {
+    } catch (_) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid email or password'), backgroundColor: kEmergency));
     } finally { if (mounted) setState(() => _loading = false); }
+  }
+
+  Future<void> _socialLogin({required bool apple}) async {
+    setState(() => _loading = true);
+    try {
+      await (apple ? _authService.signInWithApple() : _authService.signInWithGoogle());
+      if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${apple ? 'Apple' : 'Google'} sign-in could not be completed.'), backgroundColor: kEmergency));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _email.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter your email first to reset your password.'), backgroundColor: kEmergency));
+      return;
+    }
+    try {
+      await _authService.sendPasswordResetEmail(email);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password reset email sent. Check your inbox.'), backgroundColor: kEmerald));
+    } on FirebaseAuthException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message ?? 'Could not send reset email.'), backgroundColor: kEmergency));
+    }
   }
 
   @override
@@ -64,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Text('Remember me', style: TextStyle(fontSize: 12, color: mutedColor)),
               const Spacer(),
               TextButton(
-                onPressed: () {},
+                onPressed: _forgotPassword,
                 child: const Text('Forgot Password?', style: TextStyle(fontSize: 12, color: Color(0xFF087F6C))),
               ),
             ],
@@ -74,7 +103,9 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 18),
           Row(children: [Expanded(child: Divider(color: isDark ? const Color(0xFF233846) : const Color(0xFFE2E8F0))), Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('OR', style: TextStyle(color: mutedColor, fontSize: 12))), Expanded(child: Divider(color: isDark ? const Color(0xFF233846) : const Color(0xFFE2E8F0)))]),
           const SizedBox(height: 17),
-          SizedBox(width: double.infinity, height: 48, child: OutlinedButton.icon(onPressed: () {}, icon: const Text('G', style: TextStyle(color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold)), label: Text('Continue with Google', style: TextStyle(color: titleColor, fontWeight: FontWeight.w600)), style: OutlinedButton.styleFrom(side: BorderSide(color: isDark ? const Color(0xFF233846) : const Color(0xFFE2E8F0)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))))),
+          SizedBox(width: double.infinity, height: 48, child: OutlinedButton.icon(onPressed: _loading ? null : () => _socialLogin(apple: false), icon: const Text('G', style: TextStyle(color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold)), label: Text('Continue with Google', style: TextStyle(color: titleColor, fontWeight: FontWeight.w600)), style: OutlinedButton.styleFrom(side: BorderSide(color: isDark ? const Color(0xFF233846) : const Color(0xFFE2E8F0)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))))),
+          const SizedBox(height: 10),
+          SizedBox(width: double.infinity, height: 48, child: OutlinedButton.icon(onPressed: _loading ? null : () => _socialLogin(apple: true), icon: Icon(Icons.apple_rounded, color: titleColor), label: Text('Continue with Apple', style: TextStyle(color: titleColor, fontWeight: FontWeight.w600)), style: OutlinedButton.styleFrom(side: BorderSide(color: isDark ? const Color(0xFF233846) : const Color(0xFFE2E8F0)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))))),
           const SizedBox(height: 16),
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text("Don't have an account? ", style: TextStyle(fontSize: 12, color: mutedColor)), TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SignUpScreen())), style: TextButton.styleFrom(foregroundColor: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB), backgroundColor: isDark ? const Color(0x1A60A5FA) : const Color(0x142563EB), padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7))), child: const Text('Sign Up', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: .15, decoration: TextDecoration.underline, decorationThickness: 1.5)))])
         ]))))

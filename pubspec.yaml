@@ -40,6 +40,8 @@ dependencies:
   google_fonts: ^6.3.3
   country_picker: ^2.0.28
   flutter_timezone: ^5.1.0
+  google_sign_in: ^7.2.0
+  sign_in_with_apple: ^8.2.0
 
 dev_dependencies:
   flutter_test:

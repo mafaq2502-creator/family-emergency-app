@@ -20,7 +20,7 @@ The visual direction is a calm **Emerald & Neutral** design:
 | App framework | Flutter / Dart | SDK constraint: `^3.13.2` |
 | UI | Material widgets + Material icons | No custom avatar/image assets have been added yet. |
 | Typography | Manrope via `google_fonts` | Applied globally through the light and dark `ThemeData` text themes. |
-| Authentication | Firebase Authentication | Email/password sign-up and sign-in are implemented. Google button is visual only. |
+| Authentication | Firebase Authentication | Email/password, password-reset email, Google, and Apple client flows are coded. Firebase providers/platform configuration is still required. |
 | Data | Cloud Firestore | User profile document is read and saved at `users/{uid}`. |
 | Firebase bootstrap | `firebase_core` | `Firebase.initializeApp()` runs before `runApp()`. |
 | Country phone selector | `country_picker` | Searchable country list, device-locale suggestion, manual override. |
@@ -43,12 +43,22 @@ cupertino_icons: ^1.0.8
 ### Not connected yet
 
 - Firebase Storage / profile photo upload
-- Google Sign-In provider and package
+- Firebase Console enablement and platform configuration for Google/Apple providers
+- Firebase Auth password update + re-authentication connection
+- Secure server-side password history enforcement
+- Email OTP delivery and verification for account deletion
+- Actual Firebase Auth/Firestore account deletion
 - Device location services or map provider
 - Push notifications, local notifications, SMS, phone calling, or background jobs
 - Battery/offline tracking
 - Payments/subscriptions
 - A server/backend for scheduled daily check-ins
+
+### Member CRUD and social sign-in setup
+
+- Member CRUD code uses `users/{ownerUid}/members/{memberId}` in Cloud Firestore through `FamilyMemberService`.
+- Before testing it, enable Firestore and deploy rules that allow an authenticated owner to manage only their own `members` subcollection.
+- Enable Google and Apple in Firebase Authentication. Google needs Android/iOS/web client configuration; Apple needs an Apple Developer Team, Service ID, return URL, and iOS capability configuration. The app code alone cannot enable either provider.
 
 Do **not** claim any of the above work as complete until it is actually added, configured, and tested.
 
@@ -62,12 +72,36 @@ An authorized project owner must enable the Cloud Firestore API / create the Fir
 
 | File | Responsibility |
 | --- | --- |
-| [`lib/main.dart`](../lib/main.dart) | App themes, `HomeScreen`, bottom navigation, tabs, profile persistence, SOS countdown, add-member dialog. |
-| [`lib/screens/login_screen.dart`](../lib/screens/login_screen.dart) | Email/password Login UI and Firebase sign-in. |
-| [`lib/screens/signup_screen.dart`](../lib/screens/signup_screen.dart) | Sign-up UI, validation, Firebase account creation, initial Firestore user document. |
+| [`lib/main.dart`](../lib/main.dart) | Firebase bootstrap only. |
+| [`lib/app/family_emergency_app.dart`](../lib/app/family_emergency_app.dart) | App root, themes, and initial route. |
+| [`lib/features/auth/presentation/login_screen.dart`](../lib/features/auth/presentation/login_screen.dart) | Email/password Login UI and Firebase sign-in. |
+| [`lib/features/auth/presentation/signup_screen.dart`](../lib/features/auth/presentation/signup_screen.dart) | Sign-up UI, validation, Firebase account creation, initial Firestore user document. |
+| [`lib/features/profile/presentation/profile_settings_screen.dart`](../lib/features/profile/presentation/profile_settings_screen.dart) | In-app Profile Settings, Update Password UI, and multi-step Delete Account demo flow. |
+| [`lib/features/shell/presentation/family_shell.dart`](../lib/features/shell/presentation/family_shell.dart) | Shared family-shell state, navigation, profile persistence, check-in and SOS actions. |
 | [`docs/UI_COLOR_PALETTE.md`](UI_COLOR_PALETTE.md) | Reusable light/dark color tokens and combinations. |
 | [`Family_Emergency_App_Product_Plan.docx`](../Family_Emergency_App_Product_Plan.docx) | Earlier product-planning document; preserve it. |
 | [`create_product_document.py`](../create_product_document.py) | Script previously used to create the DOCX; preserve it. |
+
+## 3.1 Current code structure
+
+```text
+lib/
+  main.dart                                # Firebase bootstrap only
+  app/family_emergency_app.dart            # MaterialApp, global theme, initial route
+  core/theme/                              # App colors and theme-mode controller
+  core/widgets/                            # Shared card and primary-button UI components
+  models/                                  # UserProfile, FamilyMember, NotificationSettings
+  services/                                # Auth, profile/check-in, notification persistence boundaries
+  features/
+    auth/presentation/                     # Login and Sign Up
+    notifications/presentation/            # Notification Settings
+    profile/presentation/                  # Profile Settings / account-security demo
+    shell/presentation/
+      family_shell.dart                    # Authenticated shell, shared state and navigation
+      tabs/                                # Home, Members, Location, Plan and Profile widgets
+```
+
+`main.dart` is intentionally minimal. Each tab now lives in its own presentation file, while `FamilyShell` owns the temporary shared in-memory state and callbacks. Members use the `FamilyMember` model, and shared core widgets avoid repeated card/button styling. The next data-layer refactor should add a dedicated family-member repository backed by Firestore.
 
 ## 4. Current navigation and screens
 
@@ -185,11 +219,14 @@ Implemented:
 - **Relationship** is editable with a dropdown, including `Self`.
 - **Email** and **phone** are displayed locked/read-only.
 - Save button appears in the Profile header and is enabled only when name or relationship changed.
-- Saving updates Firestore `users/{uid}` and Firebase Auth display name.
+- Saving updates Firestore `users/{uid}`. Firebase Auth display-name synchronization remains pending.
 - Navigating back with unsaved profile edits prompts the user to Save, Discard, or Keep Editing.
 - Theme selector supports System, Light, and Dark; system is the initial default.
 - **Notification Settings** opens a dedicated settings screen. The user can control missed check-in, emergency, battery, device-offline, and location-sharing preferences.
 - The family-wide missed-check-in notification toggle is enabled only for `isFamilyOwner: true` accounts; invited members should be stored with `isFamilyOwner: false`.
+- **Profile Settings** opens an Account Security page with Update Password and Delete Account flows.
+- Update Password currently validates current/new/confirm inputs, requires a new password different from the entered current password, and shows a demo success result. It does **not** yet call Firebase Auth.
+- Delete Account currently provides the requested UI flow: registered email confirmation → code entry → final destructive confirmation. The local demo code is `123456`; it does **not** send email or delete the account.
 - Logout works through Firebase Auth sign-out.
 
 Current limitation:
