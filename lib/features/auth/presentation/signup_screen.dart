@@ -66,6 +66,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
           backgroundColor: kEmergency,
         ));
       }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account was created, but your family group could not be prepared. Please sign in again.'), backgroundColor: kEmergency));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }

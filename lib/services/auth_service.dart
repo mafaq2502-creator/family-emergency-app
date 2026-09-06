@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
+import 'group_service.dart';
+
 class AuthService {
   static Future<void>? _googleInitialization;
   AuthService({FirebaseAuth? auth, FirebaseFirestore? firestore})
@@ -50,6 +52,9 @@ class AuthService {
       'role': 'Self',
       'createdAt': FieldValue.serverTimestamp(),
     });
+    // A new owner gets a real group immediately, so Home never depends on
+    // legacy-member migration before it can render.
+    await GroupService(firestore: _firestoreClient).ensureDefaultGroup(user);
     return user;
   }
 }

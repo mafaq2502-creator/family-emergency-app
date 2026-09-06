@@ -1,5 +1,16 @@
 # Family Emergency — Project Handoff Reference
 
+## Latest implementation update (September 2026)
+
+- The notification bell opens an in-place top notification banner; it does not open a separate screen.
+- Automated widget tests cover invalid sign-in and mismatched-password sign-up validation.
+- Group CRUD includes create, live read, rename, and owner deletion. Member CRUD includes add, live read, edit details, edit member alerts, and delete.
+- SOS events can be read from a group's SOS activity screen and acknowledged or resolved by eligible members.
+- **Manual Firebase step:** publish the current `firestore.rules` in Firebase Console. Group deletion will be denied until the new owner-only delete rule is deployed.
+- New email/password accounts create a real default **My Family** group after the profile document is saved, avoiding the previous new-user Home crash.
+- Group rules use `getAfter()` for migration-safe member creation and restrict ordinary group updates to approved fields.
+- Registered-user invitation acceptance, FCM delivery, and scheduled missed-check-in processing remain server-side work.
+
 > Read this file first in any new chat. It records the app purpose, current code state, decisions made with the product owner, technical setup, and the next safe work items.
 
 ## 1. Product purpose

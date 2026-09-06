@@ -22,7 +22,7 @@ import '../../members/presentation/member_notification_settings_editor.dart';
 import '../../groups/presentation/group_settings_screen.dart';
 import '../../groups/presentation/group_members_screen.dart';
 import '../../notifications/presentation/notification_settings_screen.dart';
-import '../../notifications/presentation/notification_center_screen.dart';
+import '../../notifications/presentation/notification_banner.dart';
 import '../../profile/presentation/profile_settings_screen.dart';
 
 part 'tabs/home_tab.dart';
@@ -69,6 +69,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final AppNotificationService _appNotificationService = AppNotificationService();
   List<FamilyGroup> _groups = const [];
   FamilyGroup? _selectedGroup;
+  StreamSubscription<List<FamilyGroup>>? _groupsSubscription;
+  StreamSubscription<List<FamilyMember>>? _membersSubscription;
 
   static const List<String> _roles = [
     'Self', 'Father', 'Mother', 'Son', 'Daughter', 'Husband', 'Wife',
@@ -76,12 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
     'Brother', 'Sister',
   ];
 
-  List<FamilyMember> familyMembers = [
-    FamilyMember(name: 'Father', status: 'Online'),
-    FamilyMember(name: 'Mother', status: 'Online'),
-    FamilyMember(name: 'Brother', status: 'Online'),
-    FamilyMember(name: 'Sister', status: 'Online'),
-  ];
+  List<FamilyMember> familyMembers = const [];
 
   @override
   void initState() {
@@ -103,7 +100,16 @@ class _HomeScreenState extends State<HomeScreen> {
   void _watchGroups() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    _groupService.watchGroups(user).listen((groups) { if (mounted) setState(() { _groups = groups; _selectedGroup ??= groups.isEmpty ? null : groups.first; }); _watchMembers(); }, onError: (_) {});
+    _groupsSubscription?.cancel();
+    _groupsSubscription = _groupService.watchGroups(user).listen((groups) {
+      if (!mounted) return;
+      setState(() {
+        _groups = groups;
+        final currentId = _selectedGroup?.id;
+        _selectedGroup = groups.where((group) => group.id == currentId).cast<FamilyGroup?>().firstOrNull ?? (groups.isEmpty ? null : groups.first);
+      });
+      _watchMembers();
+    }, onError: (_) {});
   }
 
   Future<void> _createGroup() async {
@@ -121,12 +127,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _openGroupHome(FamilyGroup group) { setState(() => _selectedGroup = group); Navigator.push(context, MaterialPageRoute(builder: (_) => GroupMembersScreen(group: group))); }
 
-  Widget _notificationBell() { final user = FirebaseAuth.instance.currentUser; if (user == null) return const SizedBox(); return StreamBuilder<List<AppNotification>>(stream: _appNotificationService.watch(user), builder: (context, snapshot) { final unread = (snapshot.data ?? []).where((item) => !item.isRead).length; return IconButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationCenterScreen(groups: _groups))), icon: Badge(isLabelVisible: unread > 0, label: Text('$unread'), child: const Icon(Icons.notifications_none_rounded, color: kEmerald))); }); }
+  Widget _notificationBell() { final user = FirebaseAuth.instance.currentUser; if (user == null) return const SizedBox(); return StreamBuilder<List<AppNotification>>(stream: _appNotificationService.watch(user), builder: (context, snapshot) { final unread = (snapshot.data ?? []).where((item) => !item.isRead).length; return IconButton(onPressed: () => showNotificationBanner(context, user), icon: Badge(isLabelVisible: unread > 0, label: Text('$unread'), child: const Icon(Icons.notifications_none_rounded, color: kEmerald))); }); }
 
   void _watchMembers() {
     final group = _selectedGroup;
-    if (group == null) return;
-    _memberService.watchGroupMembers(group.id).listen((members) {
+    _membersSubscription?.cancel();
+    if (group == null) {
+      if (mounted) setState(() => familyMembers = const []);
+      return;
+    }
+    _membersSubscription = _memberService.watchGroupMembers(group.id).listen((members) {
       if (mounted) setState(() => familyMembers = members);
     }, onError: (_) {});
   }
@@ -462,6 +472,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _groupsSubscription?.cancel();
+    _membersSubscription?.cancel();
     _timer?.cancel();
     _profileNameController.dispose();
     super.dispose();
@@ -804,7 +816,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     value: _profileRole,
                     isExpanded: true,
                     isDense: true,
-                    itemHeight: 42,
+                    itemHeight: kMinInteractiveDimension,
                     icon: Icon(Icons.keyboard_arrow_down_rounded, color: mutedColor, size: 18),
                     dropdownColor: isDark ? kDarkCard : Colors.white,
                     style: TextStyle(fontSize: 11, color: mutedColor),

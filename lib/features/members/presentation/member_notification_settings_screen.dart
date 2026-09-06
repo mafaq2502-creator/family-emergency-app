@@ -25,7 +25,7 @@ class _MemberNotificationSettingsScreenState extends State<MemberNotificationSet
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      await widget.onSave(FamilyMember(id: widget.member.id, name: widget.member.name, status: widget.member.status, phone: widget.member.phone, email: widget.member.email, relation: widget.member.relation, locationAccess: widget.member.locationAccess, batteryAccess: widget.member.batteryAccess, notificationSettings: _settings));
+      await widget.onSave(FamilyMember(id: widget.member.id, userId: widget.member.userId, name: widget.member.name, status: widget.member.status, phone: widget.member.phone, email: widget.member.email, relation: widget.member.relation, locationAccess: widget.member.locationAccess, batteryAccess: widget.member.batteryAccess, notificationSettings: _settings));
       if (mounted) Navigator.pop(context);
     } finally { if (mounted) setState(() => _saving = false); }
   }
