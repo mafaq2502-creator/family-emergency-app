@@ -1,17 +1,22 @@
-# Apps
+# Family Emergency
 
-Family emergency Flutter app.
+Flutter family-safety app using Firebase Authentication and Cloud Firestore.
 
-## Getting Started
+## Start here
 
-This project is a starting point for a Flutter application.
+Before changing code, read [the project handoff reference](docs/PROJECT_HANDOFF.md). It records:
 
-A few resources to get you started if this is your first Flutter project:
+- implemented, partial, and pending features;
+- Firebase/data-model status and attached technologies;
+- the approved UI and dark-mode direction;
+- reusable colors and local run commands.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+For screen colors, use [the UI color palette](docs/UI_COLOR_PALETTE.md).
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Local commands
+
+```powershell
+C:\Users\Farhan\develop\flutter\bin\flutter.bat pub get
+C:\Users\Farhan\develop\flutter\bin\flutter.bat analyze
+C:\Users\Farhan\develop\flutter\bin\flutter.bat run
+```

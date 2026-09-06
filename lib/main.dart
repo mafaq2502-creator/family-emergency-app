@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'dart:async';
 
 import 'screens/login_screen.dart';
+import 'screens/notification_settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,7 +16,16 @@ void main() async {
   runApp(const FamilyEmergencyApp());
 }
 
-final ValueNotifier<ThemeMode> appThemeMode = ValueNotifier(ThemeMode.dark);
+const kEmerald = Color(0xFF10B981);
+const kNavy = Color(0xFF112A55);
+const kEmergency = Color(0xFFEF4444);
+const kDarkBackground = Color(0xFF07131D);
+const kDarkSurface = Color(0xFF10212D);
+const kDarkCard = Color(0xFF132431);
+const kDarkCardElevated = Color(0xFF182C3A);
+const kDarkMuted = Color(0xFFAFC0CF);
+
+final ValueNotifier<ThemeMode> appThemeMode = ValueNotifier(ThemeMode.system);
 
 class FamilyEmergencyApp extends StatelessWidget {
   const FamilyEmergencyApp({super.key});
@@ -29,25 +41,41 @@ class FamilyEmergencyApp extends StatelessWidget {
           themeMode: themeMode,
           theme: ThemeData(
             brightness: Brightness.light,
-            primaryColor: Colors.redAccent,
+            primaryColor: kEmerald,
+            textTheme: GoogleFonts.manropeTextTheme(ThemeData.light().textTheme),
+            primaryTextTheme: GoogleFonts.manropeTextTheme(ThemeData.light().primaryTextTheme),
             colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.redAccent,
+              seedColor: kEmerald,
               brightness: Brightness.light,
             ),
-            scaffoldBackgroundColor: const Color(0xFFF7F7F9),
+            scaffoldBackgroundColor: const Color(0xFFF8FBFA),
             appBarTheme: const AppBarTheme(
               backgroundColor: Colors.white,
-              foregroundColor: Color(0xFF202124),
+              foregroundColor: kNavy,
               elevation: 0,
             ),
           ),
           darkTheme: ThemeData(
             brightness: Brightness.dark,
-            primaryColor: Colors.redAccent,
-            scaffoldBackgroundColor: const Color(0xFF0F0F0F),
+            primaryColor: kEmerald,
+            textTheme: GoogleFonts.manropeTextTheme(ThemeData.dark().textTheme),
+            primaryTextTheme: GoogleFonts.manropeTextTheme(ThemeData.dark().primaryTextTheme),
+            colorScheme: ColorScheme.fromSeed(seedColor: kEmerald, brightness: Brightness.dark, surface: kDarkCard),
+            scaffoldBackgroundColor: kDarkBackground,
             appBarTheme: const AppBarTheme(
-              backgroundColor: Color(0xFF1A1A1A),
+              backgroundColor: kDarkSurface,
+              foregroundColor: Colors.white,
               elevation: 0,
+            ),
+            cardColor: kDarkCard,
+            dividerColor: const Color(0xFF233846),
+            inputDecorationTheme: InputDecorationTheme(
+              filled: true,
+              fillColor: kDarkCard,
+              hintStyle: const TextStyle(color: kDarkMuted),
+              labelStyle: const TextStyle(color: kDarkMuted),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF233846))),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kEmerald)),
             ),
           ),
           home: const LoginScreen(),
@@ -82,17 +110,17 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isProfileLoading = true;
   bool _isSavingProfile = false;
   bool _isProfileDirty = false;
+  DateTime? _lastDailyCheckIn;
+  bool _isMarkingAlive = false;
+  String _deviceTimeZone = 'UTC';
+  bool _isFamilyOwner = true;
+  Map<String, dynamic> _notificationSettings = {};
 
   static const List<String> _roles = [
-    'Father', 'Mother', 'Son', 'Daughter', 'Husband', 'Wife',
+    'Self', 'Father', 'Mother', 'Son', 'Daughter', 'Husband', 'Wife',
     'Grandfather', 'Grandmother', 'Grandson', 'Granddaughter',
     'Brother', 'Sister',
   ];
-
-  final String _appOpenTime = DateTime.now().toString().substring(
-    11,
-    16,
-  ); // HH:MM
 
   final List<Map<String, dynamic>> familyMembers = [
     {'name': 'Father', 'status': 'Online'},
@@ -105,7 +133,17 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _profileNameController.addListener(_updateProfileDirtyState);
+    _loadDeviceTimeZone();
     _loadProfile();
+  }
+
+  Future<void> _loadDeviceTimeZone() async {
+    try {
+      final timezone = await FlutterTimezone.getLocalTimezone();
+      if (mounted) setState(() => _deviceTimeZone = timezone.identifier);
+    } catch (_) {
+      if (mounted) setState(() => _deviceTimeZone = DateTime.now().timeZoneName);
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -118,14 +156,21 @@ class _HomeScreenState extends State<HomeScreen> {
       final snapshot = await FirebaseFirestore.instance
           .collection('users').doc(user.uid).get();
       final data = snapshot.data();
+      final savedCheckIn = data?['lastDailyCheckInAt'];
       if (!mounted) return;
       setState(() {
-        _initialProfileName = data?['name'] as String? ?? '';
+        _initialProfileName = data?['name'] as String? ??
+            user.displayName ??
+            user.email?.split('@').first ??
+            '';
         _profileRole = data?['role'] as String?;
         _initialProfileRole = _profileRole;
         _profileNameController.text = _initialProfileName;
         _profileEmail = data?['email'] as String? ?? user.email ?? '';
         _profilePhone = data?['phone'] as String? ?? '';
+        _lastDailyCheckIn = savedCheckIn is Timestamp ? savedCheckIn.toDate() : null;
+        _isFamilyOwner = data?['isFamilyOwner'] as bool? ?? true;
+        _notificationSettings = Map<String, dynamic>.from(data?['notificationSettings'] as Map? ?? const {});
         _isProfileLoading = false;
         _isProfileDirty = false;
       });
@@ -248,15 +293,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _cancelSOS() {
-    _timer?.cancel();
-    setState(() {
-      _isCountingDown = false;
-      _countdown = 3;
-      _alertSent = false;
-    });
-  }
-
   Future<void> _logout() async {
     await FirebaseAuth.instance.signOut();
     if (!mounted) return;
@@ -337,7 +373,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: selectedRelation,
+                      initialValue: selectedRelation,
                       dropdownColor: const Color(0xFF1A1A1A),
                       decoration: InputDecoration(
                         labelText: 'Relationship',
@@ -372,7 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(color: Colors.white),
                       ),
                       value: locationAccess,
-                      activeColor: Colors.redAccent,
+                      activeThumbColor: kEmerald,
                       onChanged: (value) {
                         setDialogState(() => locationAccess = value);
                       },
@@ -383,7 +419,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(color: Colors.white),
                       ),
                       value: batteryAccess,
-                      activeColor: Colors.redAccent,
+                      activeThumbColor: kEmerald,
                       onChanged: (value) {
                         setDialogState(() => batteryAccess = value);
                       },
@@ -461,70 +497,139 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _currentIndex == 3 ? _confirmProfileExit : () async => true,
+    return PopScope<Object?>(
+      canPop: _currentIndex != 4 || !_isProfileDirty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop || _currentIndex != 4 || !_isProfileDirty) return;
+        final canLeave = await _confirmProfileExit();
+        if (!mounted || !canLeave) return;
+        Navigator.of(this.context).pop();
+      },
       child: Scaffold(
-        appBar: AppBar(
-        title: const Text(
-          'Family Emergency',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        actions: _currentIndex == 3
-            ? [
-                TextButton(
-                  onPressed: _isProfileDirty && !_isSavingProfile ? _saveProfile : null,
-                  child: _isSavingProfile
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          'Save',
-                          style: TextStyle(
-                            color: _isProfileDirty ? Colors.redAccent : Colors.grey,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                ),
-              ]
-            : null,
-        ),
         body: IndexedStack(
         index: _currentIndex,
         children: [
-          _buildHomeTab(),
           _buildFamilyTab(),
           _buildLocationTab(),
+          _buildHomeTab(),
+          _buildPlanTab(),
           _buildProfileTab(),
         ],
       ),
-        bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: const Color(0xFF1A1A1A),
-        selectedItemColor: Colors.redAccent,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_rounded),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people_rounded),
-            label: 'Family',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.location_on_rounded),
-            label: 'Location',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_rounded),
-            label: 'Profile',
-          ),
-        ],
+        bottomNavigationBar: _buildNavigationBar(),
+      ),
+    );
+  }
+
+  bool get _checkedInToday {
+    final checkIn = _lastDailyCheckIn;
+    if (checkIn == null) return false;
+    final now = DateTime.now();
+    return checkIn.year == now.year && checkIn.month == now.month && checkIn.day == now.day;
+  }
+
+  Future<void> _markAlive() async {
+    if (_checkedInToday) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("You're already checked in for today."), backgroundColor: kEmerald));
+      return;
+    }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please sign in to check in.'), backgroundColor: kEmergency));
+      return;
+    }
+
+    setState(() => _isMarkingAlive = true);
+    final now = DateTime.now();
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'lastDailyCheckInAt': FieldValue.serverTimestamp(),
+        'lastDailyCheckInTimeZone': _deviceTimeZone,
+        'lastDailyCheckInLocalDate': '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
+      }, SetOptions(merge: true));
+      if (!mounted) return;
+      setState(() => _lastDailyCheckIn = now);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Today's check-in is confirmed. Stay safe!"), backgroundColor: kEmerald));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not save today\'s check-in. Please try again.'), backgroundColor: kEmergency));
+      }
+    } finally {
+      if (mounted) setState(() => _isMarkingAlive = false);
+    }
+  }
+
+  Widget _buildNavigationBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const items = [
+      (Icons.location_on_rounded, 'Location', 1),
+      (Icons.groups_rounded, 'Members', 0),
+      (Icons.workspace_premium_rounded, 'Plan', 3),
+      (Icons.person_rounded, 'Profile', 4),
+    ];
+    return SafeArea(
+      child: SizedBox(
+        height: 78,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.topCenter,
+          children: [
+            Positioned.fill(
+              top: 14,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark ? kDarkSurface : Colors.white,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                ),
+                child: Row(
+                  children: [
+                    for (final item in items.take(2)) _navItem(item.$1, item.$2, item.$3),
+                    const Spacer(flex: 2),
+                    for (final item in items.skip(2)) _navItem(item.$1, item.$2, item.$3),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: -14,
+              child: GestureDetector(
+                onTap: () => setState(() => _currentIndex = 2),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 62,
+                      height: 62,
+                      decoration: BoxDecoration(
+                        color: kEmerald,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: isDark ? kDarkBackground : const Color(0xFFF8FBFA), width: 4),
+                      ),
+                      child: const Icon(Icons.home_rounded, color: Colors.white, size: 30),
+                    ),
+                    const SizedBox(height: 0),
+                    Text('Home', style: TextStyle(color: _currentIndex == 2 ? kEmerald : Colors.grey, fontSize: 11)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _navItem(IconData icon, String label, int index) {
+    final selected = _currentIndex == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _currentIndex = index),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: selected ? kEmerald : Colors.grey),
+            const SizedBox(height: 3),
+            Text(label, style: TextStyle(color: selected ? kEmerald : Colors.grey, fontSize: 11)),
+          ],
         ),
       ),
     );
@@ -532,226 +637,123 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ================= HOME TAB =================
   Widget _buildHomeTab() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark ? Colors.white : kNavy;
+    final mutedColor = isDark ? Colors.white70 : const Color(0xFF64748B);
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 10),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Status Cards
             Row(
               children: [
                 Expanded(
-                  child: _infoCard(
-                    Icons.access_time,
-                    'App Opened',
-                    _appOpenTime,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Hello, ${_profileNameController.text.isEmpty ? 'Afaq' : _profileNameController.text}', style: TextStyle(fontSize: 21, height: 1, fontWeight: FontWeight.bold, color: titleColor)),
+                      const SizedBox(height: 6),
+                      Row(children: [Text('Your family is safe', style: TextStyle(fontSize: 12, color: mutedColor)), const SizedBox(width: 5), const Icon(Icons.favorite, size: 15, color: kEmergency)]),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _infoCard(Icons.battery_full, 'Battery', '84%'),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.groups_rounded, color: kEmerald, size: 37),
+                    Positioned(right: -2, top: -2, child: Container(width: 10, height: 10, decoration: BoxDecoration(color: kEmergency, shape: BoxShape.circle, border: Border.all(color: isDark ? const Color(0xFF101916) : const Color(0xFFF8FBFA), width: 1.5)))),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            _infoCard(
-              Icons.location_on,
-              'Location',
-              'Lahore, Pakistan (Mock)',
-              fullWidth: true,
+            const SizedBox(height: 15),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: familyMembers.length.clamp(0, 4),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: .93),
+              itemBuilder: (_, index) => _homeMemberCard(familyMembers[index], index, isDark),
             ),
-            const SizedBox(height: 20),
-
-            // Family Status
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(16),
-              ),
+            const SizedBox(height: 13),
+            Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Family Status',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white70,
+                  SizedBox(
+                    width: 156,
+                    height: 38,
+                    child: OutlinedButton.icon(
+                      onPressed: _isMarkingAlive ? null : _markAlive,
+                      icon: _isMarkingAlive
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: kEmerald))
+                          : Icon(_checkedInToday ? Icons.check_circle_rounded : Icons.favorite_rounded, size: 18),
+                      label: const Text("I'm Alive", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _checkedInToday ? kEmerald : (isDark ? const Color(0xFF9FE8D2) : const Color(0xFF087F6C)),
+                        side: BorderSide(color: _checkedInToday ? kEmerald : (isDark ? const Color(0xFF2D806E) : const Color(0xFF9DDCCB))),
+                        backgroundColor: _checkedInToday ? (isDark ? const Color(0xFF123A31) : const Color(0xFFE8F8F1)) : Colors.transparent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  ...familyMembers.map((member) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: const BoxDecoration(
-                              color: Colors.greenAccent,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            member['name'],
-                            style: const TextStyle(fontSize: 15),
-                          ),
-                          const Spacer(),
-                          Text(
-                            member['status'],
-                            style: const TextStyle(
-                              color: Colors.greenAccent,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
+                  const SizedBox(height: 4),
+                  Text(_checkedInToday ? 'Checked in today' : 'Tap once each day', style: TextStyle(fontSize: 10, color: mutedColor)),
                 ],
               ),
             ),
-            const SizedBox(height: 40),
-
-            // SOS Button
-            if (!_alertSent) ...[
-              if (_isCountingDown)
-                Column(
-                  children: [
-                    Text(
-                      '$_countdown',
-                      style: const TextStyle(
-                        fontSize: 72,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.redAccent,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Emergency alert will be sent...',
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                    TextButton(
-                      onPressed: _cancelSOS,
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                  ],
-                )
-              else
-                GestureDetector(
-                  onTap: _startSOS,
-                  child: Container(
-                    width: 170,
-                    height: 170,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.redAccent,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.redAccent.withOpacity(0.5),
-                          blurRadius: 25,
-                          spreadRadius: 6,
-                        ),
-                      ],
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'SOS',
-                        style: TextStyle(
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ),
-                  ),
+            const SizedBox(height: 10),
+            Center(
+              child: SizedBox(
+                width: 143,
+                height: 43,
+                child: ElevatedButton.icon(
+                  onPressed: _startSOS,
+                  icon: const Icon(Icons.warning_amber_rounded, size: 19),
+                  label: const Text('Emergency', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(backgroundColor: kEmergency, foregroundColor: Colors.white, elevation: 6, shadowColor: kEmergency.withValues(alpha: .45), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
                 ),
-            ] else ...[
-              Column(
-                children: [
-                  Container(
-                    width: 90,
-                    height: 90,
-                    decoration: const BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      size: 50,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Emergency Alert Sent!',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.greenAccent,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => setState(() => _alertSent = false),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
-                    ),
-                    child: const Text(
-                      'Back to Home',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
               ),
-            ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _infoCard(
-    IconData icon,
-    String title,
-    String value, {
-    bool fullWidth = false,
-  }) {
+  Widget _homeMemberCard(Map<String, dynamic> member, int index, bool isDark) {
+    final name = member['name'] as String;
+    final titleColor = isDark ? Colors.white : kNavy;
+    final mutedColor = isDark ? Colors.white60 : const Color(0xFF52647B);
+    final battery = const ['85%', '72%', '60%', '40%'][index];
+    final batteryColor = index == 3 ? const Color(0xFFFFB21A) : kEmerald;
+    final avatarColors = const [Color(0xFFE9EEF0), Color(0xFFF2E9E8), Color(0xFFF0E8DF), Color(0xFFF5E8E8)];
+    final avatarIcons = const [Icons.face_rounded, Icons.face_3_rounded, Icons.face_rounded, Icons.face_3_rounded];
     return Container(
-      width: fullWidth ? double.infinity : null,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(12, 10, 10, 9),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        color: isDark ? kDarkCard : Colors.white,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE9EDF0)),
+        boxShadow: isDark ? null : const [BoxShadow(color: Color(0x080F172A), blurRadius: 10, offset: Offset(0, 3))],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.redAccent, size: 22),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Stack(
+            clipBehavior: Clip.none,
             children: [
-              Text(
-                title,
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
-              ),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              CircleAvatar(radius: 22, backgroundColor: avatarColors[index], child: Icon(avatarIcons[index], color: const Color(0xFF536878), size: 29)),
+              const Positioned(right: -1, top: -1, child: CircleAvatar(radius: 5.5, backgroundColor: Colors.white, child: CircleAvatar(radius: 4, backgroundColor: kEmerald))),
             ],
           ),
+          const SizedBox(height: 6),
+          Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, height: 1, fontWeight: FontWeight.bold, color: titleColor)),
+          const SizedBox(height: 5),
+          const Row(children: [Icon(Icons.circle, size: 8, color: kEmerald), SizedBox(width: 4), Text('Online', style: TextStyle(color: kEmerald, fontSize: 11, fontWeight: FontWeight.w500))]),
+          const SizedBox(height: 7),
+          Row(children: [Icon(Icons.battery_5_bar_rounded, size: 16, color: batteryColor), const SizedBox(width: 4), Text(battery, style: TextStyle(fontSize: 11, color: mutedColor))]),
+          const SizedBox(height: 4),
+          Row(children: [Icon(Icons.location_on_rounded, size: 14, color: mutedColor), const SizedBox(width: 3), Flexible(child: Text('Lahore, PK', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: mutedColor)))]),
         ],
       ),
     );
@@ -759,77 +761,35 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ================= FAMILY TAB =================
   Widget _buildFamilyTab() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark ? Colors.white : kNavy;
+    final mutedColor = isDark ? Colors.white60 : const Color(0xFF64748B);
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 8),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Family Members',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    // Add Member popup baad mein
-                    _showAddMemberDialog();
-                  },
-                  icon: const Icon(Icons.person_add, size: 18),
-                  label: const Text('Add'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                  ),
-                ),
-              ],
+            Text('Family Members', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: titleColor)),
+            const SizedBox(height: 4),
+            Text('Add and manage your family members.', style: TextStyle(fontSize: 12, color: mutedColor)),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 38,
+              child: ElevatedButton.icon(
+                onPressed: _showAddMemberDialog,
+                icon: const Icon(Icons.add_rounded, size: 24),
+                label: const Text('Add Member', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                style: ElevatedButton.styleFrom(backgroundColor: kEmerald, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 13),
             Expanded(
               child: ListView.builder(
+                padding: EdgeInsets.zero,
                 itemCount: familyMembers.length,
-                itemBuilder: (context, index) {
-                  final member = familyMembers[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A1A),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: Colors.redAccent.withOpacity(0.2),
-                          child: Text(
-                            member['name'][0],
-                            style: const TextStyle(color: Colors.redAccent),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              member['name'],
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              member['status'],
-                              style: const TextStyle(
-                                color: Colors.greenAccent,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                itemBuilder: (context, index) => _memberListCard(familyMembers[index], index, isDark),
               ),
             ),
           ],
@@ -838,13 +798,175 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _memberListCard(Map<String, dynamic> member, int index, bool isDark) {
+    final name = member['name'] as String;
+    final titleColor = isDark ? Colors.white : kNavy;
+    final mutedColor = isDark ? Colors.white60 : const Color(0xFF60728C);
+    final phone = member['phone'] as String? ?? const ['+92 300 1234567', '+92 300 2345678', '+92 300 3456789', '+92 300 4567890'][index % 4];
+    final relation = member['relation'] as String? ?? name;
+    final avatarColors = const [Color(0xFFE9EEF0), Color(0xFFF3E8E7), Color(0xFFF0E8DF), Color(0xFFF5E8E8)];
+    final avatarIcons = const [Icons.face_rounded, Icons.face_3_rounded, Icons.face_rounded, Icons.face_3_rounded];
+    return Container(
+      height: 70,
+      margin: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.fromLTRB(12, 9, 8, 9),
+      decoration: BoxDecoration(
+        color: isDark ? kDarkCard : Colors.white,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE9EDF0)),
+        boxShadow: isDark ? null : const [BoxShadow(color: Color(0x080F172A), blurRadius: 10, offset: Offset(0, 3))],
+      ),
+      child: Row(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              CircleAvatar(radius: 23, backgroundColor: avatarColors[index % 4], child: Icon(avatarIcons[index % 4], color: const Color(0xFF536878), size: 30)),
+              const Positioned(right: -1, top: -1, child: CircleAvatar(radius: 6, backgroundColor: Colors.white, child: CircleAvatar(radius: 4.5, backgroundColor: kEmerald))),
+            ],
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(name, style: TextStyle(fontSize: 13, height: 1.1, fontWeight: FontWeight.bold, color: titleColor)),
+                const SizedBox(height: 4),
+                Text(phone, style: TextStyle(fontSize: 11, height: 1, color: mutedColor)),
+                const SizedBox(height: 4),
+                Text(relation, style: TextStyle(fontSize: 11, height: 1, color: mutedColor)),
+              ],
+            ),
+          ),
+          IconButton(
+            constraints: const BoxConstraints.tightFor(width: 28, height: 34),
+            padding: EdgeInsets.zero,
+            icon: Icon(Icons.more_vert_rounded, color: mutedColor, size: 20),
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name options will be available soon'))),
+          ),
+          IconButton(
+            constraints: const BoxConstraints.tightFor(width: 29, height: 34),
+            padding: EdgeInsets.zero,
+            icon: const Icon(Icons.delete_outline_rounded, color: kEmergency, size: 20),
+            onPressed: () => setState(() => familyMembers.removeAt(index)),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ================= LOCATION TAB =================
   Widget _buildLocationTab() {
-    return const Center(
-      child: Text(
-        'Access Location Screen\n(Coming Soon)',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 18, color: Colors.white54),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark ? Colors.white : kNavy;
+    final mutedColor = isDark ? Colors.white60 : const Color(0xFF64748B);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Live Location', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: titleColor)),
+            const SizedBox(height: 4),
+            Text('View your family members on map.', style: TextStyle(fontSize: 12, color: mutedColor)),
+            const Spacer(),
+            Center(child: _locationEmptyArtwork(isDark)),
+            const SizedBox(height: 25),
+            Center(child: Text('Location map will be available soon.', style: TextStyle(fontSize: 12, color: mutedColor))),
+            const Spacer(flex: 2),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _locationEmptyArtwork(bool isDark) => SizedBox(
+        width: 195,
+        height: 150,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned(bottom: 2, child: Transform.rotate(angle: -.18, child: Container(width: 150, height: 72, decoration: BoxDecoration(color: const Color(0xFFBDECEE), borderRadius: BorderRadius.circular(8))))),
+            Positioned(bottom: 21, child: Transform.rotate(angle: -.18, child: Container(width: 156, height: 3, color: Colors.white70))),
+            Positioned(bottom: 40, child: Transform.rotate(angle: -.18, child: Container(width: 156, height: 3, color: Colors.white70))),
+            const Positioned(left: 30, bottom: 38, child: Icon(Icons.park_rounded, color: Color(0xFF69CBBE), size: 32)),
+            const Positioned(right: 25, bottom: 20, child: Icon(Icons.park_rounded, color: Color(0xFF69CBBE), size: 36)),
+            const Positioned(right: 25, top: 43, child: Icon(Icons.cloud_rounded, color: Color(0xFFDCECF8), size: 44)),
+            Container(
+              width: 67,
+              height: 76,
+              decoration: const BoxDecoration(color: kEmerald, shape: BoxShape.circle),
+              child: const Icon(Icons.location_on_rounded, color: Colors.white, size: 43),
+            ),
+          ],
+        ),
+      );
+
+  Widget _buildPlanTab() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark ? Colors.white : kNavy;
+    final mutedColor = isDark ? Colors.white60 : const Color(0xFF64748B);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Choose Your Plan', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: titleColor)),
+            const SizedBox(height: 4),
+            Text('Get more features to keep your family\nextra safe.', style: TextStyle(fontSize: 12, color: mutedColor)),
+            const SizedBox(height: 12),
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(child: _planCard(title: 'Free', subtitle: 'Basic features for\nsmall families.', price: '\$0', features: const ['Up to 5 members', 'Basic alerts', 'Location tracking'], selected: true)),
+                  const SizedBox(width: 9),
+                  Expanded(child: _planCard(title: 'Premium', subtitle: 'Advanced features\nfor complete safety.', price: '\$4.99', features: const ['Unlimited members', 'Real-time alerts', 'Location history', 'Priority support'])),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _planCard({required String title, required String subtitle, required String price, required List<String> features, bool selected = false}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 11, 10, 10),
+      decoration: BoxDecoration(
+        color: isDark ? kDarkCard : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE9EDF0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: selected ? const Color(0xFFEAF4FF) : const Color(0xFFFFF4D9), shape: BoxShape.circle), child: Icon(selected ? Icons.send_rounded : Icons.workspace_premium_rounded, color: selected ? const Color(0xFF2586F6) : const Color(0xFFFFAE00), size: 23)),
+          const SizedBox(height: 8),
+          Text('$title Plan', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : kNavy)),
+          const SizedBox(height: 4),
+          Text(subtitle, style: TextStyle(fontSize: 10, height: 1.12, color: isDark ? Colors.white60 : const Color(0xFF64748B))),
+          const SizedBox(height: 10),
+          RichText(text: TextSpan(children: [TextSpan(text: price, style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold, color: isDark ? Colors.white : kNavy)), TextSpan(text: ' / month', style: TextStyle(fontSize: 10, color: isDark ? Colors.white60 : const Color(0xFF52647B)))])),
+          const SizedBox(height: 10),
+          for (final feature in features) Padding(
+            padding: const EdgeInsets.only(bottom: 5),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [const Icon(Icons.check, size: 15, color: kEmerald), const SizedBox(width: 4), Expanded(child: Text(feature, style: TextStyle(fontSize: 9.5, height: 1.1, color: isDark ? Colors.white70 : const Color(0xFF314761))))]),
+          ),
+          const Spacer(),
+          SizedBox(
+            width: double.infinity,
+            height: 35,
+            child: ElevatedButton(
+              onPressed: selected ? null : () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Premium upgrade will be available soon.'))),
+              style: ElevatedButton.styleFrom(backgroundColor: selected ? const Color(0xFFF1F3F4) : kEmerald, foregroundColor: selected ? const Color(0xFF64748B) : Colors.white, disabledBackgroundColor: const Color(0xFFF1F3F4), disabledForegroundColor: const Color(0xFF64748B), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9))),
+              child: Text(selected ? 'Current Plan' : 'Upgrade Now', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -852,104 +974,129 @@ class _HomeScreenState extends State<HomeScreen> {
   // ================= PROFILE TAB =================
   Widget _buildProfileTab() {
     if (_isProfileLoading) {
-      return const Center(child: CircularProgressIndicator(color: Colors.redAccent));
+      return const Center(child: CircularProgressIndicator(color: kEmerald));
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
-    final mutedText = isDark ? Colors.white54 : Colors.black54;
-    final enabledText = isDark ? Colors.white : Colors.black87;
-
+    final titleColor = isDark ? Colors.white : kNavy;
+    final mutedColor = isDark ? Colors.white60 : const Color(0xFF64748B);
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 12),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 12),
-            CircleAvatar(
-              radius: 45,
-              backgroundColor: Colors.redAccent.withOpacity(0.2),
-              child: const Icon(Icons.person, size: 50, color: Colors.redAccent),
+            Row(
+              children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('My Profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: titleColor)), const SizedBox(height: 4), Text('Manage your account information.', style: TextStyle(fontSize: 12, color: mutedColor))])),
+                TextButton(
+                  onPressed: _isProfileDirty && !_isSavingProfile ? _saveProfile : null,
+                  child: _isSavingProfile
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: kEmerald, strokeWidth: 2))
+                      : Text('Save', style: TextStyle(fontWeight: FontWeight.bold, color: _isProfileDirty ? kEmerald : mutedColor)),
+                ),
+              ],
             ),
-            const SizedBox(height: 28),
-            TextField(
-              controller: _profileNameController,
-              style: TextStyle(color: enabledText),
-              decoration: _profileInputDecoration('Full Name', Icons.person, cardColor, mutedText),
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _profileRole,
-              dropdownColor: cardColor,
-              style: TextStyle(color: enabledText),
-              decoration: _profileInputDecoration('Relation', Icons.family_restroom, cardColor, mutedText),
-              items: _roles.map((role) => DropdownMenuItem(value: role, child: Text(role))).toList(),
-              onChanged: _changeProfileRole,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              initialValue: _profileEmail,
-              readOnly: true,
-              style: TextStyle(color: mutedText),
-              decoration: _profileInputDecoration('Email', Icons.email, cardColor, mutedText).copyWith(
-                suffixIcon: Icon(Icons.lock_outline, color: mutedText),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              initialValue: _profilePhone,
-              readOnly: true,
-              style: TextStyle(color: mutedText),
-              decoration: _profileInputDecoration('Phone Number', Icons.phone, cardColor, mutedText).copyWith(
-                suffixIcon: Icon(Icons.lock_outline, color: mutedText),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Container(
-              decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(12)),
-              child: SwitchListTile(
-                title: Text('Dark mode', style: TextStyle(color: enabledText)),
-                secondary: Icon(isDark ? Icons.dark_mode : Icons.light_mode, color: Colors.redAccent),
-                value: isDark,
-                activeColor: Colors.redAccent,
-                onChanged: (value) => appThemeMode.value = value ? ThemeMode.dark : ThemeMode.light,
-              ),
-            ),
-            const SizedBox(height: 36),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _logout,
-                icon: const Icon(Icons.logout, color: Colors.white),
-                label: const Text('Logout', style: TextStyle(color: Colors.white, fontSize: 16)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            const SizedBox(height: 15),
+            _profileRow(icon: Icons.person_rounded, iconColor: const Color(0xFF778BA0), label: 'User Name', value: _profileNameController.text, isDark: isDark, editable: TextField(controller: _profileNameController, style: TextStyle(fontSize: 11, color: mutedColor), decoration: const InputDecoration(isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.zero))),
+            const SizedBox(height: 7),
+            _profileRow(icon: Icons.mail_rounded, iconColor: const Color(0xFF778BA0), label: 'Email', value: _profileEmail.isEmpty ? 'Not available' : _profileEmail, isDark: isDark, locked: true),
+            const SizedBox(height: 7),
+            _profileRow(icon: Icons.phone_rounded, iconColor: const Color(0xFF778BA0), label: 'Phone Number', value: _profilePhone.isEmpty ? 'Not available' : _profilePhone, isDark: isDark, locked: true),
+            const SizedBox(height: 7),
+            _profileRow(
+              icon: Icons.favorite_rounded,
+              iconColor: const Color(0xFFD95B69),
+              label: 'Relationship',
+              value: _profileRole ?? 'Self',
+              isDark: isDark,
+              height: 66,
+              showTrailing: false,
+              editable: SizedBox(
+                height: 24,
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _profileRole,
+                    isExpanded: true,
+                    isDense: true,
+                    itemHeight: 42,
+                    icon: Icon(Icons.keyboard_arrow_down_rounded, color: mutedColor, size: 18),
+                    dropdownColor: isDark ? kDarkCard : Colors.white,
+                    style: TextStyle(fontSize: 11, color: mutedColor),
+                    items: _roles.map((role) => DropdownMenuItem(value: role, child: Text(role))).toList(),
+                    onChanged: _changeProfileRole,
+                  ),
                 ),
               ),
             ),
+            const SizedBox(height: 7),
+            _profileRow(icon: Icons.workspace_premium_rounded, iconColor: const Color(0xFFFF7A47), label: 'Current Plan', value: 'Free Plan', isDark: isDark, plan: true),
+            const SizedBox(height: 7),
+            _profileRow(
+              icon: Icons.notifications_active_rounded,
+              iconColor: const Color(0xFF2563EB),
+              label: 'Notification Settings',
+              value: _isFamilyOwner ? 'Personal & family owner controls' : 'Personal notification preferences',
+              isDark: isDark,
+              onTap: () async {
+                final saved = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => NotificationSettingsScreen(initialSettings: _notificationSettings, isFamilyOwner: _isFamilyOwner)));
+                if (saved == true && mounted) _loadProfile();
+              },
+            ),
+            const SizedBox(height: 18),
+            Text('Theme', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: titleColor)),
+            const SizedBox(height: 8),
+            _themeSelector(isDark ? kDarkCard : Colors.white, titleColor, mutedColor),
+            const SizedBox(height: 22),
+            SizedBox(width: double.infinity, height: 45, child: ElevatedButton.icon(onPressed: _logout, icon: const Icon(Icons.logout_rounded), label: const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)), style: ElevatedButton.styleFrom(backgroundColor: kEmergency, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
           ],
         ),
       ),
     );
   }
 
-  InputDecoration _profileInputDecoration(
-    String label,
-    IconData icon,
-    Color backgroundColor,
-    Color mutedText,
-  ) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: TextStyle(color: mutedText),
-      prefixIcon: Icon(icon, color: mutedText),
-      filled: true,
-      fillColor: backgroundColor,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+  Widget _profileRow({required IconData icon, required Color iconColor, required String label, required String value, required bool isDark, Widget? editable, bool locked = false, bool plan = false, VoidCallback? onTap, double height = 54, bool showTrailing = true}) {
+    final titleColor = isDark ? Colors.white : kNavy;
+    final mutedColor = isDark ? Colors.white60 : const Color(0xFF64748B);
+    final row = Container(
+      height: height,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(color: isDark ? kDarkCard : Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: isDark ? const Color(0xFF233846) : const Color(0xFFE9EDF0)), boxShadow: isDark ? null : const [BoxShadow(color: Color(0x080F172A), blurRadius: 10, offset: Offset(0, 3))]),
+      child: Row(children: [
+        Container(width: 30, height: 30, decoration: BoxDecoration(color: iconColor.withValues(alpha: .16), shape: BoxShape.circle), child: Icon(icon, color: iconColor, size: 18)),
+        const SizedBox(width: 11),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(label, style: TextStyle(fontSize: 11, height: 1, fontWeight: FontWeight.bold, color: titleColor)), const SizedBox(height: 5), editable ?? Row(children: [if (plan) const Icon(Icons.workspace_premium_rounded, size: 12, color: Color(0xFFFFAE00)), if (plan) const SizedBox(width: 3), Text(value, style: TextStyle(fontSize: 11, height: 1, color: mutedColor))])])),
+        if (showTrailing) ...[const SizedBox(width: 7), Icon(locked ? Icons.lock_outline_rounded : Icons.chevron_right_rounded, color: mutedColor, size: 19)],
+      ]),
+    );
+    if (onTap == null) return row;
+    return InkWell(borderRadius: BorderRadius.circular(12), onTap: onTap, child: row);
+  }
+
+  Widget _themeSelector(Color cardColor, Color enabledText, Color mutedText) {
+    const choices = [(ThemeMode.system, 'System', Icons.brightness_auto_rounded), (ThemeMode.light, 'Light', Icons.light_mode_rounded), (ThemeMode.dark, 'Dark', Icons.dark_mode_rounded)];
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(14)),
+      child: Row(
+        children: choices.map((choice) {
+          final selected = appThemeMode.value == choice.$1;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => appThemeMode.value = choice.$1,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(color: selected ? Colors.green : Colors.transparent, borderRadius: BorderRadius.circular(10)),
+                child: Column(children: [
+                  Icon(choice.$3, size: 19, color: selected ? Colors.white : mutedText),
+                  const SizedBox(height: 3),
+                  Text(choice.$2, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: selected ? Colors.white : enabledText)),
+                ]),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
