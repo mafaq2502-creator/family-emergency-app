@@ -1,5 +1,12 @@
 # Family Emergency — Project Handoff Reference
 
+## Latest UI/group update (September 7, 2026)
+
+- Group creation now updates Home/Members optimistically, selects the new owner group immediately, enables Add Member, restarts the Firestore watcher, and exposes/retries watcher failures instead of silently swallowing them.
+- Light/dark themes provide consistent hover, focus, splash, and pressed feedback for buttons, icon buttons, fields, cards, and navigation items. Android uses the equivalent touch/ripple feedback because phones do not have pointer hover.
+- Empty Home keeps the daily check-in and Emergency controls in the lower action area; populated group cards push those controls downward naturally.
+- Bottom navigation uses a curved wave surface around the larger raised circular Home action.
+
 ## Latest implementation update (September 2026)
 
 - The notification bell opens an in-place top notification banner; it does not open a separate screen.

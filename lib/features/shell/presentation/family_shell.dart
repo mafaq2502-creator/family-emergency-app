@@ -46,6 +46,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _countdown = 3;
   bool _alertSent = false;
   Timer? _timer;
+  Timer? _groupRetryTimer;
+  bool _groupLoadErrorShown = false;
 
   final _profileNameController = TextEditingController();
   String? _profileRole;
@@ -103,13 +105,28 @@ class _HomeScreenState extends State<HomeScreen> {
     _groupsSubscription?.cancel();
     _groupsSubscription = _groupService.watchGroups(user).listen((groups) {
       if (!mounted) return;
+      _groupRetryTimer?.cancel();
+      _groupLoadErrorShown = false;
       setState(() {
         _groups = groups;
         final currentId = _selectedGroup?.id;
         _selectedGroup = groups.where((group) => group.id == currentId).cast<FamilyGroup?>().firstOrNull ?? (groups.isEmpty ? null : groups.first);
       });
       _watchMembers();
-    }, onError: (_) {});
+    }, onError: (_) {
+      if (!mounted) return;
+      if (!_groupLoadErrorShown) {
+        _groupLoadErrorShown = true;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not sync groups. Retrying…'),
+          backgroundColor: kEmergency,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ));
+      }
+      _groupRetryTimer?.cancel();
+      _groupRetryTimer = Timer(const Duration(seconds: 3), _watchGroups);
+    });
   }
 
   Future<void> _createGroup() async {
@@ -118,7 +135,21 @@ class _HomeScreenState extends State<HomeScreen> {
     if (name == null || name.isEmpty) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    try { await _groupService.createGroup(user, name); } catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not create group.'), backgroundColor: kEmergency)); }
+    try {
+      final groupId = await _groupService.createGroup(user, name);
+      if (!mounted) return;
+      final createdGroup = FamilyGroup(id: groupId, name: name, ownerId: user.uid, role: 'owner', emergencyRecipientIds: [user.uid]);
+      setState(() {
+        _groups = [..._groups.where((group) => group.id != groupId), createdGroup];
+        _selectedGroup = createdGroup;
+        familyMembers = const [];
+      });
+      _watchMembers();
+      _watchGroups();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name created.'), backgroundColor: kEmerald));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not create group. Check Firestore rules and connection.'), backgroundColor: kEmergency));
+    }
   }
 
   Widget _groupSelector() => Row(children: [Expanded(child: DropdownButtonHideUnderline(child: DropdownButton<FamilyGroup>(value: _selectedGroup, hint: const Text('Select group'), isExpanded: true, items: _groups.map((group) => DropdownMenuItem(value: group, child: Text(group.name))).toList(), onChanged: (group) { setState(() => _selectedGroup = group); _watchMembers(); }))), IconButton(onPressed: _createGroup, icon: const Icon(Icons.add_circle_outline_rounded, color: kEmerald), tooltip: 'Add group')]);
@@ -475,6 +506,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _groupsSubscription?.cancel();
     _membersSubscription?.cancel();
     _timer?.cancel();
+    _groupRetryTimer?.cancel();
     _profileNameController.dispose();
     super.dispose();
   }
@@ -585,32 +617,37 @@ class _HomeScreenState extends State<HomeScreen> {
       (Icons.person_rounded, 'Profile', 4),
     ];
     return SafeArea(
+      top: false,
       child: SizedBox(
-        height: 78,
+        height: 88,
         child: Stack(
           clipBehavior: Clip.none,
           alignment: Alignment.topCenter,
           children: [
             Positioned.fill(
-              top: 14,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark ? kDarkSurface : Colors.white,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-                ),
-                child: Row(
+              child: PhysicalShape(
+                clipper: const _WaveNavigationClipper(),
+                color: isDark ? kDarkSurface : Colors.white,
+                elevation: 10,
+                shadowColor: Colors.black26,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 20),
+                  child: Row(
                   children: [
                     for (final item in items.take(2)) _navItem(item.$1, item.$2, item.$3),
                     const Spacer(flex: 2),
                     for (final item in items.skip(2)) _navItem(item.$1, item.$2, item.$3),
                   ],
                 ),
+                ),
               ),
             ),
             Positioned(
-              top: -14,
-              child: GestureDetector(
+              top: -8,
+              child: InkResponse(
                 onTap: () => setState(() => _currentIndex = 2),
+                radius: 40,
+                hoverColor: kEmerald.withValues(alpha: .14),
                 child: Column(
                   children: [
                     Container(
@@ -623,8 +660,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: const Icon(Icons.home_rounded, color: Colors.white, size: 30),
                     ),
-                    const SizedBox(height: 0),
-                    Text('Home', style: TextStyle(color: _currentIndex == 2 ? kEmerald : Colors.grey, fontSize: 11)),
+                    const SizedBox(height: 1),
+                    Text('Home', style: TextStyle(color: _currentIndex == 2 ? kEmerald : Colors.grey, fontSize: 11, fontWeight: FontWeight.w700)),
                   ],
                 ),
               ),
@@ -640,6 +677,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Expanded(
       child: InkWell(
         onTap: () => setState(() => _currentIndex = index),
+        hoverColor: kEmerald.withValues(alpha: .10),
+        borderRadius: BorderRadius.circular(18),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -907,4 +946,28 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
   */
+}
+
+class _WaveNavigationClipper extends CustomClipper<Path> {
+  const _WaveNavigationClipper();
+
+  @override
+  Path getClip(Size size) {
+    final center = size.width / 2;
+    return Path()
+      ..moveTo(0, size.height)
+      ..lineTo(0, 22)
+      ..quadraticBezierTo(0, 10, 18, 10)
+      ..lineTo(center - 60, 10)
+      ..cubicTo(center - 43, 10, center - 44, 0, center - 27, 0)
+      ..quadraticBezierTo(center, -2, center + 27, 0)
+      ..cubicTo(center + 44, 0, center + 43, 10, center + 60, 10)
+      ..lineTo(size.width - 18, 10)
+      ..quadraticBezierTo(size.width, 10, size.width, 22)
+      ..lineTo(size.width, size.height)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }

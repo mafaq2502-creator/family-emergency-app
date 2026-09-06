@@ -6,11 +6,15 @@ extension _HomeTab on _HomeScreenState {
     final titleColor = isDark ? Colors.white : kNavy;
     final mutedColor = isDark ? Colors.white70 : const Color(0xFF64748B);
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 22, 24, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: LayoutBuilder(
+        builder: (context, viewport) => SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: viewport.maxHeight - 36),
+            child: IntrinsicHeight(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
             Row(children: [
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Hello, ${_profileNameController.text.isEmpty ? 'Afaq' : _profileNameController.text}', style: TextStyle(fontSize: 21, height: 1, fontWeight: FontWeight.bold, color: titleColor)),
@@ -26,9 +30,13 @@ extension _HomeTab on _HomeScreenState {
             ]),
             const SizedBox(height: 15),
             Text('Your Groups', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: titleColor)),
-            if (_groups.isEmpty)
-              SizedBox(height: 285, child: Center(child: _homeActions(isDark, mutedColor)))
-            else ...[
+            if (_groups.isEmpty) ...[
+              const Spacer(),
+              Center(child: Text('No groups yet. Create one from Members.', style: TextStyle(fontSize: 12, color: mutedColor))),
+              const SizedBox(height: 22),
+              _homeActions(isDark, mutedColor),
+              const SizedBox(height: 18),
+            ] else ...[
               const SizedBox(height: 10),
               // A Wrap is deliberately used here instead of a nested GridView.
               // This tab lives inside a SingleChildScrollView; a nested viewport
@@ -51,7 +59,10 @@ extension _HomeTab on _HomeScreenState {
               const SizedBox(height: 13),
               _homeActions(isDark, mutedColor),
             ],
-          ],
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -103,7 +114,7 @@ extension _HomeTab on _HomeScreenState {
     );
   }
 
-  Widget _groupHomeCard(FamilyGroup group, bool isDark) => InkWell(onTap: () => _openGroupHome(group), borderRadius: BorderRadius.circular(15), child: Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: isDark ? kDarkCard : Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE9EDF0))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.groups_rounded, color: kEmerald, size: 30), const Spacer(), Text(group.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : kNavy)), const SizedBox(height: 3), Text(group.canManage ? 'Owner/Admin' : 'Member', style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : const Color(0xFF64748B)))])));
+  Widget _groupHomeCard(FamilyGroup group, bool isDark) => Material(color: isDark ? kDarkCard : Colors.white, borderRadius: BorderRadius.circular(15), child: InkWell(onTap: () => _openGroupHome(group), borderRadius: BorderRadius.circular(15), child: Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(borderRadius: BorderRadius.circular(15), border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE9EDF0))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.groups_rounded, color: kEmerald, size: 30), const Spacer(), Text(group.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : kNavy)), const SizedBox(height: 3), Text(group.canManage ? 'Owner/Admin' : 'Member', style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : const Color(0xFF64748B)))]))));
 
   // ignore: unused_element
   Widget _homeMemberCard(FamilyMember member, int index, bool isDark) {
