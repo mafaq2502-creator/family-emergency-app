@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../models/app_notification.dart';
 import '../../../models/family_group.dart';
 import '../../../services/app_notification_service.dart';
+import '../../../core/widgets/light_ui.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
   const NotificationCenterScreen({super.key, required this.groups});
@@ -17,6 +18,7 @@ class NotificationCenterScreen extends StatefulWidget {
 class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
   final _service = AppNotificationService();
   String? _groupId;
+  bool _unreadOnly = false;
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -35,27 +37,50 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       ),
       body: Column(
         children: [
-          SizedBox(
-            height: 48,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
+            child: Column(
               children: [
-                ChoiceChip(
-                  label: const Text('All'),
-                  selected: _groupId == null,
-                  onSelected: (_) => setState(() => _groupId = null),
-                ),
-                ...widget.groups.map(
-                  (group) => Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: ChoiceChip(
-                      label: Text(group.name),
-                      selected: _groupId == group.id,
-                      onSelected: (_) => setState(() => _groupId = group.id),
-                    ),
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: kLightSurfaceMuted,
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Row(
+                    children: [
+                      _filterButton('All', !_unreadOnly),
+                      _filterButton('Unread', _unreadOnly),
+                    ],
                   ),
                 ),
+                if (widget.groups.isNotEmpty) ...[
+                  const SizedBox(height: 9),
+                  DropdownButtonFormField<String?>(
+                    initialValue: _groupId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.groups_rounded),
+                      labelText: 'Family Circle',
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('All Circles'),
+                      ),
+                      ...widget.groups.map(
+                        (group) => DropdownMenuItem<String?>(
+                          value: group.id,
+                          child: Text(
+                            group.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) => setState(() => _groupId = value),
+                  ),
+                ],
               ],
             ),
           ),
@@ -63,41 +88,83 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
             child: StreamBuilder<List<AppNotification>>(
               stream: _service.watch(user),
               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const LightStateView(
+                    icon: Icons.cloud_off_rounded,
+                    title: 'Notifications unavailable',
+                    message: 'Check your connection and try again.',
+                  );
+                }
+                if (!snapshot.hasData) {
+                  return const LightStateView(
+                    icon: Icons.sync_rounded,
+                    title: 'Loading notifications',
+                    message: 'Getting your latest family updates…',
+                    busy: true,
+                  );
+                }
                 final notices = (snapshot.data ?? [])
                     .where(
-                      (item) => _groupId == null || item.groupId == _groupId,
+                      (item) =>
+                          (_groupId == null || item.groupId == _groupId) &&
+                          (!_unreadOnly || !item.isRead),
                     )
                     .toList();
                 if (notices.isEmpty) {
-                  return const Center(child: Text('No notifications yet.'));
+                  return LightStateView(
+                    icon: _unreadOnly
+                        ? Icons.done_all_rounded
+                        : Icons.notifications_none_rounded,
+                    title: _unreadOnly
+                        ? 'You’re all caught up'
+                        : 'No notifications yet',
+                    message: _unreadOnly
+                        ? 'There are no unread family updates.'
+                        : 'Family and safety updates will appear here.',
+                  );
                 }
                 return ListView.separated(
                   itemCount: notices.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+                  separatorBuilder: (_, _) => const SizedBox(height: 9),
                   itemBuilder: (_, index) {
                     final item = notices[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: item.isRead
-                            ? Colors.grey.shade200
-                            : kEmerald.withValues(alpha: .16),
-                        child: Icon(
-                          item.type.startsWith('emergency')
-                              ? Icons.warning_amber_rounded
-                              : Icons.notifications_outlined,
-                          color: item.isRead ? Colors.grey : kEmergency,
-                        ),
-                      ),
-                      title: Text(
-                        item.title,
-                        style: TextStyle(
-                          fontWeight: item.isRead
-                              ? FontWeight.w500
-                              : FontWeight.w800,
-                        ),
-                      ),
-                      subtitle: Text(item.body),
+                    return LightCard(
+                      padding: EdgeInsets.zero,
                       onTap: () => _service.markRead(user, item.id),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: item.isRead
+                              ? Colors.grey.shade200
+                              : kEmerald.withValues(alpha: .16),
+                          child: Icon(
+                            item.type.startsWith('emergency')
+                                ? Icons.warning_amber_rounded
+                                : Icons.notifications_outlined,
+                            color: item.isRead ? Colors.grey : kEmergency,
+                          ),
+                        ),
+                        title: Text(
+                          item.title,
+                          style: TextStyle(
+                            fontWeight: item.isRead
+                                ? FontWeight.w500
+                                : FontWeight.w800,
+                          ),
+                        ),
+                        subtitle: Text(
+                          item.body,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: item.isRead
+                            ? const Icon(
+                                Icons.done_all_rounded,
+                                color: kLightMuted,
+                                size: 18,
+                              )
+                            : const LightStatusChip(label: 'New'),
+                      ),
                     );
                   },
                 );
@@ -108,4 +175,27 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       ),
     );
   }
+
+  Widget _filterButton(String label, bool selected) => Expanded(
+    child: GestureDetector(
+      onTap: () => setState(() => _unreadOnly = label == 'Unread'),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: BoxDecoration(
+          gradient: selected ? kPrimaryGradient : null,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : kLightMuted,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    ),
+  );
 }

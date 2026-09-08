@@ -34,9 +34,10 @@ extension _PlanTab on _HomeScreenState {
                       subtitle: 'Basic features for\nsmall families.',
                       price: '\$0',
                       features: const [
-                        'Up to 5 members',
-                        'Basic alerts',
-                        'Location tracking',
+                        'Owner + 2 members',
+                        'Manual SOS alerts',
+                        'Daily check-in',
+                        'Emergency contacts',
                       ],
                       selected: true,
                     ),
@@ -48,10 +49,10 @@ extension _PlanTab on _HomeScreenState {
                       subtitle: 'Advanced features\nfor complete safety.',
                       price: '\$4.99',
                       features: const [
-                        'Unlimited members',
-                        'Real-time alerts',
-                        'Location history',
-                        'Priority support',
+                        'Owner + 10 members',
+                        'Approved device access',
+                        'Battery/offline alerts',
+                        'Emergency history',
                       ],
                     ),
                   ),
@@ -198,6 +199,24 @@ extension _PlanTab on _HomeScreenState {
               ),
             ),
           ),
+          if (!selected) ...[
+            const SizedBox(height: 5),
+            Center(
+              child: TextButton(
+                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Subscription management is not connected yet.',
+                    ),
+                  ),
+                ),
+                child: const Text(
+                  'Manage Subscription',
+                  style: TextStyle(fontSize: 9),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

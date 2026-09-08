@@ -8,6 +8,8 @@ import '../../../models/family_group.dart';
 import '../../../models/family_member.dart';
 import '../../../services/circle_join_service.dart';
 import '../../../services/group_service.dart';
+import '../../../core/widgets/light_ui.dart';
+import 'share_circle_screen.dart';
 
 class GroupSettingsScreen extends StatefulWidget {
   const GroupSettingsScreen({
@@ -54,14 +56,108 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     }
   }
 
+  Future<void> _renameCircle() async {
+    final controller = TextEditingController(text: widget.group.name);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.edit_rounded, color: kEmerald),
+        title: const Text('Rename Circle'),
+        content: TextField(
+          controller: controller,
+          maxLength: 60,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Circle name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value == null || value.isEmpty || value == widget.group.name) return;
+    await _service.renameGroup(widget.group, value);
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Circle renamed.')));
+    }
+  }
+
+  Future<void> _deleteCircle() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.warning_amber_rounded, color: kEmergency),
+        title: const Text('Delete Circle?'),
+        content: Text(
+          '“${widget.group.name}” and its member and emergency records will be permanently removed.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kEmergency,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete Circle'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _service.deleteGroup(widget.group);
+    if (mounted) Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Group Settings')),
     body: ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Text(widget.group.name, style: Theme.of(context).textTheme.titleLarge),
+        LightSettingRow(
+          icon: Icons.edit_rounded,
+          title: 'Rename Circle',
+          subtitle: widget.group.name,
+          onTap: _renameCircle,
+        ),
+        const SizedBox(height: 9),
+        LightSettingRow(
+          icon: Icons.admin_panel_settings_rounded,
+          title: 'Owner Information',
+          subtitle: widget.group.ownerId,
+        ),
+        const SizedBox(height: 9),
+        LightSettingRow(
+          icon: Icons.manage_accounts_rounded,
+          title: 'Member Roles',
+          subtitle: 'Owner, parent, adult and child permissions',
+        ),
         const SizedBox(height: 20),
+        LightSettingRow(
+          icon: Icons.ios_share_rounded,
+          title: 'Share Circle',
+          subtitle: 'QR code, invitation code and joining link',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ShareCircleScreen(group: widget.group),
+            ),
+          ),
+        ),
+        const SizedBox(height: 22),
         const Text(
           'Invite Family Members',
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
@@ -168,6 +264,38 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
             ),
             child: Text(_saving ? 'Saving...' : 'Save Emergency Recipients'),
           ),
+        ),
+        const SizedBox(height: 28),
+        const LightSectionTitle('Circle management'),
+        LightSettingRow(
+          icon: Icons.logout_rounded,
+          title: 'Leave Circle',
+          subtitle: widget.group.isOwner
+              ? 'Transfer ownership before leaving'
+              : 'Leave this Circle',
+          destructive: true,
+          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Leave Circle is not connected yet.')),
+          ),
+        ),
+        const SizedBox(height: 9),
+        LightSettingRow(
+          icon: Icons.swap_horiz_rounded,
+          title: 'Transfer Ownership',
+          subtitle: 'Choose another active adult or parent',
+          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Ownership transfer is not connected yet.'),
+            ),
+          ),
+        ),
+        const SizedBox(height: 9),
+        LightSettingRow(
+          icon: Icons.delete_forever_rounded,
+          title: 'Delete Circle',
+          subtitle: 'Only the owner can permanently delete this Circle',
+          destructive: true,
+          onTap: widget.group.isOwner ? _deleteCircle : null,
         ),
       ],
     ),

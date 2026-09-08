@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../models/family_member.dart';
+import '../../devices/presentation/device_screens.dart';
+import '../../progress/presentation/progress_detail_screens.dart';
 import 'member_notification_settings_screen.dart';
 
 class MemberProfileScreen extends StatelessWidget {
@@ -86,6 +88,52 @@ class MemberProfileScreen extends StatelessWidget {
             Icons.battery_charging_full_rounded,
             'Battery status access',
             member.batteryAccess ? 'Allowed' : 'Not allowed',
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DeviceDetailScreen(memberName: member.name),
+                ),
+              ),
+              icon: const Icon(Icons.smartphone_rounded),
+              label: const Text('Device details'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DevicePairingScreen(member: member),
+                ),
+              ),
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+              label: const Text('Pair a device'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      ProgressDetailsScreen(memberName: member.name),
+                ),
+              ),
+              icon: const Icon(Icons.insights_rounded),
+              label: const Text('View progress'),
+            ),
           ),
           if (onSave != null) ...[
             const SizedBox(height: 14),

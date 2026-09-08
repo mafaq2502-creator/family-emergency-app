@@ -24,6 +24,8 @@ import '../../groups/presentation/group_members_screen.dart';
 import '../../notifications/presentation/notification_settings_screen.dart';
 import '../../notifications/presentation/notification_banner.dart';
 import '../../profile/presentation/profile_settings_screen.dart';
+import '../../profile/presentation/account_settings_screen.dart';
+import '../../progress/presentation/progress_detail_screens.dart';
 
 part 'tabs/home_tab.dart';
 part 'tabs/members_tab.dart';
@@ -48,6 +50,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _timer;
   Timer? _groupRetryTimer;
   bool _groupLoadErrorShown = false;
+  bool _showOwnedCircles = true;
+
+  void _setCircleScope(bool owned) {
+    setState(() => _showOwnedCircles = owned);
+  }
 
   final _profileNameController = TextEditingController();
   String? _profileRole;
@@ -271,7 +278,8 @@ class _HomeScreenState extends State<HomeScreen> {
             .where((item) => !item.isRead)
             .length;
         return IconButton(
-          onPressed: () => showNotificationBanner(context, user),
+          onPressed: () =>
+              showNotificationBanner(context, user, groups: _groups),
           icon: Badge(
             isLabelVisible: unread > 0,
             label: Text('$unread'),
@@ -423,7 +431,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return result ?? false;
   }
 
-  void _startSOS() {
+  Future<void> _startSOS() async {
     if (_isCountingDown || _alertSent) return;
     final group = _selectedGroup;
     if (group == null || group.emergencyRecipientIds.isEmpty) {
@@ -437,6 +445,43 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            color: kEmergency.withValues(alpha: .11),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.sos_rounded, color: kEmergency, size: 32),
+        ),
+        title: const Text('Send Emergency Alert?'),
+        content: Text(
+          'This will alert the selected recipients in ${group.name}.',
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.sos_rounded),
+            label: const Text('Send SOS'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kEmergency,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
 
     setState(() {
       _isCountingDown = true;
@@ -458,7 +503,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _logout() async {
-    await AuthService().signOut();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.logout_rounded, color: kEmergency, size: 34),
+        title: const Text('Logout Confirmation'),
+        content: const Text(
+          'Are you sure you want to log out?',
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kEmergency,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await AuthService().signOut();
   }
 
   void _showAddMemberDialog() {
@@ -490,13 +561,13 @@ class _HomeScreenState extends State<HomeScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: const Color(0xFF1A1A1A),
+              backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
               title: const Text(
                 'Add Family Member',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: kLightNavy),
               ),
               content: SingleChildScrollView(
                 child: Column(
@@ -504,12 +575,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     TextField(
                       controller: nameController,
-                      style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Name',
-                        labelStyle: const TextStyle(color: Colors.white54),
                         filled: true,
-                        fillColor: const Color(0xFF0F0F0F),
+                        fillColor: Colors.white,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -518,13 +587,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: emailController,
-                      style: const TextStyle(color: Colors.white),
                       keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
                         labelText: 'Email',
-                        labelStyle: const TextStyle(color: Colors.white54),
                         filled: true,
-                        fillColor: const Color(0xFF0F0F0F),
+                        fillColor: Colors.white,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -533,17 +600,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: selectedRelation,
-                      dropdownColor: const Color(0xFF1A1A1A),
+                      dropdownColor: Colors.white,
                       decoration: InputDecoration(
                         labelText: 'Relationship',
-                        labelStyle: const TextStyle(color: Colors.white54),
                         filled: true,
-                        fillColor: const Color(0xFF0F0F0F),
+                        fillColor: Colors.white,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      style: const TextStyle(color: Colors.white),
+                      style: const TextStyle(color: kLightNavy),
                       items: relations
                           .map(
                             (r) => DropdownMenuItem(value: r, child: Text(r)),
@@ -558,13 +624,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         'Access Permissions',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                        style: TextStyle(
+                          color: kLightNavy,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                     SwitchListTile(
                       title: const Text(
                         'Location',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(color: kLightNavy),
                       ),
                       value: locationAccess,
                       activeThumbColor: kEmerald,
@@ -580,7 +650,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     SwitchListTile(
                       title: const Text(
                         'Battery Status',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(color: kLightNavy),
                       ),
                       value: batteryAccess,
                       activeThumbColor: kEmerald,
@@ -652,9 +722,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     );
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: kEmerald),
                   child: const Text(
                     'Add Member',
                     style: TextStyle(color: Colors.white),

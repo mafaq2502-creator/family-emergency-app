@@ -103,7 +103,16 @@ extension _LocationTab on _HomeScreenState {
           SizedBox(
             height: 48,
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ProgressDetailsScreen(
+                    memberName: familyMembers.isEmpty
+                        ? 'All members'
+                        : familyMembers.first.name,
+                  ),
+                ),
+              ),
               child: const Text('View Details'),
             ),
           ),

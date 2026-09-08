@@ -3,11 +3,18 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../models/app_notification.dart';
+import '../../../models/family_group.dart';
 import '../../../services/app_notification_service.dart';
+import '../../../core/widgets/light_ui.dart';
+import 'notification_center_screen.dart';
 
 /// A compact in-place inbox opened from the notification bell.
 /// It deliberately does not navigate away from the current tab.
-Future<void> showNotificationBanner(BuildContext context, User user) {
+Future<void> showNotificationBanner(
+  BuildContext context,
+  User user, {
+  List<FamilyGroup> groups = const [],
+}) {
   final service = AppNotificationService();
   return showGeneralDialog<void>(
     context: context,
@@ -21,7 +28,11 @@ Future<void> showNotificationBanner(BuildContext context, User user) {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Material(
             color: Colors.transparent,
-            child: _NotificationBanner(user: user, service: service),
+            child: _NotificationBanner(
+              user: user,
+              service: service,
+              groups: groups,
+            ),
           ),
         ),
       ),
@@ -30,9 +41,14 @@ Future<void> showNotificationBanner(BuildContext context, User user) {
 }
 
 class _NotificationBanner extends StatelessWidget {
-  const _NotificationBanner({required this.user, required this.service});
+  const _NotificationBanner({
+    required this.user,
+    required this.service,
+    required this.groups,
+  });
   final User user;
   final AppNotificationService service;
+  final List<FamilyGroup> groups;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -86,26 +102,30 @@ class _NotificationBanner extends StatelessWidget {
               ),
             ),
             const Divider(height: 1),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => NotificationCenterScreen(groups: groups),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.open_in_new_rounded, size: 16),
+              label: const Text('View all notifications'),
+            ),
             if (snapshot.hasError)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: Text('Notifications could not be loaded.'),
+              const LightStateView(
+                icon: Icons.cloud_off_rounded,
+                title: 'Could not load notifications',
+                message: 'Check your connection and try again.',
               )
             else if (notifications.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.notifications_off_outlined,
-                      size: 34,
-                      color: Colors.grey,
-                    ),
-                    SizedBox(height: 10),
-                    Text('No notifications yet.'),
-                  ],
-                ),
+              const LightStateView(
+                icon: Icons.notifications_none_rounded,
+                title: 'No notifications yet',
+                message: 'Your latest family updates will appear here.',
               )
             else
               Flexible(

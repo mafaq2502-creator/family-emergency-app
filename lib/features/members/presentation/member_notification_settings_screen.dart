@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../models/family_member.dart';
 import '../../../models/notification_settings.dart';
 import 'member_notification_settings_editor.dart';
+import '../../../core/widgets/light_ui.dart';
 
 class MemberNotificationSettingsScreen extends StatefulWidget {
   const MemberNotificationSettingsScreen({
@@ -69,6 +70,14 @@ class _MemberNotificationSettingsScreenState
         MemberNotificationSettingsEditor(
           settings: _settings,
           onChanged: (settings) => setState(() => _settings = settings),
+        ),
+        const SizedBox(height: 8),
+        const LightToggleRow(
+          icon: Icons.monitor_heart_rounded,
+          title: 'Screen-time report',
+          subtitle: 'Available after device telemetry is connected',
+          value: false,
+          onChanged: null,
         ),
         const SizedBox(height: 20),
         SizedBox(

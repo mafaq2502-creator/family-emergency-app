@@ -36,98 +36,54 @@ extension _ProfileTab on _HomeScreenState {
                     ],
                   ),
                 ),
-                TextButton(
-                  onPressed: _isProfileDirty && !_isSavingProfile
-                      ? _saveProfile
-                      : null,
-                  child: _isSavingProfile
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            color: kEmerald,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text(
-                          'Save',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: _isProfileDirty ? kEmerald : mutedColor,
-                          ),
-                        ),
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: kLightSuccessSurface,
+                  child: Text(
+                    _profileNameController.text.isEmpty
+                        ? '?'
+                        : _profileNameController.text[0].toUpperCase(),
+                    style: const TextStyle(
+                      color: kLightPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 15),
             _profileRow(
-              icon: Icons.person_rounded,
-              iconColor: const Color(0xFF778BA0),
-              label: 'User Name',
-              value: _profileNameController.text,
+              icon: Icons.manage_accounts_rounded,
+              iconColor: kEmerald,
+              label: 'Account Settings',
+              value: 'Name, email, phone and relationship',
               isDark: isDark,
-              editable: TextField(
-                controller: _profileNameController,
-                style: TextStyle(fontSize: 11, color: mutedColor),
-                decoration: const InputDecoration(
-                  isDense: true,
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ),
-            const SizedBox(height: 7),
-            _profileRow(
-              icon: Icons.mail_rounded,
-              iconColor: const Color(0xFF778BA0),
-              label: 'Email',
-              value: _profileEmail.isEmpty ? 'Not available' : _profileEmail,
-              isDark: isDark,
-              locked: true,
-            ),
-            const SizedBox(height: 7),
-            _profileRow(
-              icon: Icons.phone_rounded,
-              iconColor: const Color(0xFF778BA0),
-              label: 'Phone Number',
-              value: _profilePhone.isEmpty ? 'Not available' : _profilePhone,
-              isDark: isDark,
-              locked: true,
-            ),
-            const SizedBox(height: 7),
-            _profileRow(
-              icon: Icons.favorite_rounded,
-              iconColor: const Color(0xFFD95B69),
-              label: 'Relationship',
-              value: _profileRole ?? 'Self',
-              isDark: isDark,
-              height: 66,
-              showTrailing: false,
-              editable: SizedBox(
-                height: 24,
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _profileRole,
-                    isExpanded: true,
-                    isDense: true,
-                    itemHeight: kMinInteractiveDimension,
-                    icon: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: mutedColor,
-                      size: 18,
+              onTap: () async {
+                final result = await Navigator.push<String>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AccountSettingsScreen(
+                      nameController: _profileNameController,
+                      email: _profileEmail,
+                      phone: _profilePhone,
+                      relationship: _profileRole,
+                      relationships: _HomeScreenState._roles,
+                      onRelationshipChanged: _changeProfileRole,
+                      onSave: _saveProfile,
+                      saving: _isSavingProfile,
                     ),
-                    dropdownColor: isDark ? kDarkCard : Colors.white,
-                    style: TextStyle(fontSize: 11, color: mutedColor),
-                    items: _HomeScreenState._roles
-                        .map(
-                          (role) =>
-                              DropdownMenuItem(value: role, child: Text(role)),
-                        )
-                        .toList(),
-                    onChanged: _changeProfileRole,
                   ),
-                ),
-              ),
+                );
+                if (result == 'security') {
+                  if (!mounted) return;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ProfileSettingsScreen(),
+                    ),
+                  );
+                }
+              },
             ),
             const SizedBox(height: 7),
             _profileRow(

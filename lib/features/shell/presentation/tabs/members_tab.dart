@@ -5,6 +5,9 @@ extension _MembersTab on _HomeScreenState {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark ? Colors.white : kLightNavy;
     final mutedColor = isDark ? Colors.white60 : kLightMuted;
+    final visibleGroups = _groups
+        .where((group) => _showOwnedCircles ? group.isOwner : !group.isOwner)
+        .toList();
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(24, 22, 24, 12),
@@ -22,6 +25,95 @@ extension _MembersTab on _HomeScreenState {
             'Create circles and manage your family members.',
             style: TextStyle(fontSize: 12, color: mutedColor),
           ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: isDark ? kDarkSurface : kLightSurfaceMuted,
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Row(
+              children: [
+                _circleScopeButton('Owned', true, isDark),
+                _circleScopeButton('Joined', false, isDark),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (visibleGroups.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: isDark ? kDarkCard : kLightSurface,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: isDark ? Colors.white12 : kLightBorder,
+                ),
+              ),
+              child: Text(
+                _showOwnedCircles
+                    ? 'You do not own a Circle yet.'
+                    : 'You have not joined another Circle yet.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: mutedColor, fontSize: 11),
+              ),
+            )
+          else
+            ...visibleGroups.map(
+              (group) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(15),
+                  onTap: () => _openGroupHome(group),
+                  child: Container(
+                    padding: const EdgeInsets.all(13),
+                    decoration: BoxDecoration(
+                      color: isDark ? kDarkCard : kLightSurface,
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: isDark ? Colors.white12 : kLightBorder,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: kEmerald.withValues(alpha: .13),
+                          child: const Icon(
+                            Icons.groups_rounded,
+                            color: kEmerald,
+                          ),
+                        ),
+                        const SizedBox(width: 11),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                group.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: titleColor,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              Text(
+                                group.isOwner ? 'Owner' : group.role.value,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: mutedColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right_rounded),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: 12),
           _groupSelector(),
           const SizedBox(height: 10),
@@ -95,6 +187,35 @@ extension _MembersTab on _HomeScreenState {
             (index) => _memberListCard(familyMembers[index], index, isDark),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _circleScopeButton(String label, bool owned, bool isDark) {
+    final selected = _showOwnedCircles == owned;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _setCircleScope(owned),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            gradient: selected && !isDark ? kPrimaryGradient : null,
+            color: selected && isDark ? kEmerald : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected
+                  ? Colors.white
+                  : (isDark ? Colors.white60 : kLightMuted),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
       ),
     );
   }

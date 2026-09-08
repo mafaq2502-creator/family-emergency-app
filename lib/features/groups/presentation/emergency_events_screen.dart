@@ -5,8 +5,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../models/emergency_event.dart';
 import '../../../models/family_group.dart';
 import '../../../services/emergency_service.dart';
+import '../../../core/widgets/light_ui.dart';
+import 'emergency_detail_screen.dart';
 
-class EmergencyEventsScreen extends StatelessWidget {
+class EmergencyEventsScreen extends StatefulWidget {
   const EmergencyEventsScreen({
     super.key,
     required this.group,
@@ -16,129 +18,211 @@ class EmergencyEventsScreen extends StatelessWidget {
   final String currentUserName;
 
   @override
+  State<EmergencyEventsScreen> createState() => _EmergencyEventsScreenState();
+}
+
+class _EmergencyEventsScreenState extends State<EmergencyEventsScreen> {
+  String _filter = 'active';
+
+  @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     return Scaffold(
-      appBar: AppBar(title: Text('${group.name} SOS activity')),
-      body: StreamBuilder<List<EmergencyEvent>>(
-        stream: EmergencyService().watchEvents(group.id),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return const Center(
-              child: Text('Emergency activity could not be loaded.'),
-            );
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final events = snapshot.data!;
-          if (events.isEmpty) {
-            return const Center(child: Text('No SOS alerts in this group.'));
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: events.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              final event = events[index];
-              final active = event.status != 'resolved';
-              final canResolve =
-                  user != null &&
-                  (group.canManage || event.senderId == user.uid);
-              return Card(
-                child: Padding(
+      appBar: AppBar(title: Text('${widget.group.name} SOS activity')),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: kLightSurfaceMuted,
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Row(
+                children: [
+                  _filterButton('active', 'Active'),
+                  _filterButton('acknowledged', 'Acknowledged'),
+                  _filterButton('resolved', 'Resolved'),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<List<EmergencyEvent>>(
+              stream: EmergencyService().watchEvents(widget.group.id),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const LightStateView(
+                    icon: Icons.cloud_off_rounded,
+                    title: 'Could not load emergencies',
+                    message: 'Check your connection and try again.',
+                  );
+                }
+                if (!snapshot.hasData) {
+                  return const LightStateView(
+                    icon: Icons.sync_rounded,
+                    title: 'Loading activity',
+                    message: 'Getting the latest emergency status…',
+                    busy: true,
+                  );
+                }
+                final events = snapshot.data!
+                    .where((event) => event.status == _filter)
+                    .toList();
+                if (events.isEmpty) {
+                  return const LightStateView(
+                    icon: Icons.health_and_safety_rounded,
+                    title: 'No emergency alerts',
+                    message: 'SOS activity for this Circle will appear here.',
+                  );
+                }
+                return ListView.separated(
                   padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            active
-                                ? Icons.warning_amber_rounded
-                                : Icons.check_circle_rounded,
-                            color: active ? kEmergency : kEmerald,
+                  itemCount: events.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final event = events[index];
+                    final active = event.status != 'resolved';
+                    final canResolve =
+                        user != null &&
+                        (widget.group.canManage || event.senderId == user.uid);
+                    return LightCard(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EmergencyDetailScreen(
+                            group: widget.group,
+                            event: event,
+                            currentUserName: widget.currentUserName,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'SOS from ${event.senderName}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            event.status.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: active ? kEmergency : kEmerald,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                      if (event.createdAt != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 7),
-                          child: Text(
-                            'Sent ${MaterialLocalizations.of(context).formatMediumDate(event.createdAt!)} at ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(event.createdAt!))}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF64748B),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  active
+                                      ? Icons.warning_amber_rounded
+                                      : Icons.check_circle_rounded,
+                                  color: active ? kEmergency : kEmerald,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'SOS from ${event.senderName}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  event.status.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: active ? kEmergency : kEmerald,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
-                      if (event.acknowledgedByName != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 7),
-                          child: Text(
-                            'Acknowledged by ${event.acknowledgedByName}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
-                        ),
-                      if (active)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: Wrap(
-                            spacing: 8,
-                            children: [
-                              if (event.status == 'active' && user != null)
-                                OutlinedButton(
-                                  onPressed: () =>
-                                      EmergencyService().acknowledge(
-                                        groupId: group.id,
-                                        emergencyId: event.id,
-                                        user: user,
-                                        name: currentUserName,
+                            if (event.createdAt != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 7),
+                                child: Text(
+                                  'Sent ${MaterialLocalizations.of(context).formatMediumDate(event.createdAt!)} at ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(event.createdAt!))}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ),
+                            if (event.acknowledgedByName != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 7),
+                                child: Text(
+                                  'Acknowledged by ${event.acknowledgedByName}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ),
+                            if (active)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: Wrap(
+                                  spacing: 8,
+                                  children: [
+                                    if (event.status == 'active' &&
+                                        user != null)
+                                      OutlinedButton(
+                                        onPressed: () =>
+                                            EmergencyService().acknowledge(
+                                              groupId: widget.group.id,
+                                              emergencyId: event.id,
+                                              user: user,
+                                              name: widget.currentUserName,
+                                            ),
+                                        child: const Text('Acknowledge'),
                                       ),
-                                  child: const Text('Acknowledge'),
+                                    if (canResolve)
+                                      ElevatedButton(
+                                        onPressed: () =>
+                                            EmergencyService().resolve(
+                                              groupId: widget.group.id,
+                                              emergencyId: event.id,
+                                            ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: kEmergency,
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        child: const Text('Resolve'),
+                                      ),
+                                  ],
                                 ),
-                              if (canResolve)
-                                ElevatedButton(
-                                  onPressed: () => EmergencyService().resolve(
-                                    groupId: group.id,
-                                    emergencyId: event.id,
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: kEmergency,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: const Text('Resolve'),
-                                ),
-                            ],
-                          ),
+                              ),
+                          ],
                         ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterButton(String value, String label) {
+    final selected = _filter == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _filter = value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            gradient: selected ? kPrimaryGradient : null,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: selected ? Colors.white : kLightMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
       ),
     );
   }

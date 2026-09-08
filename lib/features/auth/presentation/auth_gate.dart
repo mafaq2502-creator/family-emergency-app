@@ -10,6 +10,7 @@ import '../../shell/presentation/family_shell.dart';
 import '../domain/auth_destination.dart';
 import 'login_screen.dart';
 import 'onboarding/circle_onboarding_screen.dart';
+import 'onboarding/intro_flow.dart';
 import 'onboarding/profile_setup_screen.dart';
 
 class AuthGate extends StatefulWidget {
@@ -29,6 +30,7 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
+  static bool _introSeenThisRun = false;
   late final AuthService _authService = widget.authService ?? AuthService();
   late final ProfileService _profileService =
       widget.profileService ?? ProfileService();
@@ -63,7 +65,7 @@ class _AuthGateState extends State<AuthGate> {
       stream: _authService.authStateChanges(),
       builder: (context, authSnapshot) {
         if (authSnapshot.connectionState == ConnectionState.waiting) {
-          return const _AuthLoadingScreen(message: 'Checking your session…');
+          return const StartupSplash(message: 'Checking your session…');
         }
         if (authSnapshot.hasError) {
           return _StartupErrorScreen(onRetry: _refresh);
@@ -72,6 +74,11 @@ class _AuthGateState extends State<AuthGate> {
         if (user == null) {
           _resolvedUid = null;
           _resolution = null;
+          if (!_introSeenThisRun) {
+            return IntroFlow(
+              onFinished: () => setState(() => _introSeenThisRun = true),
+            );
+          }
           return LoginScreen(authService: _authService);
         }
 
@@ -79,9 +86,7 @@ class _AuthGateState extends State<AuthGate> {
           future: _resolutionFor(user),
           builder: (context, profileSnapshot) {
             if (profileSnapshot.connectionState != ConnectionState.done) {
-              return const _AuthLoadingScreen(
-                message: 'Preparing your account…',
-              );
+              return const StartupSplash(message: 'Preparing your account…');
             }
             if (profileSnapshot.hasError || profileSnapshot.data == null) {
               return _StartupErrorScreen(
@@ -132,26 +137,6 @@ class _SessionResolution {
 
   final UserProfile profile;
   final bool hasCircle;
-}
-
-class _AuthLoadingScreen extends StatelessWidget {
-  const _AuthLoadingScreen({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    body: Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(color: kEmerald),
-          const SizedBox(height: 16),
-          Text(message),
-        ],
-      ),
-    ),
-  );
 }
 
 class _StartupErrorScreen extends StatelessWidget {

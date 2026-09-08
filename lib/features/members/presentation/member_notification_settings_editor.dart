@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../models/notification_settings.dart';
+import '../../../core/widgets/light_ui.dart';
 
 class MemberNotificationSettingsEditor extends StatelessWidget {
   const MemberNotificationSettingsEditor({
@@ -46,26 +47,31 @@ class MemberNotificationSettingsEditor extends StatelessWidget {
           style: TextStyle(fontSize: 11, color: muted),
         ),
         _toggle(
+          Icons.event_busy_rounded,
           'Missed daily check-in',
           settings.missedCheckInAlerts,
           (value) => onChanged(_copy(missedCheckInAlerts: value)),
         ),
         _toggle(
+          Icons.sos_rounded,
           'Emergency alerts',
           settings.emergencyAlerts,
           (value) => onChanged(_copy(emergencyAlerts: value)),
         ),
         _toggle(
+          Icons.battery_alert_rounded,
           'Low battery alerts',
           settings.batteryAlerts,
           (value) => onChanged(_copy(batteryAlerts: value)),
         ),
         _toggle(
+          Icons.signal_wifi_connected_no_internet_4_rounded,
           'Offline alerts',
           settings.offlineAlerts,
           (value) => onChanged(_copy(offlineAlerts: value)),
         ),
         _toggle(
+          Icons.location_on_rounded,
           'Location sharing',
           settings.locationSharing,
           (value) => onChanged(_copy(locationSharing: value)),
@@ -74,22 +80,18 @@ class MemberNotificationSettingsEditor extends StatelessWidget {
     );
   }
 
-  Widget _toggle(String label, bool value, ValueChanged<bool> onChanged) =>
-      Builder(
-        builder: (context) => SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(
-            label,
-            style: TextStyle(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white
-                  : kLightNavy,
-              fontSize: 13,
-            ),
-          ),
-          value: value,
-          activeThumbColor: kEmerald,
-          onChanged: onChanged,
-        ),
-      );
+  Widget _toggle(
+    IconData icon,
+    String label,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) => Padding(
+    padding: const EdgeInsets.only(top: 8),
+    child: LightToggleRow(
+      icon: icon,
+      title: label,
+      value: value,
+      onChanged: onChanged,
+    ),
+  );
 }
