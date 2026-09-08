@@ -9,14 +9,14 @@ import '../../../core/theme/theme_mode_controller.dart';
 import '../../../models/family_member.dart';
 import '../../../models/notification_settings.dart';
 import '../../../models/family_group.dart';
+import '../../../models/circle_role.dart';
 import '../../../models/app_notification.dart';
 import '../../../services/profile_service.dart';
 import '../../../services/family_member_service.dart';
 import '../../../services/group_service.dart';
-import '../../../services/group_migration_service.dart';
 import '../../../services/emergency_service.dart';
 import '../../../services/app_notification_service.dart';
-import '../../auth/presentation/login_screen.dart';
+import '../../../services/auth_service.dart';
 import '../../members/presentation/member_profile_screen.dart';
 import '../../members/presentation/member_notification_settings_editor.dart';
 import '../../groups/presentation/group_settings_screen.dart';
@@ -61,23 +61,32 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime? _lastDailyCheckIn;
   bool _isMarkingAlive = false;
   String _deviceTimeZone = 'UTC';
-  bool _isFamilyOwner = true;
   Map<String, dynamic> _notificationSettings = {};
   final ProfileService _profileService = ProfileService();
   final FamilyMemberService _memberService = FamilyMemberService();
   final GroupService _groupService = GroupService();
-  final GroupMigrationService _migrationService = GroupMigrationService();
   final EmergencyService _emergencyService = EmergencyService();
-  final AppNotificationService _appNotificationService = AppNotificationService();
+  final AppNotificationService _appNotificationService =
+      AppNotificationService();
   List<FamilyGroup> _groups = const [];
   FamilyGroup? _selectedGroup;
   StreamSubscription<List<FamilyGroup>>? _groupsSubscription;
   StreamSubscription<List<FamilyMember>>? _membersSubscription;
 
   static const List<String> _roles = [
-    'Self', 'Father', 'Mother', 'Son', 'Daughter', 'Husband', 'Wife',
-    'Grandfather', 'Grandmother', 'Grandson', 'Granddaughter',
-    'Brother', 'Sister',
+    'Self',
+    'Father',
+    'Mother',
+    'Son',
+    'Daughter',
+    'Husband',
+    'Wife',
+    'Grandfather',
+    'Grandmother',
+    'Grandson',
+    'Granddaughter',
+    'Brother',
+    'Sister',
   ];
 
   List<FamilyMember> familyMembers = const [];
@@ -95,7 +104,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _prepareGroups() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    try { await _migrationService.migrateLegacyMembers(user); } catch (_) {}
     _watchGroups();
   }
 
@@ -103,62 +111,179 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     _groupsSubscription?.cancel();
-    _groupsSubscription = _groupService.watchGroups(user).listen((groups) {
-      if (!mounted) return;
-      _groupRetryTimer?.cancel();
-      _groupLoadErrorShown = false;
-      setState(() {
-        _groups = groups;
-        final currentId = _selectedGroup?.id;
-        _selectedGroup = groups.where((group) => group.id == currentId).cast<FamilyGroup?>().firstOrNull ?? (groups.isEmpty ? null : groups.first);
-      });
-      _watchMembers();
-    }, onError: (_) {
-      if (!mounted) return;
-      if (!_groupLoadErrorShown) {
-        _groupLoadErrorShown = true;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Could not sync groups. Retrying…'),
-          backgroundColor: kEmergency,
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 2),
-        ));
-      }
-      _groupRetryTimer?.cancel();
-      _groupRetryTimer = Timer(const Duration(seconds: 3), _watchGroups);
-    });
+    _groupsSubscription = _groupService
+        .watchGroups(user)
+        .listen(
+          (groups) {
+            if (!mounted) return;
+            _groupRetryTimer?.cancel();
+            _groupLoadErrorShown = false;
+            setState(() {
+              _groups = groups;
+              final currentId = _selectedGroup?.id;
+              _selectedGroup =
+                  groups
+                      .where((group) => group.id == currentId)
+                      .cast<FamilyGroup?>()
+                      .firstOrNull ??
+                  (groups.isEmpty ? null : groups.first);
+            });
+            _watchMembers();
+          },
+          onError: (_) {
+            if (!mounted) return;
+            if (!_groupLoadErrorShown) {
+              _groupLoadErrorShown = true;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Could not sync groups. Retrying…'),
+                  backgroundColor: kEmergency,
+                  behavior: SnackBarBehavior.floating,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+            _groupRetryTimer?.cancel();
+            _groupRetryTimer = Timer(const Duration(seconds: 3), _watchGroups);
+          },
+        );
   }
 
   Future<void> _createGroup() async {
     final controller = TextEditingController();
-    final name = await showDialog<String>(context: context, builder: (context) => AlertDialog(title: const Text('Create group'), content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(labelText: 'Group name')), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')), ElevatedButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('Create'))]));
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Create group'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Group name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
     if (name == null || name.isEmpty) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     try {
       final groupId = await _groupService.createGroup(user, name);
       if (!mounted) return;
-      final createdGroup = FamilyGroup(id: groupId, name: name, ownerId: user.uid, role: 'owner', emergencyRecipientIds: [user.uid]);
+      final createdGroup = FamilyGroup(
+        id: groupId,
+        name: name,
+        ownerId: user.uid,
+        role: CircleRole.owner,
+        emergencyRecipientIds: [user.uid],
+      );
       setState(() {
-        _groups = [..._groups.where((group) => group.id != groupId), createdGroup];
+        _groups = [
+          ..._groups.where((group) => group.id != groupId),
+          createdGroup,
+        ];
         _selectedGroup = createdGroup;
         familyMembers = const [];
       });
       _watchMembers();
       _watchGroups();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name created.'), backgroundColor: kEmerald));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$name created.'), backgroundColor: kEmerald),
+      );
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not create group. Check Firestore rules and connection.'), backgroundColor: kEmergency));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not create group. Check Firestore rules and connection.',
+            ),
+            backgroundColor: kEmergency,
+          ),
+        );
+      }
     }
   }
 
-  Widget _groupSelector() => Row(children: [Expanded(child: DropdownButtonHideUnderline(child: DropdownButton<FamilyGroup>(value: _selectedGroup, hint: const Text('Select group'), isExpanded: true, items: _groups.map((group) => DropdownMenuItem(value: group, child: Text(group.name))).toList(), onChanged: (group) { setState(() => _selectedGroup = group); _watchMembers(); }))), IconButton(onPressed: _createGroup, icon: const Icon(Icons.add_circle_outline_rounded, color: kEmerald), tooltip: 'Add group')]);
+  Widget _groupSelector() => Row(
+    children: [
+      Expanded(
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<FamilyGroup>(
+            value: _selectedGroup,
+            hint: const Text('Select group'),
+            isExpanded: true,
+            items: _groups
+                .map(
+                  (group) =>
+                      DropdownMenuItem(value: group, child: Text(group.name)),
+                )
+                .toList(),
+            onChanged: (group) {
+              setState(() => _selectedGroup = group);
+              _watchMembers();
+            },
+          ),
+        ),
+      ),
+      IconButton(
+        onPressed: _createGroup,
+        icon: const Icon(Icons.add_circle_outline_rounded, color: kEmerald),
+        tooltip: 'Add group',
+      ),
+    ],
+  );
 
-  void _openGroupSettings() { final group = _selectedGroup; if (group == null || !group.canManage) return; Navigator.push(context, MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group, members: familyMembers))); }
+  void _openGroupSettings() {
+    final group = _selectedGroup;
+    if (group == null || !group.canManage) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            GroupSettingsScreen(group: group, members: familyMembers),
+      ),
+    );
+  }
 
-  void _openGroupHome(FamilyGroup group) { setState(() => _selectedGroup = group); Navigator.push(context, MaterialPageRoute(builder: (_) => GroupMembersScreen(group: group))); }
+  void _openGroupHome(FamilyGroup group) {
+    setState(() => _selectedGroup = group);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => GroupMembersScreen(group: group)),
+    );
+  }
 
-  Widget _notificationBell() { final user = FirebaseAuth.instance.currentUser; if (user == null) return const SizedBox(); return StreamBuilder<List<AppNotification>>(stream: _appNotificationService.watch(user), builder: (context, snapshot) { final unread = (snapshot.data ?? []).where((item) => !item.isRead).length; return IconButton(onPressed: () => showNotificationBanner(context, user), icon: Badge(isLabelVisible: unread > 0, label: Text('$unread'), child: const Icon(Icons.notifications_none_rounded, color: kEmerald))); }); }
+  Widget _notificationBell() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return const SizedBox();
+    return StreamBuilder<List<AppNotification>>(
+      stream: _appNotificationService.watch(user),
+      builder: (context, snapshot) {
+        final unread = (snapshot.data ?? [])
+            .where((item) => !item.isRead)
+            .length;
+        return IconButton(
+          onPressed: () => showNotificationBanner(context, user),
+          icon: Badge(
+            isLabelVisible: unread > 0,
+            label: Text('$unread'),
+            child: const Icon(
+              Icons.notifications_none_rounded,
+              color: kEmerald,
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   void _watchMembers() {
     final group = _selectedGroup;
@@ -167,7 +292,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) setState(() => familyMembers = const []);
       return;
     }
-    _membersSubscription = _memberService.watchGroupMembers(group.id).listen((members) {
+    _membersSubscription = _memberService.watchGroupMembers(group.id).listen((
+      members,
+    ) {
       if (mounted) setState(() => familyMembers = members);
     }, onError: (_) {});
   }
@@ -177,7 +304,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final timezone = await FlutterTimezone.getLocalTimezone();
       if (mounted) setState(() => _deviceTimeZone = timezone.identifier);
     } catch (_) {
-      if (mounted) setState(() => _deviceTimeZone = DateTime.now().timeZoneName);
+      if (mounted) {
+        setState(() => _deviceTimeZone = DateTime.now().timeZoneName);
+      }
     }
   }
 
@@ -192,13 +321,12 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() {
         _initialProfileName = profile.name;
-        _profileRole = profile.role;
+        _profileRole = profile.relationship;
         _initialProfileRole = _profileRole;
         _profileNameController.text = _initialProfileName;
         _profileEmail = profile.email;
         _profilePhone = profile.phone;
         _lastDailyCheckIn = profile.lastDailyCheckIn;
-        _isFamilyOwner = profile.isFamilyOwner;
         _notificationSettings = profile.notificationSettings.toMap();
         _isProfileLoading = false;
         _isProfileDirty = false;
@@ -214,7 +342,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _updateProfileDirtyState() {
-    final changed = _profileNameController.text.trim() != _initialProfileName ||
+    final changed =
+        _profileNameController.text.trim() != _initialProfileName ||
         _profileRole != _initialProfileRole;
     if (mounted && changed != _isProfileDirty) {
       setState(() => _isProfileDirty = changed);
@@ -232,7 +361,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (user == null) return;
     setState(() => _isSavingProfile = true);
     try {
-      await _profileService.saveBasicProfile(user, name: _profileNameController.text.trim(), role: _profileRole);
+      await _profileService.saveBasicProfile(
+        user,
+        name: _profileNameController.text.trim(),
+        relationship: _profileRole,
+      );
       if (!mounted) return;
       setState(() {
         _initialProfileName = _profileNameController.text.trim();
@@ -240,12 +373,18 @@ class _HomeScreenState extends State<HomeScreen> {
         _isProfileDirty = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile saved'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('Profile saved'),
+          backgroundColor: Colors.green,
+        ),
       );
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not save profile. Please try again.'), backgroundColor: Colors.redAccent),
+          const SnackBar(
+            content: Text('Could not save profile. Please try again.'),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     } finally {
@@ -261,8 +400,14 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Save changes?'),
         content: const Text('You have unsaved profile changes.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Keep editing')),
-          TextButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Discard')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep editing'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Discard'),
+          ),
           ElevatedButton(
             onPressed: () async {
               await _saveProfile();
@@ -282,7 +427,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_isCountingDown || _alertSent) return;
     final group = _selectedGroup;
     if (group == null || group.emergencyRecipientIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Configure emergency recipients in Group Settings first.'), backgroundColor: kEmergency));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Configure emergency recipients in Group Settings first.',
+          ),
+          backgroundColor: kEmergency,
+        ),
+      );
       return;
     }
 
@@ -306,13 +458,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _logout() async {
-    await FirebaseAuth.instance.signOut();
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-      (route) => false,
-    );
+    await AuthService().signOut();
   }
 
   void _showAddMemberDialog() {
@@ -426,7 +572,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         setDialogState(() => locationAccess = value);
                       },
                     ),
-                    MemberNotificationSettingsEditor(settings: memberNotifications, onChanged: (settings) => setDialogState(() => memberNotifications = settings)),
+                    MemberNotificationSettingsEditor(
+                      settings: memberNotifications,
+                      onChanged: (settings) =>
+                          setDialogState(() => memberNotifications = settings),
+                    ),
                     SwitchListTile(
                       title: const Text(
                         'Battery Status',
@@ -463,13 +613,30 @@ class _HomeScreenState extends State<HomeScreen> {
                       return;
                     }
 
-                    final member = FamilyMember(name: nameController.text.trim(), status: 'Pending', email: emailController.text.trim(), relation: selectedRelation, locationAccess: locationAccess, batteryAccess: batteryAccess, notificationSettings: memberNotifications);
+                    final member = FamilyMember(
+                      name: nameController.text.trim(),
+                      status: 'Pending',
+                      email: emailController.text.trim(),
+                      relation: selectedRelation,
+                      locationAccess: locationAccess,
+                      batteryAccess: batteryAccess,
+                      notificationSettings: memberNotifications,
+                    );
                     final group = _selectedGroup;
                     if (group == null || !group.canManage) return;
                     try {
                       await _memberService.createInGroup(group.id, member);
                     } catch (_) {
-                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not save member. Check your connection and Firestore setup.'), backgroundColor: kEmergency));
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Could not save member. Check your connection and Firestore setup.',
+                            ),
+                            backgroundColor: kEmergency,
+                          ),
+                        );
+                      }
                       return;
                     }
 
@@ -523,15 +690,15 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Scaffold(
         body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          _buildFamilyTab(),
-          _buildLocationTab(),
-          _buildHomeTab(),
-          _buildPlanTab(),
-          _buildProfileTab(),
-        ],
-      ),
+          index: _currentIndex,
+          children: [
+            _buildFamilyTab(),
+            _buildLocationTab(),
+            _buildHomeTab(),
+            _buildPlanTab(),
+            _buildProfileTab(),
+          ],
+        ),
         bottomNavigationBar: _buildNavigationBar(),
       ),
     );
@@ -541,12 +708,31 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     try {
-      await _emergencyService.create(groupId: group.id, sender: user, senderName: _profileNameController.text.trim().isEmpty ? 'A group member' : _profileNameController.text.trim(), recipientIds: group.emergencyRecipientIds);
+      await _emergencyService.create(
+        groupId: group.id,
+        sender: user,
+        senderName: _profileNameController.text.trim().isEmpty
+            ? 'A group member'
+            : _profileNameController.text.trim(),
+        recipientIds: group.emergencyRecipientIds,
+      );
       if (!mounted) return;
       setState(() => _alertSent = true);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('SOS sent to ${group.name} emergency recipients.'), backgroundColor: kEmergency));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('SOS sent to ${group.name} emergency recipients.'),
+          backgroundColor: kEmergency,
+        ),
+      );
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not send SOS. Please try again.'), backgroundColor: kEmergency));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not send SOS. Please try again.'),
+            backgroundColor: kEmergency,
+          ),
+        );
+      }
     }
   }
 
@@ -558,7 +744,14 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     _memberService.deleteInGroup(group.id, member.id!).catchError((_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not remove member.'), backgroundColor: kEmergency));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not remove member.'),
+            backgroundColor: kEmergency,
+          ),
+        );
+      }
     });
   }
 
@@ -568,23 +761,45 @@ class _HomeScreenState extends State<HomeScreen> {
     await _memberService.updateInGroup(group.id, member);
   }
 
-  Future<void> _openMemberProfile(FamilyMember member, int index) => Navigator.push(context, MaterialPageRoute(builder: (_) => MemberProfileScreen(member: member, onDelete: () async => _removeFamilyMember(index), onSave: _updateFamilyMember)));
+  Future<void> _openMemberProfile(FamilyMember member, int index) =>
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MemberProfileScreen(
+            member: member,
+            onDelete: () async => _removeFamilyMember(index),
+            onSave: _updateFamilyMember,
+          ),
+        ),
+      );
 
   bool get _checkedInToday {
     final checkIn = _lastDailyCheckIn;
     if (checkIn == null) return false;
     final now = DateTime.now();
-    return checkIn.year == now.year && checkIn.month == now.month && checkIn.day == now.day;
+    return checkIn.year == now.year &&
+        checkIn.month == now.month &&
+        checkIn.day == now.day;
   }
 
   Future<void> _markAlive() async {
     if (_checkedInToday) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("You're already checked in for today."), backgroundColor: kEmerald));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("You're already checked in for today."),
+          backgroundColor: kEmerald,
+        ),
+      );
       return;
     }
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please sign in to check in.'), backgroundColor: kEmergency));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please sign in to check in.'),
+          backgroundColor: kEmergency,
+        ),
+      );
       return;
     }
 
@@ -594,14 +809,27 @@ class _HomeScreenState extends State<HomeScreen> {
       await _profileService.recordDailyCheckIn(
         user,
         timeZone: _deviceTimeZone,
-        localDate: '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
+        localDate:
+            '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
       );
       if (!mounted) return;
       setState(() => _lastDailyCheckIn = now);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Today's check-in is confirmed. Stay safe!"), backgroundColor: kEmerald));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Today's check-in is confirmed. Stay safe!"),
+          backgroundColor: kEmerald,
+        ),
+      );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not save today\'s check-in. Please try again.'), backgroundColor: kEmergency));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not save today\'s check-in. Please try again.',
+            ),
+            backgroundColor: kEmergency,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isMarkingAlive = false);
@@ -611,8 +839,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildNavigationBar() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     const items = [
-      (Icons.location_on_rounded, 'Location', 1),
-      (Icons.groups_rounded, 'Members', 0),
+      (Icons.bar_chart_rounded, 'Progress', 1),
+      (Icons.groups_rounded, 'Family', 0),
       (Icons.workspace_premium_rounded, 'Plan', 3),
       (Icons.person_rounded, 'Profile', 4),
     ];
@@ -627,18 +855,20 @@ class _HomeScreenState extends State<HomeScreen> {
             Positioned.fill(
               child: PhysicalShape(
                 clipper: const _WaveNavigationClipper(),
-                color: isDark ? kDarkSurface : Colors.white,
+                color: isDark ? kDarkSurface : kLightSurface,
                 elevation: 10,
                 shadowColor: Colors.black26,
                 child: Padding(
                   padding: const EdgeInsets.only(top: 20),
                   child: Row(
-                  children: [
-                    for (final item in items.take(2)) _navItem(item.$1, item.$2, item.$3),
-                    const Spacer(flex: 2),
-                    for (final item in items.skip(2)) _navItem(item.$1, item.$2, item.$3),
-                  ],
-                ),
+                    children: [
+                      for (final item in items.take(2))
+                        _navItem(item.$1, item.$2, item.$3),
+                      const Spacer(flex: 2),
+                      for (final item in items.skip(2))
+                        _navItem(item.$1, item.$2, item.$3),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -647,21 +877,54 @@ class _HomeScreenState extends State<HomeScreen> {
               child: InkResponse(
                 onTap: () => setState(() => _currentIndex = 2),
                 radius: 40,
-                hoverColor: kEmerald.withValues(alpha: .14),
+                hoverColor: (isDark ? kEmerald : kLightAccent).withValues(
+                  alpha: .14,
+                ),
                 child: Column(
                   children: [
                     Container(
                       width: 62,
                       height: 62,
                       decoration: BoxDecoration(
-                        color: kEmerald,
+                        gradient: isDark
+                            ? null
+                            : const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [kLightAccent, kLightPrimary],
+                              ),
+                        color: isDark ? kEmerald : null,
                         shape: BoxShape.circle,
-                        border: Border.all(color: isDark ? kDarkBackground : const Color(0xFFF8FBFA), width: 4),
+                        border: Border.all(
+                          color: isDark ? kDarkBackground : kLightBackground,
+                          width: 4,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isDark ? kEmerald : kLightAccent)
+                                .withValues(alpha: .28),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
                       ),
-                      child: const Icon(Icons.home_rounded, color: Colors.white, size: 30),
+                      child: const Icon(
+                        Icons.home_rounded,
+                        color: Colors.white,
+                        size: 30,
+                      ),
                     ),
                     const SizedBox(height: 1),
-                    Text('Home', style: TextStyle(color: _currentIndex == 2 ? kEmerald : Colors.grey, fontSize: 11, fontWeight: FontWeight.w700)),
+                    Text(
+                      'Home',
+                      style: TextStyle(
+                        color: _currentIndex == 2
+                            ? (isDark ? kEmerald : kLightPrimary)
+                            : (isDark ? Colors.grey : kLightMuted),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -674,17 +937,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _navItem(IconData icon, String label, int index) {
     final selected = _currentIndex == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeColor = isDark ? kEmerald : kLightPrimary;
+    final inactiveColor = isDark ? Colors.grey : kLightMuted;
     return Expanded(
       child: InkWell(
         onTap: () => setState(() => _currentIndex = index),
-        hoverColor: kEmerald.withValues(alpha: .10),
+        hoverColor: activeColor.withValues(alpha: .10),
         borderRadius: BorderRadius.circular(18),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: selected ? kEmerald : Colors.grey),
+            Icon(icon, color: selected ? activeColor : inactiveColor),
             const SizedBox(height: 3),
-            Text(label, style: TextStyle(color: selected ? kEmerald : Colors.grey, fontSize: 11)),
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? activeColor : inactiveColor,
+                fontSize: 11,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
@@ -872,10 +1145,10 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Icons.notifications_active_rounded,
               iconColor: const Color(0xFF2563EB),
               label: 'Notification Settings',
-              value: _isFamilyOwner ? 'Personal & family owner controls' : 'Personal notification preferences',
+              value: (_selectedGroup?.isOwner ?? false) ? 'Personal & family owner controls' : 'Personal notification preferences',
               isDark: isDark,
               onTap: () async {
-                final saved = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => NotificationSettingsScreen(initialSettings: _notificationSettings, isFamilyOwner: _isFamilyOwner)));
+                final saved = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => NotificationSettingsScreen(initialSettings: _notificationSettings, isCircleOwner: _selectedGroup?.isOwner ?? false)));
                 if (saved == true && mounted) _loadProfile();
               },
             ),

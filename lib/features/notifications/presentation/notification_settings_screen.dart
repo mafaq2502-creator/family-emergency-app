@@ -7,21 +7,27 @@ import '../../../models/notification_settings.dart';
 import '../../../services/notification_settings_service.dart';
 
 const _emerald = kEmerald;
-const _navy = kNavy;
+const _navy = kLightNavy;
 const _darkBackground = kDarkBackground;
 const _darkMuted = kDarkMuted;
 
 class NotificationSettingsScreen extends StatefulWidget {
-  const NotificationSettingsScreen({super.key, required this.initialSettings, required this.isFamilyOwner});
+  const NotificationSettingsScreen({
+    super.key,
+    required this.initialSettings,
+    required this.isCircleOwner,
+  });
 
   final Map<String, dynamic> initialSettings;
-  final bool isFamilyOwner;
+  final bool isCircleOwner;
 
   @override
-  State<NotificationSettingsScreen> createState() => _NotificationSettingsScreenState();
+  State<NotificationSettingsScreen> createState() =>
+      _NotificationSettingsScreenState();
 }
 
-class _NotificationSettingsScreenState extends State<NotificationSettingsScreen> {
+class _NotificationSettingsScreenState
+    extends State<NotificationSettingsScreen> {
   late bool _missedCheckInAlerts;
   late bool _emergencyAlerts;
   late bool _batteryAlerts;
@@ -40,7 +46,8 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     _batteryAlerts = settings['batteryAlerts'] as bool? ?? false;
     _offlineAlerts = settings['offlineAlerts'] as bool? ?? false;
     _locationSharing = settings['locationSharing'] as bool? ?? false;
-    _ownerMissedCheckInAlerts = settings['ownerMissedCheckInAlerts'] as bool? ?? true;
+    _ownerMissedCheckInAlerts =
+        settings['ownerMissedCheckInAlerts'] as bool? ?? true;
   }
 
   Future<void> _save() async {
@@ -48,19 +55,31 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     if (user == null) return;
     setState(() => _saving = true);
     try {
-      await _settingsService.save(user, NotificationSettings(
-        missedCheckInAlerts: _missedCheckInAlerts,
-        emergencyAlerts: _emergencyAlerts,
-        batteryAlerts: _batteryAlerts,
-        offlineAlerts: _offlineAlerts,
-        locationSharing: _locationSharing,
-        ownerMissedCheckInAlerts: widget.isFamilyOwner ? _ownerMissedCheckInAlerts : false,
-      ));
+      await _settingsService.save(
+        user,
+        NotificationSettings(
+          missedCheckInAlerts: _missedCheckInAlerts,
+          emergencyAlerts: _emergencyAlerts,
+          batteryAlerts: _batteryAlerts,
+          offlineAlerts: _offlineAlerts,
+          locationSharing: _locationSharing,
+          ownerMissedCheckInAlerts: widget.isCircleOwner
+              ? _ownerMissedCheckInAlerts
+              : false,
+        ),
+      );
       if (!mounted) return;
       Navigator.pop(context, true);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not save notification settings. Please try again.'), backgroundColor: Color(0xFFEF4444)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not save notification settings. Please try again.',
+            ),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -71,56 +90,162 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark ? Colors.white : _navy;
-    final muted = isDark ? _darkMuted : const Color(0xFF64748B);
+    final muted = isDark ? _darkMuted : kLightMuted;
     return Scaffold(
-      backgroundColor: isDark ? _darkBackground : const Color(0xFFF8FBFA),
+      backgroundColor: isDark ? _darkBackground : Colors.transparent,
       appBar: AppBar(
-        backgroundColor: isDark ? _darkBackground : const Color(0xFFF8FBFA),
+        backgroundColor: isDark ? _darkBackground : Colors.transparent,
         foregroundColor: titleColor,
         elevation: 0,
-        title: const Text('Notification Settings', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-        actions: [TextButton(onPressed: _saving ? null : _save, child: _saving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: _emerald)) : const Text('Save', style: TextStyle(color: _emerald, fontWeight: FontWeight.w800)))],
+        title: const Text(
+          'Notification Settings',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _saving ? null : _save,
+            child: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: _emerald,
+                    ),
+                  )
+                : const Text(
+                    'Save',
+                    style: TextStyle(
+                      color: _emerald,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [
-          Text('Personal alerts', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: titleColor)),
+          Text(
+            'Personal alerts',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: titleColor,
+            ),
+          ),
           const SizedBox(height: 8),
           _settingsCard(isDark, [
-            _settingTile('Missed daily check-in', 'Alert me when a family member misses their 10:00 AM deadline.', Icons.favorite_rounded, _missedCheckInAlerts, (value) => setState(() => _missedCheckInAlerts = value)),
-            _settingTile('Emergency alerts', 'Receive emergency SOS alerts from family members.', Icons.warning_amber_rounded, _emergencyAlerts, (value) => setState(() => _emergencyAlerts = value)),
-            _settingTile('Low battery alerts', 'Receive alerts when a shared device has low battery.', Icons.battery_alert_rounded, _batteryAlerts, (value) => setState(() => _batteryAlerts = value)),
-            _settingTile('Device offline alerts', 'Receive alerts when a shared device goes offline.', Icons.phonelink_erase_rounded, _offlineAlerts, (value) => setState(() => _offlineAlerts = value)),
+            _settingTile(
+              'Missed daily check-in',
+              'Alert me when a family member misses their 10:00 AM deadline.',
+              Icons.favorite_rounded,
+              _missedCheckInAlerts,
+              (value) => setState(() => _missedCheckInAlerts = value),
+            ),
+            _settingTile(
+              'Emergency alerts',
+              'Receive emergency SOS alerts from family members.',
+              Icons.warning_amber_rounded,
+              _emergencyAlerts,
+              (value) => setState(() => _emergencyAlerts = value),
+            ),
+            _settingTile(
+              'Low battery alerts',
+              'Receive alerts when a shared device has low battery.',
+              Icons.battery_alert_rounded,
+              _batteryAlerts,
+              (value) => setState(() => _batteryAlerts = value),
+            ),
+            _settingTile(
+              'Device offline alerts',
+              'Receive alerts when a shared device goes offline.',
+              Icons.phonelink_erase_rounded,
+              _offlineAlerts,
+              (value) => setState(() => _offlineAlerts = value),
+            ),
           ]),
           const SizedBox(height: 18),
-          Text('Privacy & sharing', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: titleColor)),
+          Text(
+            'Privacy & sharing',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: titleColor,
+            ),
+          ),
           const SizedBox(height: 8),
           _settingsCard(isDark, [
-            _settingTile('Location sharing', 'Allow approved family members to view your live location.', Icons.location_on_rounded, _locationSharing, (value) => setState(() => _locationSharing = value)),
+            _settingTile(
+              'Location sharing',
+              'Allow approved family members to view your live location.',
+              Icons.location_on_rounded,
+              _locationSharing,
+              (value) => setState(() => _locationSharing = value),
+            ),
           ]),
           const SizedBox(height: 18),
-          Text('Family owner controls', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: titleColor)),
+          Text(
+            'Family owner controls',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: titleColor,
+            ),
+          ),
           const SizedBox(height: 8),
           _settingsCard(isDark, [
-            _settingTile('Notify the family about missed check-ins', 'At a member’s local 10:00 AM deadline, notify opted-in family members.', Icons.groups_rounded, _ownerMissedCheckInAlerts, widget.isFamilyOwner ? (value) => setState(() => _ownerMissedCheckInAlerts = value) : null),
+            _settingTile(
+              'Notify the family about missed check-ins',
+              'At a member’s local 10:00 AM deadline, notify opted-in family members.',
+              Icons.groups_rounded,
+              _ownerMissedCheckInAlerts,
+              widget.isCircleOwner
+                  ? (value) => setState(() => _ownerMissedCheckInAlerts = value)
+                  : null,
+            ),
           ]),
-          if (!widget.isFamilyOwner) Padding(padding: const EdgeInsets.only(top: 8), child: Text('Only the family-circle owner can change family-wide alert rules.', style: TextStyle(fontSize: 11, color: muted))),
+          if (!widget.isCircleOwner)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Only the family-circle owner can change family-wide alert rules.',
+                style: TextStyle(fontSize: 11, color: muted),
+              ),
+            ),
           const SizedBox(height: 18),
-          Text('Daily check-in uses the member’s own device time zone: 10:00 AM to 9:59 AM. Push delivery requires the family backend and notification permission.', style: TextStyle(fontSize: 11, height: 1.4, color: muted)),
+          Text(
+            'Daily check-in uses the member’s own device time zone: 10:00 AM to 9:59 AM. Push delivery requires the family backend and notification permission.',
+            style: TextStyle(fontSize: 11, height: 1.4, color: muted),
+          ),
         ],
       ),
     );
   }
 
-  Widget _settingsCard(bool isDark, List<Widget> children) => AppSurfaceCard(child: Column(children: children));
+  Widget _settingsCard(bool isDark, List<Widget> children) =>
+      AppSurfaceCard(child: Column(children: children));
 
-  Widget _settingTile(String title, String detail, IconData icon, bool value, ValueChanged<bool>? onChanged) => SwitchListTile.adaptive(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-        value: value,
-        onChanged: onChanged,
-        activeThumbColor: _emerald,
-        secondary: Icon(icon, color: onChanged == null ? Colors.grey : _emerald),
-        title: Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: onChanged == null ? Colors.grey : null)),
-        subtitle: Text(detail, style: const TextStyle(fontSize: 11, height: 1.25)),
-      );
+  Widget _settingTile(
+    String title,
+    String detail,
+    IconData icon,
+    bool value,
+    ValueChanged<bool>? onChanged,
+  ) => SwitchListTile.adaptive(
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+    value: value,
+    onChanged: onChanged,
+    activeThumbColor: _emerald,
+    secondary: Icon(icon, color: onChanged == null ? Colors.grey : _emerald),
+    title: Text(
+      title,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: onChanged == null ? Colors.grey : null,
+      ),
+    ),
+    subtitle: Text(detail, style: const TextStyle(fontSize: 11, height: 1.25)),
+  );
 }

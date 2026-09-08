@@ -3,8 +3,8 @@ part of '../family_shell.dart';
 extension _HomeTab on _HomeScreenState {
   Widget _buildHomeTab() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : kNavy;
-    final mutedColor = isDark ? Colors.white70 : const Color(0xFF64748B);
+    final titleColor = isDark ? Colors.white : kLightNavy;
+    final mutedColor = isDark ? Colors.white70 : kLightMuted;
     return SafeArea(
       child: LayoutBuilder(
         builder: (context, viewport) => SingleChildScrollView(
@@ -15,50 +15,123 @@ extension _HomeTab on _HomeScreenState {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-            Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Hello, ${_profileNameController.text.isEmpty ? 'Afaq' : _profileNameController.text}', style: TextStyle(fontSize: 21, height: 1, fontWeight: FontWeight.bold, color: titleColor)),
-                const SizedBox(height: 6),
-                Row(children: [Text('Your family is safe', style: TextStyle(fontSize: 12, color: mutedColor)), const SizedBox(width: 5), const Icon(Icons.favorite, size: 15, color: kEmergency)]),
-              ])),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                _notificationBell(),
-                Stack(clipBehavior: Clip.none, children: [
-                const Icon(Icons.groups_rounded, color: kEmerald, size: 37),
-                Positioned(right: -2, top: -2, child: Container(width: 10, height: 10, decoration: BoxDecoration(color: kEmergency, shape: BoxShape.circle, border: Border.all(color: isDark ? const Color(0xFF101916) : const Color(0xFFF8FBFA), width: 1.5)))),
-              ]),]),
-            ]),
-            const SizedBox(height: 15),
-            Text('Your Groups', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: titleColor)),
-            if (_groups.isEmpty) ...[
-              const Spacer(),
-              Center(child: Text('No groups yet. Create one from Members.', style: TextStyle(fontSize: 12, color: mutedColor))),
-              const SizedBox(height: 22),
-              _homeActions(isDark, mutedColor),
-              const SizedBox(height: 18),
-            ] else ...[
-              const SizedBox(height: 10),
-              // A Wrap is deliberately used here instead of a nested GridView.
-              // This tab lives inside a SingleChildScrollView; a nested viewport
-              // can receive an unbounded height after authentication and crash.
-              LayoutBuilder(builder: (context, constraints) {
-                final cardWidth = (constraints.maxWidth - 10) / 2;
-                return Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    for (final group in _groups)
-                      SizedBox(
-                        width: cardWidth,
-                        height: cardWidth / 1.25,
-                        child: _groupHomeCard(group, isDark),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Hello, ${_profileNameController.text.isEmpty ? 'Afaq' : _profileNameController.text}',
+                              style: TextStyle(
+                                fontSize: 25,
+                                height: 1,
+                                fontWeight: FontWeight.bold,
+                                color: titleColor,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Text(
+                                  'Your family is safe',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: mutedColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                const Icon(
+                                  Icons.favorite,
+                                  size: 15,
+                                  color: kEmergency,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _notificationBell(),
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Icon(
+                                Icons.groups_rounded,
+                                color: isDark ? kEmerald : kLightPrimary,
+                                size: 37,
+                              ),
+                              Positioned(
+                                right: -2,
+                                top: -2,
+                                child: Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                    color: kEmergency,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isDark
+                                          ? const Color(0xFF101916)
+                                          : kLightBackground,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  Text(
+                    'Your Groups',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: titleColor,
+                    ),
+                  ),
+                  if (_groups.isEmpty) ...[
+                    const Spacer(),
+                    Center(
+                      child: Text(
+                        'No groups yet. Create one from Members.',
+                        style: TextStyle(fontSize: 12, color: mutedColor),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    _homeActions(isDark, mutedColor),
+                    const SizedBox(height: 18),
+                  ] else ...[
+                    const SizedBox(height: 10),
+                    // A Wrap is deliberately used here instead of a nested GridView.
+                    // This tab lives inside a SingleChildScrollView; a nested viewport
+                    // can receive an unbounded height after authentication and crash.
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final cardWidth = (constraints.maxWidth - 10) / 2;
+                        return Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            for (final group in _groups)
+                              SizedBox(
+                                width: cardWidth,
+                                height: cardWidth / 1.25,
+                                child: _groupHomeCard(group, isDark),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 13),
+                    _homeActions(isDark, mutedColor),
                   ],
-                );
-              }),
-              const SizedBox(height: 13),
-              _homeActions(isDark, mutedColor),
-            ],
                 ],
               ),
             ),
@@ -74,38 +147,71 @@ extension _HomeTab on _HomeScreenState {
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            width: 156,
-            height: 38,
+            width: double.infinity,
+            height: 48,
             child: OutlinedButton.icon(
               onPressed: _isMarkingAlive ? null : _markAlive,
               icon: _isMarkingAlive
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: kEmerald))
-                  : Icon(_checkedInToday ? Icons.check_circle_rounded : Icons.favorite_rounded, size: 18),
-              label: const Text("I'm Alive", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: kEmerald,
+                      ),
+                    )
+                  : Icon(
+                      _checkedInToday
+                          ? Icons.check_circle_rounded
+                          : Icons.favorite_rounded,
+                      size: 18,
+                    ),
+              label: const Text(
+                "I'm Alive",
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+              ),
               style: OutlinedButton.styleFrom(
-                foregroundColor: _checkedInToday ? kEmerald : (isDark ? const Color(0xFF9FE8D2) : const Color(0xFF087F6C)),
-                side: BorderSide(color: _checkedInToday ? kEmerald : (isDark ? const Color(0xFF2D806E) : const Color(0xFF9DDCCB))),
-                backgroundColor: _checkedInToday ? (isDark ? const Color(0xFF123A31) : const Color(0xFFE8F8F1)) : Colors.transparent,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                foregroundColor: _checkedInToday
+                    ? kEmerald
+                    : (isDark ? const Color(0xFF9FE8D2) : kLightPrimary),
+                side: BorderSide(
+                  color: _checkedInToday
+                      ? kEmerald
+                      : (isDark ? const Color(0xFF2D806E) : kLightAccent),
+                ),
+                backgroundColor: _checkedInToday
+                    ? (isDark ? const Color(0xFF123A31) : kLightSuccessSurface)
+                    : Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(22),
+                ),
               ),
             ),
           ),
           const SizedBox(height: 4),
-          Text(_checkedInToday ? 'Checked in today' : 'Tap once each day', style: TextStyle(fontSize: 10, color: mutedColor)),
-          const SizedBox(height: 10),
+          Text(
+            _checkedInToday ? 'Checked in today' : 'Tap once each day',
+            style: TextStyle(fontSize: 10, color: mutedColor),
+          ),
+          const SizedBox(height: 12),
           SizedBox(
-            width: 143,
-            height: 43,
+            width: double.infinity,
+            height: 48,
             child: ElevatedButton.icon(
               onPressed: _startSOS,
               icon: const Icon(Icons.warning_amber_rounded, size: 19),
-              label: const Text('Emergency', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              label: const Text(
+                'Emergency',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kEmergency,
                 foregroundColor: Colors.white,
                 elevation: 6,
                 shadowColor: kEmergency.withValues(alpha: .45),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
               ),
             ),
           ),
@@ -114,20 +220,169 @@ extension _HomeTab on _HomeScreenState {
     );
   }
 
-  Widget _groupHomeCard(FamilyGroup group, bool isDark) => Material(color: isDark ? kDarkCard : Colors.white, borderRadius: BorderRadius.circular(15), child: InkWell(onTap: () => _openGroupHome(group), borderRadius: BorderRadius.circular(15), child: Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(borderRadius: BorderRadius.circular(15), border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE9EDF0))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.groups_rounded, color: kEmerald, size: 30), const Spacer(), Text(group.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : kNavy)), const SizedBox(height: 3), Text(group.canManage ? 'Owner/Admin' : 'Member', style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : const Color(0xFF64748B)))]))));
+  Widget _groupHomeCard(FamilyGroup group, bool isDark) => Material(
+    color: isDark ? kDarkCard : kLightSurface,
+    borderRadius: BorderRadius.circular(15),
+    child: InkWell(
+      onTap: () => _openGroupHome(group),
+      borderRadius: BorderRadius.circular(15),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: isDark ? Colors.white12 : kLightBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.groups_rounded, color: kEmerald, size: 30),
+            const Spacer(),
+            Text(
+              group.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : kLightNavy,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              group.canManage ? 'Owner/Admin' : 'Member',
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? Colors.white60 : kLightMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 
   // ignore: unused_element
   Widget _homeMemberCard(FamilyMember member, int index, bool isDark) {
     final name = member.name;
-    final titleColor = isDark ? Colors.white : kNavy;
-    final mutedColor = isDark ? Colors.white60 : const Color(0xFF52647B);
+    final titleColor = isDark ? Colors.white : kLightNavy;
+    final mutedColor = isDark ? Colors.white60 : kLightMuted;
     final battery = const ['85%', '72%', '60%', '40%'][index];
     final batteryColor = index == 3 ? const Color(0xFFFFB21A) : kEmerald;
-    final avatarColors = const [Color(0xFFE9EEF0), Color(0xFFF2E9E8), Color(0xFFF0E8DF), Color(0xFFF5E8E8)];
-    final avatarIcons = const [Icons.face_rounded, Icons.face_3_rounded, Icons.face_rounded, Icons.face_3_rounded];
-    return InkWell(borderRadius: BorderRadius.circular(14), onTap: () => _openMemberProfile(member, index), child: Container(padding: const EdgeInsets.fromLTRB(12, 10, 10, 9), decoration: BoxDecoration(color: isDark ? kDarkCard : Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE9EDF0)), boxShadow: isDark ? null : const [BoxShadow(color: Color(0x080F172A), blurRadius: 10, offset: Offset(0, 3))]), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Stack(clipBehavior: Clip.none, children: [CircleAvatar(radius: 22, backgroundColor: avatarColors[index], child: Icon(avatarIcons[index], color: const Color(0xFF536878), size: 29)), const Positioned(right: -1, top: -1, child: CircleAvatar(radius: 5.5, backgroundColor: Colors.white, child: CircleAvatar(radius: 4, backgroundColor: kEmerald)))]),
-      const SizedBox(height: 6), Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, height: 1, fontWeight: FontWeight.bold, color: titleColor)), const SizedBox(height: 5), const Row(children: [Icon(Icons.circle, size: 8, color: kEmerald), SizedBox(width: 4), Text('Online', style: TextStyle(color: kEmerald, fontSize: 11, fontWeight: FontWeight.w500))]), const SizedBox(height: 7), Row(children: [Icon(Icons.battery_5_bar_rounded, size: 16, color: batteryColor), const SizedBox(width: 4), Text(battery, style: TextStyle(fontSize: 11, color: mutedColor))]), const SizedBox(height: 4), Row(children: [Icon(Icons.location_on_rounded, size: 14, color: mutedColor), const SizedBox(width: 3), Flexible(child: Text('Lahore, PK', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: mutedColor)))])
-    ])));
+    final avatarColors = const [
+      Color(0xFFE9EEF0),
+      Color(0xFFF2E9E8),
+      Color(0xFFF0E8DF),
+      Color(0xFFF5E8E8),
+    ];
+    final avatarIcons = const [
+      Icons.face_rounded,
+      Icons.face_3_rounded,
+      Icons.face_rounded,
+      Icons.face_3_rounded,
+    ];
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => _openMemberProfile(member, index),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 10, 9),
+        decoration: BoxDecoration(
+          color: isDark ? kDarkCard : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: isDark ? Colors.white12 : kLightBorder),
+          boxShadow: isDark
+              ? null
+              : const [
+                  BoxShadow(
+                    color: Color(0x080F172A),
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
+                  ),
+                ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: avatarColors[index],
+                  child: Icon(
+                    avatarIcons[index],
+                    color: const Color(0xFF536878),
+                    size: 29,
+                  ),
+                ),
+                const Positioned(
+                  right: -1,
+                  top: -1,
+                  child: CircleAvatar(
+                    radius: 5.5,
+                    backgroundColor: Colors.white,
+                    child: CircleAvatar(radius: 4, backgroundColor: kEmerald),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1,
+                fontWeight: FontWeight.bold,
+                color: titleColor,
+              ),
+            ),
+            const SizedBox(height: 5),
+            const Row(
+              children: [
+                Icon(Icons.circle, size: 8, color: kEmerald),
+                SizedBox(width: 4),
+                Text(
+                  'Online',
+                  style: TextStyle(
+                    color: kEmerald,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Row(
+              children: [
+                Icon(
+                  Icons.battery_5_bar_rounded,
+                  size: 16,
+                  color: batteryColor,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  battery,
+                  style: TextStyle(fontSize: 11, color: mutedColor),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.location_on_rounded, size: 14, color: mutedColor),
+                const SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    'Lahore, PK',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 10, color: mutedColor),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

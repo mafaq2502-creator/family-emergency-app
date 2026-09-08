@@ -1,27 +1,153 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    function group(groupId) { return get(/databases/$(database)/documents/groups/$(groupId)); }
-    function groupAfter(groupId) { return getAfter(/databases/$(database)/documents/groups/$(groupId)); }
-    function isMember(groupId) { return signedIn() && request.auth.uid in group(groupId).data.memberIds; }
-    function isAdmin(groupId) { return isMember(groupId) && group(groupId).data.roles[request.auth.uid] in ['owner', 'admin']; }
-    function isAdminAfter(groupId) { return signedIn() && request.auth.uid in groupAfter(groupId).data.memberIds && groupAfter(groupId).data.roles[request.auth.uid] in ['owner', 'admin']; }
-
-    match /users/{userId} { allow read, update: if signedIn() && request.auth.uid == userId; allow create: if signedIn() && request.auth.uid == userId; }
-    // Temporary read access for the one-time legacy-member migration.
-    match /users/{userId}/members/{memberId} { allow read: if signedIn() && request.auth.uid == userId; }
-    match /users/{userId}/notifications/{notificationId} { allow read, update: if signedIn() && request.auth.uid == userId; }
-    match /groups/{groupId} {
-      // Query authorization must be provable from each returned document.
-      // Reading the same group through get() in isMember() makes the
-      // arrayContains memberIds query fail even for valid members.
-      allow read: if signedIn() && request.auth.uid in resource.data.memberIds;
-      allow create: if signedIn() && request.auth.uid == request.resource.data.ownerId && request.auth.uid in request.resource.data.memberIds && request.resource.data.roles[request.auth.uid] == 'owner';
-      allow update: if isAdmin(groupId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'emergencyRecipientIds', 'updatedAt']);
-      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    function signedIn() {
+      return request.auth != null;
     }
-    match /groups/{groupId}/members/{memberId} { allow read: if isMember(groupId); allow create: if isAdminAfter(groupId); allow update, delete: if isAdmin(groupId); }
-    match /groups/{groupId}/emergencies/{emergencyId} { allow read: if isMember(groupId); allow create: if isMember(groupId) && request.resource.data.senderId == request.auth.uid; allow update: if isMember(groupId); allow delete: if signedIn() && group(groupId).data.ownerId == request.auth.uid; }
+
+    function groupPath(groupId) {
+      return /databases/$(database)/documents/groups/$(groupId);
+    }
+
+    function group(groupId) {
+      return get(groupPath(groupId));
+    }
+
+    function groupAfter(groupId) {
+      return getAfter(groupPath(groupId));
+    }
+
+    function isMember(groupId) {
+      return signedIn() && request.auth.uid in group(groupId).data.memberIds;
+    }
+
+    function role(groupId) {
+      return group(groupId).data.roles[request.auth.uid];
+    }
+
+    function isOwner(groupId) {
+      return isMember(groupId) && role(groupId) == 'owner';
+    }
+
+    function isCircleManager(groupId) {
+      // 'admin' is accepted temporarily for existing Circle documents.
+      return isMember(groupId) && role(groupId) in ['owner', 'parent', 'admin'];
+    }
+
+    function validGroupCreate() {
+      return request.resource.data.keys().hasAll([
+          'name', 'ownerId', 'memberIds', 'roles',
+          'emergencyRecipientIds', 'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.ownerId == request.auth.uid &&
+        request.resource.data.memberIds == [request.auth.uid] &&
+        request.resource.data.roles[request.auth.uid] == 'owner' &&
+        request.resource.data.emergencyRecipientIds == [request.auth.uid];
+    }
+
+    match /users/{userId} {
+      allow create: if signedIn() && request.auth.uid == userId;
+      allow read, update: if signedIn() && request.auth.uid == userId;
+      allow delete: if false;
+
+      match /notifications/{notificationId} {
+        allow read: if signedIn() && request.auth.uid == userId;
+        allow update: if signedIn() && request.auth.uid == userId &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['isRead', 'readAt']);
+        allow create, delete: if false;
+      }
+
+      match /checkIns/{checkInId} {
+        allow create: if signedIn() && request.auth.uid == userId &&
+          request.resource.data.userId == userId;
+        allow read: if signedIn() && request.auth.uid == userId;
+        allow update: if false;
+        allow delete: if signedIn() && request.auth.uid == userId;
+      }
+    }
+
+    match /groups/{groupId} {
+      allow read: if signedIn() &&
+        request.auth.uid in resource.data.memberIds;
+      allow create: if signedIn() && validGroupCreate();
+      allow update: if isCircleManager(groupId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'emergencyRecipientIds', 'updatedAt'
+        ]);
+      allow delete: if isOwner(groupId);
+
+      match /memberships/{userId} {
+        allow read: if isMember(groupId);
+        allow create: if signedIn() &&
+          request.resource.data.userId == userId &&
+          request.resource.data.status in ['pending', 'active'] &&
+          (
+            (request.auth.uid == userId &&
+              groupAfter(groupId).data.ownerId == request.auth.uid &&
+              request.resource.data.circleRole == 'owner') ||
+            isCircleManager(groupId)
+          );
+        allow update: if isCircleManager(groupId) &&
+          request.resource.data.userId == resource.data.userId;
+        allow delete: if isCircleManager(groupId) ||
+          (signedIn() && request.auth.uid == userId &&
+            resource.data.circleRole != 'owner');
+      }
+
+      // Kept temporarily for the current UI while registered-user
+      // memberships replace manually-created member records.
+      match /members/{memberId} {
+        allow read: if isMember(groupId);
+        allow create, update, delete: if isCircleManager(groupId);
+      }
+
+      match /invites/{inviteId} {
+        allow read, create, update, delete: if isCircleManager(groupId);
+      }
+
+      match /devices/{deviceId} {
+        allow read: if isMember(groupId);
+        allow create, update: if isMember(groupId) &&
+          request.resource.data.userId == request.auth.uid;
+        allow delete: if isCircleManager(groupId) ||
+          (isMember(groupId) && resource.data.userId == request.auth.uid);
+      }
+
+      match /progressDaily/{progressId} {
+        allow read: if isMember(groupId);
+        allow create, update: if isMember(groupId) &&
+          request.resource.data.userId == request.auth.uid;
+        allow delete: if isOwner(groupId);
+      }
+
+      match /locationEvents/{eventId} {
+        allow read: if isMember(groupId);
+        allow create: if isMember(groupId) &&
+          request.resource.data.userId == request.auth.uid;
+        allow update: if false;
+        allow delete: if isOwner(groupId) ||
+          (isMember(groupId) && resource.data.userId == request.auth.uid);
+      }
+
+      match /emergencies/{emergencyId} {
+        allow read: if isMember(groupId);
+        allow create: if isMember(groupId) &&
+          request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.status == 'active';
+        allow update: if isMember(groupId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'acknowledgedById', 'acknowledgedByName',
+            'acknowledgedAt', 'resolvedAt'
+          ]);
+        allow delete: if isOwner(groupId);
+      }
+    }
+
+    // Invite redemption changes both group and membership atomically and is
+    // intentionally handled by a trusted Cloud Function.
+    match /inviteLookup/{inviteCode} {
+      allow read, write: if false;
+    }
   }
 }

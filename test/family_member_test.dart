@@ -3,7 +3,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('FamilyMember preserves optional member details through a map', () {
-    const member = FamilyMember(name: 'Mother', status: 'Online', phone: '+923001234567', email: 'mother@example.com', relation: 'Mother', locationAccess: true, batteryAccess: true);
+    const member = FamilyMember(
+      name: 'Mother',
+      status: 'Online',
+      phone: '+923001234567',
+      email: 'mother@example.com',
+      relation: 'Mother',
+      locationAccess: true,
+      batteryAccess: true,
+    );
 
     expect(FamilyMember.fromMap(member.toMap()).toMap(), member.toMap());
   });

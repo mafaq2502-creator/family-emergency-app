@@ -6,36 +6,113 @@ import 'notification_settings.dart';
 class UserProfile {
   const UserProfile({
     required this.uid,
+    required this.exists,
     required this.name,
     required this.email,
     required this.phone,
-    required this.role,
-    required this.isFamilyOwner,
+    required this.relationship,
     required this.notificationSettings,
+    required this.profileCompleted,
+    required this.onboardingCompleted,
+    this.phoneCountryIso,
+    this.phoneCountryCode,
+    this.photoUrl,
+    this.providerIds = const [],
     this.lastDailyCheckIn,
+    this.createdAt,
+    this.updatedAt,
   });
 
   final String uid;
+  final bool exists;
   final String name;
   final String email;
   final String phone;
-  final String? role;
-  final bool isFamilyOwner;
+  final String? relationship;
+  final String? phoneCountryIso;
+  final String? phoneCountryCode;
+  final String? photoUrl;
+  final List<String> providerIds;
   final NotificationSettings notificationSettings;
+  final bool profileCompleted;
+  final bool onboardingCompleted;
   final DateTime? lastDailyCheckIn;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  bool get needsProfileCompletion => !profileCompleted;
 
   factory UserProfile.fromFirestore(User user, Map<String, dynamic>? data) {
-    final lastCheckIn = data?['lastDailyCheckInAt'];
-    final settings = data?['notificationSettings'];
-    return UserProfile(
+    return UserProfile.fromData(
       uid: user.uid,
-      name: data?['name'] as String? ?? user.displayName ?? user.email?.split('@').first ?? '',
-      email: data?['email'] as String? ?? user.email ?? '',
-      phone: data?['phone'] as String? ?? '',
-      role: data?['role'] as String?,
-      isFamilyOwner: data?['isFamilyOwner'] as bool? ?? true,
-      notificationSettings: NotificationSettings.fromMap(settings is Map ? Map<String, dynamic>.from(settings) : null),
-      lastDailyCheckIn: lastCheckIn is Timestamp ? lastCheckIn.toDate() : null,
+      data: data,
+      fallbackName: user.displayName,
+      fallbackEmail: user.email,
+      fallbackPhone: user.phoneNumber,
+      fallbackPhotoUrl: user.photoURL,
     );
+  }
+
+  /// Parses persisted profile data without trusting its shape. This is also
+  /// useful for deterministic routing tests without a live Firebase user.
+  factory UserProfile.fromData({
+    required String uid,
+    required Map<String, dynamic>? data,
+    String? fallbackName,
+    String? fallbackEmail,
+    String? fallbackPhone,
+    String? fallbackPhotoUrl,
+  }) {
+    final source = data ?? const <String, dynamic>{};
+    final name = _string(source['name']) ?? fallbackName?.trim() ?? '';
+    final email = _string(source['email']) ?? fallbackEmail?.trim() ?? '';
+    final phone = _string(source['phone']) ?? fallbackPhone?.trim() ?? '';
+    final relationship =
+        _string(source['relationship']) ?? _string(source['role']);
+    final safelyComplete =
+        name.isNotEmpty &&
+        email.isNotEmpty &&
+        phone.isNotEmpty &&
+        relationship != null;
+
+    return UserProfile(
+      uid: uid,
+      exists: data != null,
+      name: name,
+      email: email,
+      phone: phone,
+      relationship: relationship,
+      phoneCountryIso: _string(source['phoneCountryIso']),
+      phoneCountryCode: _string(source['phoneCountryCode']),
+      photoUrl: _string(source['photoUrl']) ?? fallbackPhotoUrl,
+      providerIds: _stringList(source['providerIds']),
+      notificationSettings: NotificationSettings.fromMap(
+        source['notificationSettings'] is Map
+            ? Map<String, dynamic>.from(source['notificationSettings'] as Map)
+            : null,
+      ),
+      profileCompleted:
+          _bool(source['profileCompleted']) == true && safelyComplete,
+      onboardingCompleted: _bool(source['onboardingCompleted']) == true,
+      lastDailyCheckIn: _date(source['lastDailyCheckInAt']),
+      createdAt: _date(source['createdAt']),
+      updatedAt: _date(source['updatedAt']),
+    );
+  }
+
+  static String? _string(Object? value) {
+    if (value is! String) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  static bool? _bool(Object? value) => value is bool ? value : null;
+
+  static DateTime? _date(Object? value) =>
+      value is Timestamp ? value.toDate() : null;
+
+  static List<String> _stringList(Object? value) {
+    if (value is! List) return const [];
+    return value.whereType<String>().where((item) => item.isNotEmpty).toList();
   }
 }

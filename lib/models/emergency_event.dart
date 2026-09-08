@@ -1,7 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class EmergencyEvent {
-  const EmergencyEvent({required this.id, required this.senderId, required this.senderName, required this.status, this.acknowledgedByName, this.createdAt});
+  const EmergencyEvent({
+    required this.id,
+    required this.senderId,
+    required this.senderName,
+    required this.status,
+    this.acknowledgedByName,
+    this.createdAt,
+  });
   final String id;
   final String senderId;
   final String senderName;
@@ -9,7 +16,8 @@ class EmergencyEvent {
   final String? acknowledgedByName;
   final DateTime? createdAt;
 
-  factory EmergencyEvent.fromMap(String id, Map<String, dynamic> map) => EmergencyEvent(
+  factory EmergencyEvent.fromMap(String id, Map<String, dynamic> map) =>
+      EmergencyEvent(
         id: id,
         senderId: map['senderId'] as String? ?? '',
         senderName: map['senderName'] as String? ?? 'A group member',

@@ -37,11 +37,11 @@ dependencies:
   firebase_core: ^4.14.0
   firebase_auth: ^6.6.1
   cloud_firestore: ^6.9.0
+  cloud_functions: ^6.4.0
   google_fonts: ^6.3.3
   country_picker: ^2.0.28
   flutter_timezone: ^5.1.0
   google_sign_in: ^7.2.0
-  sign_in_with_apple: ^8.2.0
 
 dev_dependencies:
   flutter_test:

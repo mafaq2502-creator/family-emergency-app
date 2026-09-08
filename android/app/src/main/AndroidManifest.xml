@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Authentication, Firestore, Functions, and provider sign-in require
+         network access in release builds as well as debug builds. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="family_emergency_app"
         android:name="${applicationName}"

@@ -1,0 +1,5 @@
+allowBuilds:
+  '@firebase/util': true
+  protobufjs: true
+  # Optional native acceleration; Firebase CLI works without compiling it.
+  re2: false
