@@ -24,7 +24,7 @@ class MemberProfileScreen extends StatelessWidget {
     final titleColor = isDark ? Colors.white : kLightNavy;
     final muted = isDark ? kDarkMuted : kLightMuted;
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: isDark ? kDarkBackground : kLightBackground,
       appBar: AppBar(title: const Text('Member Profile')),
       body: ListView(
         padding: const EdgeInsets.all(24),

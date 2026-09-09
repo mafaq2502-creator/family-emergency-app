@@ -6,6 +6,7 @@ import 'dart:async';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_mode_controller.dart';
+import '../../../core/widgets/light_ui.dart';
 import '../../../models/family_member.dart';
 import '../../../models/notification_settings.dart';
 import '../../../models/family_group.dart';
@@ -21,6 +22,7 @@ import '../../members/presentation/member_profile_screen.dart';
 import '../../members/presentation/member_notification_settings_editor.dart';
 import '../../groups/presentation/group_settings_screen.dart';
 import '../../groups/presentation/group_members_screen.dart';
+import '../../groups/presentation/share_circle_screen.dart';
 import '../../notifications/presentation/notification_settings_screen.dart';
 import '../../notifications/presentation/notification_banner.dart';
 import '../../profile/presentation/profile_settings_screen.dart';
@@ -51,6 +53,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _groupRetryTimer;
   bool _groupLoadErrorShown = false;
   bool _showOwnedCircles = true;
+  String _progressPeriod = 'Today';
+  String? _progressMemberId;
 
   void _setCircleScope(bool owned) {
     setState(() => _showOwnedCircles = owned);
@@ -62,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _initialProfileRole;
   String _profileEmail = '';
   String _profilePhone = '';
+  String _profileCountry = '';
   bool _isProfileLoading = true;
   bool _isSavingProfile = false;
   bool _isProfileDirty = false;
@@ -334,6 +339,10 @@ class _HomeScreenState extends State<HomeScreen> {
         _profileNameController.text = _initialProfileName;
         _profileEmail = profile.email;
         _profilePhone = profile.phone;
+        _profileCountry = [
+          profile.phoneCountryIso,
+          profile.phoneCountryCode,
+        ].whereType<String>().where((value) => value.isNotEmpty).join('  ');
         _lastDailyCheckIn = profile.lastDailyCheckIn;
         _notificationSettings = profile.notificationSettings.toMap();
         _isProfileLoading = false;
@@ -356,11 +365,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted && changed != _isProfileDirty) {
       setState(() => _isProfileDirty = changed);
     }
-  }
-
-  void _changeProfileRole(String? value) {
-    setState(() => _profileRole = value);
-    _updateProfileDirtyState();
   }
 
   Future<void> _saveProfile() async {
@@ -398,6 +402,14 @@ class _HomeScreenState extends State<HomeScreen> {
     } finally {
       if (mounted) setState(() => _isSavingProfile = false);
     }
+  }
+
+  Future<bool> _saveAccountSettings(String name, String? relationship) async {
+    _profileNameController.text = name;
+    _profileRole = relationship;
+    _updateProfileDirtyState();
+    await _saveProfile();
+    return !_isProfileDirty;
   }
 
   Future<bool> _confirmProfileExit() async {
@@ -823,6 +835,35 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _confirmRemoveFamilyMember(int index) async {
+    final member = familyMembers[index];
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.person_remove_rounded, color: kEmergency),
+        title: const Text('Remove member?'),
+        content: Text(
+          'Remove ${member.name} from ${_selectedGroup?.name ?? 'this Circle'}? This does not delete their registered account.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kEmergency,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) _removeFamilyMember(index);
+  }
+
   Future<void> _updateFamilyMember(FamilyMember member) async {
     final group = _selectedGroup;
     if (group == null || member.id == null || !group.canManage) return;
@@ -835,7 +876,7 @@ class _HomeScreenState extends State<HomeScreen> {
         MaterialPageRoute(
           builder: (_) => MemberProfileScreen(
             member: member,
-            onDelete: () async => _removeFamilyMember(index),
+            onDelete: () => _confirmRemoveFamilyMember(index),
             onSave: _updateFamilyMember,
           ),
         ),

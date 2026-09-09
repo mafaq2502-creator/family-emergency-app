@@ -20,7 +20,18 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
   bool _consent = false;
 
   @override
+  void initState() {
+    super.initState();
+    _code.addListener(_refresh);
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    _code.removeListener(_refresh);
     _code.dispose();
     super.dispose();
   }
@@ -42,8 +53,8 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
         const SizedBox(height: 9),
         _step(
           '3',
-          'Scan QR Code',
-          'Use the paired device',
+          'QR pairing',
+          'Scanner is not connected',
           Icons.qr_code_scanner_rounded,
         ),
         const SizedBox(height: 18),
@@ -58,10 +69,20 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: kEmerald, width: 2),
                 ),
-                child: const Icon(
-                  Icons.qr_code_2_rounded,
-                  size: 88,
-                  color: kLightNavy,
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.qr_code_scanner_rounded,
+                      size: 48,
+                      color: kLightMuted,
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Unavailable',
+                      style: TextStyle(color: kLightMuted, fontSize: 10),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 13),
@@ -94,7 +115,7 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
           width: double.infinity,
           height: 48,
           child: ElevatedButton(
-            onPressed: _consent
+            onPressed: _consent && _code.text.trim().isNotEmpty
                 ? () => ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(
@@ -154,7 +175,8 @@ class DeviceDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = device?.name ?? 'iPhone 13';
+    final name = device?.name ?? 'No device paired';
+    final online = device?.isOnline(DateTime.now()) ?? false;
     return LightPage(
       title: 'Device Detail',
       subtitle: 'Assigned to $memberName',
@@ -187,19 +209,25 @@ class DeviceDetailScreen extends StatelessWidget {
           LightStatusChip(
             label: device == null
                 ? 'Not paired'
-                : 'Online • ${device!.batteryLevel ?? 0}%',
-            color: device == null ? kLightMuted : kEmerald,
+                : online
+                ? 'Online'
+                : 'Offline / last seen unknown',
+            color: online ? kEmerald : kLightMuted,
           ),
           const SizedBox(height: 22),
           _metric(
             Icons.battery_5_bar_rounded,
             'Battery',
-            '${device?.batteryLevel ?? 78}%',
+            device?.batteryLevel == null
+                ? 'Not available'
+                : '${device!.batteryLevel}%',
           ),
           _metric(
             Icons.storage_rounded,
             'Storage',
-            '${device?.storageUsedPercent ?? 45}% used',
+            device?.storageUsedPercent == null
+                ? 'Not available'
+                : '${device!.storageUsedPercent}% used',
           ),
           _metric(
             Icons.sync_rounded,
@@ -212,7 +240,13 @@ class DeviceDetailScreen extends StatelessWidget {
             width: double.infinity,
             height: 48,
             child: OutlinedButton.icon(
-              onPressed: device == null ? null : () {},
+              onPressed: device == null
+                  ? null
+                  : () => ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Device unpairing is not connected yet.'),
+                      ),
+                    ),
               icon: const Icon(Icons.link_off_rounded),
               label: const Text('Unpair Device'),
               style: OutlinedButton.styleFrom(foregroundColor: kEmergency),

@@ -3,202 +3,163 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/light_ui.dart';
 
-class ScreenTimeDetailScreen extends StatelessWidget {
+const progressPeriods = ['Today', 'Yesterday', 'Last week', 'Last month'];
+
+class ProgressPeriodSelector extends StatelessWidget {
+  const ProgressPeriodSelector({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 7,
+    runSpacing: 7,
+    children: progressPeriods
+        .map(
+          (period) => ChoiceChip(
+            label: Text(period),
+            selected: period == value,
+            onSelected: (_) => onChanged(period),
+            selectedColor: kLightPrimary,
+            labelStyle: TextStyle(
+              color: period == value ? Colors.white : kLightMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+            side: BorderSide.none,
+          ),
+        )
+        .toList(),
+  );
+}
+
+class ScreenTimeDetailScreen extends StatefulWidget {
   const ScreenTimeDetailScreen({super.key, this.memberName = 'All members'});
   final String memberName;
 
   @override
-  Widget build(BuildContext context) {
-    const values = [26.0, 38.0, 22.0, 61.0, 44.0, 72.0, 54.0];
-    const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-    return LightPage(
-      title: 'Screen Time',
-      subtitle: memberName,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _periodSelector(),
-          const SizedBox(height: 14),
-          LightCard(
-            child: Column(
-              children: [
-                const Text(
-                  '2h 30m',
-                  style: TextStyle(
-                    color: kLightNavy,
-                    fontSize: 31,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const Text(
-                  'Total Screen Time',
-                  style: TextStyle(color: kLightMuted, fontSize: 11),
-                ),
-                const SizedBox(height: 22),
-                SizedBox(
-                  height: 130,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: List.generate(
-                      values.length,
-                      (index) => Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Container(
-                              width: 18,
-                              height: values[index],
-                              decoration: BoxDecoration(
-                                gradient: kPrimaryGradient,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            const SizedBox(height: 7),
-                            Text(
-                              labels[index],
-                              style: const TextStyle(
-                                color: kLightMuted,
-                                fontSize: 10,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          const LightSectionTitle('App Usage'),
-          ...const [
-            (
-              'YouTube',
-              '1h 10m',
-              Icons.play_circle_fill_rounded,
-              Color(0xFFEF4444),
-            ),
-            ('TikTok', '45m', Icons.music_note_rounded, Color(0xFF111827)),
-            ('WhatsApp', '25m', Icons.chat_rounded, Color(0xFF10B981)),
-          ].map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: LightSettingRow(
-                icon: item.$3,
-                title: item.$1,
-                subtitle: 'Usage for selected period',
-                trailing: Text(
-                  item.$2,
-                  style: TextStyle(color: item.$4, fontWeight: FontWeight.w800),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  State<ScreenTimeDetailScreen> createState() => _ScreenTimeDetailScreenState();
+}
 
-  Widget _periodSelector() => Container(
-    padding: const EdgeInsets.all(4),
-    decoration: BoxDecoration(
-      color: kLightSurfaceMuted,
-      borderRadius: BorderRadius.circular(13),
-    ),
-    child: Row(
-      children: ['Today', 'Week', 'Month']
-          .map(
-            (label) => Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                decoration: BoxDecoration(
-                  gradient: label == 'Today' ? kPrimaryGradient : null,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                alignment: Alignment.center,
+class _ScreenTimeDetailScreenState extends State<ScreenTimeDetailScreen> {
+  String _period = 'Today';
+
+  @override
+  Widget build(BuildContext context) => LightPage(
+    title: 'Screen Time',
+    subtitle: widget.memberName,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ProgressPeriodSelector(
+          value: _period,
+          onChanged: (value) => setState(() => _period = value),
+        ),
+        const SizedBox(height: 18),
+        LightStateView(
+          icon: Icons.schedule_rounded,
+          title: 'Screen-time data unavailable',
+          message:
+              'No device telemetry is available for ${widget.memberName} in $_period. Pairing and consent are required before usage can be shown.',
+        ),
+        const SizedBox(height: 18),
+        const LightSectionTitle('App Usage'),
+        const LightCard(
+          child: Row(
+            children: [
+              Icon(Icons.apps_rounded, color: kLightMuted),
+              SizedBox(width: 11),
+              Expanded(
                 child: Text(
-                  label,
-                  style: TextStyle(
-                    color: label == 'Today' ? Colors.white : kLightMuted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  'App-by-app usage will appear after a supported device is paired.',
+                  style: TextStyle(color: kLightMuted, fontSize: 12),
                 ),
               ),
-            ),
-          )
-          .toList(),
+            ],
+          ),
+        ),
+      ],
     ),
   );
 }
 
-class CheckInHistoryScreen extends StatelessWidget {
-  const CheckInHistoryScreen({super.key, this.memberName = 'All members'});
+class CheckInHistoryScreen extends StatefulWidget {
+  const CheckInHistoryScreen({
+    super.key,
+    this.memberName = 'All members',
+    this.latestCheckIn,
+  });
   final String memberName;
+  final DateTime? latestCheckIn;
+
+  @override
+  State<CheckInHistoryScreen> createState() => _CheckInHistoryScreenState();
+}
+
+class _CheckInHistoryScreenState extends State<CheckInHistoryScreen> {
+  String _period = 'Today';
 
   @override
   Widget build(BuildContext context) {
-    const entries = [
-      ('Today', '07:08 AM', true),
-      ('Yesterday', '07:22 AM', true),
-      ('May 3, 2026', 'No check-in', false),
-      ('May 2, 2026', '08:04 AM', true),
-      ('May 1, 2026', '07:41 AM', true),
-    ];
+    final checkIn = widget.latestCheckIn;
     return LightPage(
       title: 'Check-In History',
-      subtitle: memberName,
+      subtitle: widget.memberName,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (final entry in entries)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 9),
-              child: LightCard(
-                child: Row(
-                  children: [
-                    Icon(
-                      entry.$3
-                          ? Icons.check_circle_rounded
-                          : Icons.cancel_rounded,
-                      color: entry.$3 ? kEmerald : kEmergency,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            entry.$1,
-                            style: const TextStyle(
-                              color: kLightNavy,
-                              fontWeight: FontWeight.w800,
-                            ),
+          ProgressPeriodSelector(
+            value: _period,
+            onChanged: (value) => setState(() => _period = value),
+          ),
+          const SizedBox(height: 18),
+          if (checkIn != null && _period == 'Today')
+            LightCard(
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: kEmerald),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Latest check-in',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        Text(
+                          MaterialLocalizations.of(context)
+                              .formatTimeOfDay(TimeOfDay.fromDateTime(checkIn)),
+                          style: const TextStyle(
+                            color: kLightMuted,
+                            fontSize: 11,
                           ),
-                          Text(
-                            entry.$2,
-                            style: const TextStyle(
-                              color: kLightMuted,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    LightStatusChip(
-                      label: entry.$3 ? 'Checked in' : 'Missed',
-                      color: entry.$3 ? kEmerald : kEmergency,
-                    ),
-                  ],
-                ),
+                  ),
+                  const LightStatusChip(label: 'Checked in'),
+                ],
               ),
+            )
+          else
+            LightStateView(
+              icon: Icons.event_note_rounded,
+              title: 'No history available',
+              message: _period == 'Today'
+                  ? 'No check-in has been recorded for this selection today.'
+                  : 'Historical check-in storage is not connected for $_period.',
             ),
-          const SizedBox(height: 8),
-          const Text(
-            'All times use the member’s local timezone.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: kLightMuted, fontSize: 11),
+          const SizedBox(height: 12),
+          const Center(
+            child: Text(
+              'Times are displayed in the device’s local timezone.',
+              style: TextStyle(color: kLightMuted, fontSize: 11),
+            ),
           ),
         ],
       ),
@@ -207,8 +168,13 @@ class CheckInHistoryScreen extends StatelessWidget {
 }
 
 class ProgressDetailsScreen extends StatelessWidget {
-  const ProgressDetailsScreen({super.key, this.memberName = 'All members'});
+  const ProgressDetailsScreen({
+    super.key,
+    this.memberName = 'All members',
+    this.latestCheckIn,
+  });
   final String memberName;
+  final DateTime? latestCheckIn;
 
   @override
   Widget build(BuildContext context) => LightPage(
@@ -219,7 +185,7 @@ class ProgressDetailsScreen extends StatelessWidget {
         LightSettingRow(
           icon: Icons.schedule_rounded,
           title: 'Screen Time',
-          subtitle: 'Daily values and weekly or monthly trend',
+          subtitle: 'Usage appears only after supported device telemetry',
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -231,19 +197,24 @@ class ProgressDetailsScreen extends StatelessWidget {
         LightSettingRow(
           icon: Icons.verified_rounded,
           title: 'Check-In History',
-          subtitle: 'Checked-in and missed days in local time',
+          subtitle: latestCheckIn == null
+              ? 'No check-in is available'
+              : 'Latest check-in is available',
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => CheckInHistoryScreen(memberName: memberName),
+              builder: (_) => CheckInHistoryScreen(
+                memberName: memberName,
+                latestCheckIn: latestCheckIn,
+              ),
             ),
           ),
         ),
         const SizedBox(height: 18),
         const LightStateView(
           icon: Icons.insights_rounded,
-          title: 'More progress is coming',
-          message: 'Device telemetry will appear here after a device is paired and sharing is enabled.',
+          title: 'Device progress is not connected',
+          message: 'Battery, storage and usage need a paired device with explicit sharing consent.',
         ),
       ],
     ),

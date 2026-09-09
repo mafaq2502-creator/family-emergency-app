@@ -59,30 +59,27 @@ extension _ProfileTab on _HomeScreenState {
               value: 'Name, email, phone and relationship',
               isDark: isDark,
               onTap: () async {
-                final result = await Navigator.push<String>(
+                final result = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
                     builder: (_) => AccountSettingsScreen(
-                      nameController: _profileNameController,
+                      initialName: _profileNameController.text,
                       email: _profileEmail,
                       phone: _profilePhone,
+                      country: _profileCountry,
                       relationship: _profileRole,
                       relationships: _HomeScreenState._roles,
-                      onRelationshipChanged: _changeProfileRole,
-                      onSave: _saveProfile,
-                      saving: _isSavingProfile,
+                      onSave: _saveAccountSettings,
+                      onUpdatePassword: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const UpdatePasswordScreen(),
+                        ),
+                      ),
                     ),
                   ),
                 );
-                if (result == 'security') {
-                  if (!mounted) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ProfileSettingsScreen(),
-                    ),
-                  );
-                }
+                if (result == true && mounted) _loadProfile();
               },
             ),
             const SizedBox(height: 7),
@@ -93,7 +90,23 @@ extension _ProfileTab on _HomeScreenState {
               value: 'Free Plan',
               isDark: isDark,
               plan: true,
+              onTap: () => setState(() => _currentIndex = 3),
             ),
+            if (_selectedGroup != null) ...[
+              const SizedBox(height: 7),
+              _profileRow(
+                icon: Icons.groups_rounded,
+                iconColor: kEmerald,
+                label: _selectedGroup!.canManage
+                    ? 'Circle Settings'
+                    : 'Circle Details',
+                value: _selectedGroup!.name,
+                isDark: isDark,
+                onTap: _selectedGroup!.canManage
+                    ? _openGroupSettings
+                    : () => _openGroupHome(_selectedGroup!),
+              ),
+            ],
             const SizedBox(height: 7),
             _profileRow(
               icon: Icons.notifications_active_rounded,

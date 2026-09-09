@@ -18,6 +18,34 @@ class EmergencyDetailScreen extends StatelessWidget {
   final EmergencyEvent event;
   final String currentUserName;
 
+  Future<void> _acknowledge(BuildContext context, User user) async {
+    try {
+      await EmergencyService().acknowledge(
+        groupId: group.id,
+        emergencyId: event.id,
+        user: user,
+        name: currentUserName,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Emergency acknowledged.'),
+            backgroundColor: kEmerald,
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not acknowledge this alert. Try again.'),
+            backgroundColor: kEmergency,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -51,7 +79,7 @@ class EmergencyDetailScreen extends StatelessWidget {
             Icons.schedule_rounded,
             'Time',
             event.createdAt == null
-                ? 'Just now'
+                ? 'Not available'
                 : MaterialLocalizations.of(
                     context,
                   ).formatTimeOfDay(TimeOfDay.fromDateTime(event.createdAt!)),
@@ -77,12 +105,7 @@ class EmergencyDetailScreen extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: user == null || event.status != 'active'
                       ? null
-                      : () => EmergencyService().acknowledge(
-                          groupId: group.id,
-                          emergencyId: event.id,
-                          user: user,
-                          name: currentUserName,
-                        ),
+                      : () => _acknowledge(context, user),
                   child: const Text('Acknowledge'),
                 ),
               ),
@@ -90,7 +113,11 @@ class EmergencyDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           TextButton.icon(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('This alert is not linked to a member profile.'),
+              ),
+            ),
             icon: const Icon(Icons.person_rounded),
             label: const Text('Open Member Profile'),
           ),

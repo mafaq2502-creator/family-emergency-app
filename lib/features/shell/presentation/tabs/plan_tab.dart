@@ -6,61 +6,59 @@ extension _PlanTab on _HomeScreenState {
     final titleColor = isDark ? Colors.white : kLightNavy;
     final mutedColor = isDark ? Colors.white60 : kLightMuted;
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 22, 24, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Choose Your Plan',
-              style: TextStyle(
-                fontSize: 23,
-                fontWeight: FontWeight.bold,
-                color: titleColor,
-              ),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
+        children: [
+          Text(
+            'Choose Your Plan',
+            style: TextStyle(
+              fontSize: 23,
+              fontWeight: FontWeight.bold,
+              color: titleColor,
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Get more features to keep your family\nextra safe.',
-              style: TextStyle(fontSize: 12, color: mutedColor),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _planCard(
-                      title: 'Free',
-                      subtitle: 'Basic features for\nsmall families.',
-                      price: '\$0',
-                      features: const [
-                        'Owner + 2 members',
-                        'Manual SOS alerts',
-                        'Daily check-in',
-                        'Emergency contacts',
-                      ],
-                      selected: true,
-                    ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Get more features to keep your family\nextra safe.',
+            style: TextStyle(fontSize: 12, color: mutedColor),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 430,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _planCard(
+                    title: 'Free',
+                    subtitle: 'Basic features for\nsmall families.',
+                    price: '\$0',
+                    features: const [
+                      'Owner + 2 members',
+                      'Manual SOS alerts',
+                      'Daily check-in',
+                      'Emergency contacts',
+                    ],
+                    selected: true,
                   ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: _planCard(
-                      title: 'Premium',
-                      subtitle: 'Advanced features\nfor complete safety.',
-                      price: '\$4.99',
-                      features: const [
-                        'Owner + 10 members',
-                        'Approved device access',
-                        'Battery/offline alerts',
-                        'Emergency history',
-                      ],
-                    ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: _planCard(
+                    title: 'Premium',
+                    subtitle: 'Advanced features\nfor complete safety.',
+                    price: '\$4.99',
+                    features: const [
+                      'Owner + 10 members',
+                      'Approved device access',
+                      'Battery/offline alerts',
+                      'Emergency history',
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

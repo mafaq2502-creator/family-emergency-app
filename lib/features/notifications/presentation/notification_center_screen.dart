@@ -19,6 +19,28 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
   final _service = AppNotificationService();
   String? _groupId;
   bool _unreadOnly = false;
+  int _streamVersion = 0;
+
+  Future<void> _markAllRead(User user) async {
+    try {
+      await _service.markAllRead(user);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Notifications marked as read.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Notifications could not be updated. Try again.'),
+            backgroundColor: kEmergency,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -30,7 +52,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         title: const Text('Notifications'),
         actions: [
           TextButton(
-            onPressed: () => _service.markAllRead(user),
+            onPressed: () => _markAllRead(user),
             child: const Text('Mark all read'),
           ),
         ],
@@ -86,13 +108,16 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
           ),
           Expanded(
             child: StreamBuilder<List<AppNotification>>(
+              key: ValueKey(_streamVersion),
               stream: _service.watch(user),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return const LightStateView(
+                  return LightStateView(
                     icon: Icons.cloud_off_rounded,
                     title: 'Notifications unavailable',
                     message: 'Check your connection and try again.',
+                    actionLabel: 'Retry',
+                    onAction: () => setState(() => _streamVersion++),
                   );
                 }
                 if (!snapshot.hasData) {

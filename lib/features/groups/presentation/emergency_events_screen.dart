@@ -23,6 +23,35 @@ class EmergencyEventsScreen extends StatefulWidget {
 
 class _EmergencyEventsScreenState extends State<EmergencyEventsScreen> {
   String _filter = 'active';
+  String? _busyEventId;
+
+  Future<void> _runAction(
+    EmergencyEvent event,
+    String successMessage,
+    Future<void> Function() action,
+  ) async {
+    if (_busyEventId != null) return;
+    setState(() => _busyEventId = event.id);
+    try {
+      await action();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(successMessage), backgroundColor: kEmerald),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Emergency status could not be updated. Try again.'),
+            backgroundColor: kEmergency,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busyEventId = null);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,10 +82,12 @@ class _EmergencyEventsScreenState extends State<EmergencyEventsScreen> {
               stream: EmergencyService().watchEvents(widget.group.id),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return const LightStateView(
+                  return LightStateView(
                     icon: Icons.cloud_off_rounded,
                     title: 'Could not load emergencies',
                     message: 'Check your connection and try again.',
+                    actionLabel: 'Retry',
+                    onAction: () => setState(() {}),
                   );
                 }
                 if (!snapshot.hasData) {
@@ -161,22 +192,39 @@ class _EmergencyEventsScreenState extends State<EmergencyEventsScreen> {
                                     if (event.status == 'active' &&
                                         user != null)
                                       OutlinedButton(
-                                        onPressed: () =>
-                                            EmergencyService().acknowledge(
-                                              groupId: widget.group.id,
-                                              emergencyId: event.id,
-                                              user: user,
-                                              name: widget.currentUserName,
-                                            ),
-                                        child: const Text('Acknowledge'),
+                                        onPressed: _busyEventId == null
+                                            ? () => _runAction(
+                                                event,
+                                                'Emergency acknowledged.',
+                                                () => EmergencyService()
+                                                    .acknowledge(
+                                                      groupId: widget.group.id,
+                                                      emergencyId: event.id,
+                                                      user: user,
+                                                      name: widget
+                                                          .currentUserName,
+                                                    ),
+                                              )
+                                            : null,
+                                        child: Text(
+                                          _busyEventId == event.id
+                                              ? 'Updating…'
+                                              : 'Acknowledge',
+                                        ),
                                       ),
                                     if (canResolve)
                                       ElevatedButton(
-                                        onPressed: () =>
-                                            EmergencyService().resolve(
-                                              groupId: widget.group.id,
-                                              emergencyId: event.id,
-                                            ),
+                                        onPressed: _busyEventId == null
+                                            ? () => _runAction(
+                                                event,
+                                                'Emergency resolved.',
+                                                () =>
+                                                    EmergencyService().resolve(
+                                                      groupId: widget.group.id,
+                                                      emergencyId: event.id,
+                                                    ),
+                                              )
+                                            : null,
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: kEmergency,
                                           foregroundColor: Colors.white,

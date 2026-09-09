@@ -134,10 +134,12 @@ class GroupMembersScreen extends StatelessWidget {
       stream: FamilyMemberService().watchGroupMembers(group.id),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const LightStateView(
+          return LightStateView(
             icon: Icons.cloud_off_rounded,
             title: 'Members could not be loaded',
             message: 'Check your connection and try again.',
+            actionLabel: 'Retry',
+            onAction: () => (context as Element).markNeedsBuild(),
           );
         }
         if (!snapshot.hasData) {

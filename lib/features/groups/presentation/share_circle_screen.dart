@@ -15,15 +15,15 @@ class ShareCircleScreen extends StatefulWidget {
 }
 
 class _ShareCircleScreenState extends State<ShareCircleScreen> {
-  final _service = CircleJoinService();
   CircleInviteResult? _invite;
   bool _busy = false;
+  int _tab = 0;
 
   Future<void> _generate() async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final invite = await _service.createInvite(widget.group.id);
+      final invite = await CircleJoinService().createInvite(widget.group.id);
       if (mounted) setState(() => _invite = invite);
     } catch (_) {
       if (mounted) {
@@ -49,8 +49,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final code = _invite?.code ?? 'Generate a code';
-    const link = 'Joining link is not configured yet';
+    final code = _invite?.code;
     return LightPage(
       title: 'Share Circle',
       subtitle: widget.group.name,
@@ -63,26 +62,31 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
               borderRadius: BorderRadius.circular(13),
             ),
             child: Row(
-              children: ['QR Code', 'Invite Code', 'Invite Link']
+              children: ['QR Code', 'Invite Code', 'Invite Link'].indexed
                   .map(
-                    (label) => Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 9),
-                        decoration: BoxDecoration(
-                          gradient: label == 'QR Code'
-                              ? kPrimaryGradient
-                              : null,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          label,
-                          style: TextStyle(
-                            color: label == 'QR Code'
-                                ? Colors.white
-                                : kLightMuted,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
+                    (entry) => Expanded(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () => setState(() => _tab = entry.$1),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          decoration: BoxDecoration(
+                            gradient: _tab == entry.$1
+                                ? kPrimaryGradient
+                                : null,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            entry.$2,
+                            style: TextStyle(
+                              color: _tab == entry.$1
+                                  ? Colors.white
+                                  : kLightMuted,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ),
@@ -92,70 +96,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
             ),
           ),
           const SizedBox(height: 18),
-          LightCard(
-            child: Column(
-              children: [
-                Container(
-                  width: 176,
-                  height: 176,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: kLightBorder),
-                  ),
-                  child: Icon(
-                    _invite == null
-                        ? Icons.qr_code_2_rounded
-                        : Icons.qr_code_rounded,
-                    size: 142,
-                    color: _invite == null ? kLightMuted : kLightNavy,
-                  ),
-                ),
-                const SizedBox(height: 15),
-                Row(
-                  children: [
-                    Expanded(
-                      child: SelectableText(
-                        code,
-                        style: const TextStyle(
-                          color: kLightNavy,
-                          fontSize: 20,
-                          letterSpacing: 2,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _invite == null
-                          ? null
-                          : () => _copy(code, 'Code'),
-                      child: const Text('Copy'),
-                    ),
-                  ],
-                ),
-                const Divider(),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        link,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: kLightMuted,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: null,
-                      icon: const Icon(Icons.copy_rounded),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          _tabContent(code),
           if (_invite != null) ...[
             const SizedBox(height: 10),
             Text(
@@ -170,7 +111,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
             child: ElevatedButton.icon(
               onPressed: _invite == null
                   ? _generate
-                  : () => _copy(code, 'Invitation code'),
+                  : () => _copy(code!, 'Invitation code'),
               icon: Icon(
                 _invite == null ? Icons.add_link_rounded : Icons.share_rounded,
               ),
@@ -192,6 +133,50 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _tabContent(String? code) {
+    if (_tab == 0) {
+      return const LightStateView(
+        icon: Icons.qr_code_scanner_rounded,
+        title: 'QR sharing unavailable',
+        message: 'A scannable QR renderer is not connected. Use the real invitation code tab instead.',
+      );
+    }
+    if (_tab == 2) {
+      return const LightStateView(
+        icon: Icons.link_off_rounded,
+        title: 'Joining link unavailable',
+        message: 'Deep-link configuration is required before a safe joining link can be shared.',
+      );
+    }
+    return LightCard(
+      child: code == null
+          ? const LightStateView(
+              icon: Icons.key_rounded,
+              title: 'Generate an invitation code',
+              message: 'The code will be created by the existing secure invitation service and will expire.',
+            )
+          : Row(
+              children: [
+                Expanded(
+                  child: SelectableText(
+                    code,
+                    style: const TextStyle(
+                      color: kLightNavy,
+                      fontSize: 20,
+                      letterSpacing: 2,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _copy(code, 'Code'),
+                  child: const Text('Copy'),
+                ),
+              ],
+            ),
     );
   }
 }

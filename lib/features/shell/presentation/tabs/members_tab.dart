@@ -98,7 +98,9 @@ extension _MembersTab on _HomeScreenState {
                                 ),
                               ),
                               Text(
-                                group.isOwner ? 'Owner' : group.role.value,
+                                group == _selectedGroup
+                                    ? '${group.isOwner ? 'Owner' : group.role.value} • ${familyMembers.length} members'
+                                    : '${group.isOwner ? 'Owner' : group.role.value} • Open to view members',
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: mutedColor,
@@ -117,49 +119,68 @@ extension _MembersTab on _HomeScreenState {
           const SizedBox(height: 12),
           _groupSelector(),
           const SizedBox(height: 10),
-          Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              Expanded(
-                child: SizedBox(
-                  height: 40,
-                  child: OutlinedButton.icon(
-                    onPressed: _createGroup,
-                    icon: const Icon(Icons.group_add_outlined, size: 19),
-                    label: const Text('Add Group'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: isDark ? kEmerald : kLightPrimary,
-                      side: BorderSide(
-                        color: isDark ? kEmerald : kLightPrimary,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(13),
-                      ),
+              SizedBox(
+                width: 145,
+                height: 40,
+                child: OutlinedButton.icon(
+                  onPressed: _createGroup,
+                  icon: const Icon(Icons.group_add_outlined, size: 19),
+                  label: const Text('Add Group'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: isDark ? kEmerald : kLightPrimary,
+                    side: BorderSide(color: isDark ? kEmerald : kLightPrimary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 40,
-                  child: ElevatedButton.icon(
-                    onPressed: _selectedGroup?.canManage == true
-                        ? _showAddMemberDialog
-                        : null,
-                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 19),
-                    label: const Text('Add Member'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isDark ? kEmerald : kLightPrimary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(13),
-                      ),
+              SizedBox(
+                width: 145,
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: _selectedGroup?.canManage == true
+                      ? _showAddMemberDialog
+                      : null,
+                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 19),
+                  label: const Text('Manual Member'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDark ? kEmerald : kLightPrimary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
                     ),
                   ),
+                ),
+              ),
+              SizedBox(
+                width: 145,
+                height: 40,
+                child: OutlinedButton.icon(
+                  onPressed: _selectedGroup == null
+                      ? null
+                      : () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ShareCircleScreen(group: _selectedGroup!),
+                          ),
+                        ),
+                  icon: const Icon(Icons.ios_share_rounded, size: 18),
+                  label: const Text('Invite User'),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Manual members are local Circle records. Invite User is for registered app accounts.',
+            style: TextStyle(fontSize: 10, color: mutedColor),
           ),
           if (_selectedGroup?.canManage == true)
             Align(
@@ -182,6 +203,12 @@ extension _MembersTab on _HomeScreenState {
             ),
           ),
           const SizedBox(height: 9),
+          if (_selectedGroup != null && familyMembers.isEmpty)
+            const LightStateView(
+              icon: Icons.group_add_rounded,
+              title: 'No members yet',
+              message: 'Add a manual record or invite a registered app user.',
+            ),
           ...List.generate(
             familyMembers.length,
             (index) => _memberListCard(familyMembers[index], index, isDark),
@@ -224,14 +251,9 @@ extension _MembersTab on _HomeScreenState {
     final name = member.name;
     final titleColor = isDark ? Colors.white : kLightNavy;
     final mutedColor = isDark ? Colors.white60 : kLightMuted;
-    final phone =
-        member.phone ??
-        const [
-          '+92 300 1234567',
-          '+92 300 2345678',
-          '+92 300 3456789',
-          '+92 300 4567890',
-        ][index % 4];
+    final phone = member.phone?.trim().isNotEmpty == true
+        ? member.phone!
+        : 'Phone not available';
     final relation = member.relation ?? name;
     final avatarColors = const [
       Color(0xFFE9EEF0),
@@ -280,15 +302,19 @@ extension _MembersTab on _HomeScreenState {
                     size: 30,
                   ),
                 ),
-                const Positioned(
-                  right: -1,
-                  top: -1,
-                  child: CircleAvatar(
-                    radius: 6,
-                    backgroundColor: Colors.white,
-                    child: CircleAvatar(radius: 4.5, backgroundColor: kEmerald),
+                if (member.status.toLowerCase() == 'online')
+                  const Positioned(
+                    right: -1,
+                    top: -1,
+                    child: CircleAvatar(
+                      radius: 6,
+                      backgroundColor: Colors.white,
+                      child: CircleAvatar(
+                        radius: 4.5,
+                        backgroundColor: kEmerald,
+                      ),
+                    ),
                   ),
-                ),
               ],
             ),
             const SizedBox(width: 11),
@@ -331,9 +357,7 @@ extension _MembersTab on _HomeScreenState {
               constraints: const BoxConstraints.tightFor(width: 28, height: 34),
               padding: EdgeInsets.zero,
               icon: Icon(Icons.more_vert_rounded, color: mutedColor, size: 20),
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('$name options will be available soon')),
-              ),
+              onPressed: () => _openMemberProfile(member, index),
             ),
             IconButton(
               constraints: const BoxConstraints.tightFor(width: 29, height: 34),
@@ -343,7 +367,9 @@ extension _MembersTab on _HomeScreenState {
                 color: kEmergency,
                 size: 20,
               ),
-              onPressed: () => _removeFamilyMember(index),
+              onPressed: _selectedGroup?.canManage == true
+                  ? () => _confirmRemoveFamilyMember(index)
+                  : null,
             ),
           ],
         ),

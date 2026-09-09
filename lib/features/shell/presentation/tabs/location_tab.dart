@@ -23,38 +23,75 @@ extension _LocationTab on _HomeScreenState {
               ),
               IconButton(
                 tooltip: 'Progress settings',
-                onPressed: () {},
+                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Progress uses the Circle, member and date filters below.',
+                    ),
+                  ),
+                ),
                 icon: const Icon(Icons.settings_outlined),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          _groupSelector(),
+          DropdownButtonFormField<FamilyGroup>(
+            initialValue: _selectedGroup,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Family Circle',
+              prefixIcon: Icon(Icons.groups_rounded),
+            ),
+            hint: const Text('Select a Circle'),
+            items: _groups
+                .map(
+                  (group) => DropdownMenuItem(
+                    value: group,
+                    child: Text(group.name, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged: (group) {
+              setState(() {
+                _selectedGroup = group;
+                _progressMemberId = null;
+              });
+              _watchMembers();
+            },
+          ),
           const SizedBox(height: 10),
-          _progressFilter(
-            label: familyMembers.isEmpty
-                ? 'All members'
-                : '${familyMembers.first.name} + ${familyMembers.length - 1}',
-            icon: Icons.person_outline_rounded,
-            isDark: isDark,
+          DropdownButtonFormField<String?>(
+            initialValue: familyMembers.any((m) => m.id == _progressMemberId)
+                ? _progressMemberId
+                : null,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Member / Child',
+              prefixIcon: Icon(Icons.person_outline_rounded),
+            ),
+            items: [
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('All members'),
+              ),
+              ...familyMembers
+                  .where((m) => m.id != null)
+                  .map(
+                    (member) => DropdownMenuItem<String?>(
+                      value: member.id,
+                      child: Text(member.name, overflow: TextOverflow.ellipsis),
+                    ),
+                  ),
+            ],
+            onChanged: (value) => setState(() => _progressMemberId = value),
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: isDark ? kDarkSurface : kLightSurfaceMuted,
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: Row(
-              children: [
-                _periodChip('Today', true, isDark),
-                _periodChip('Week', false, isDark),
-                _periodChip('Month', false, isDark),
-              ],
-            ),
+          ProgressPeriodSelector(
+            value: _progressPeriod,
+            onChanged: (value) => setState(() => _progressPeriod = value),
           ),
           const SizedBox(height: 15),
-          _screenTimeCard(isDark, titleColor, mutedColor),
+          _unavailableProgressCard(titleColor, mutedColor),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -62,7 +99,7 @@ extension _LocationTab on _HomeScreenState {
                 child: _progressMetric(
                   icon: Icons.battery_5_bar_rounded,
                   label: 'Battery',
-                  value: '78%',
+                  value: 'Not available',
                   isDark: isDark,
                 ),
               ),
@@ -71,7 +108,7 @@ extension _LocationTab on _HomeScreenState {
                 child: _progressMetric(
                   icon: Icons.storage_rounded,
                   label: 'Storage',
-                  value: '45 GB',
+                  value: 'Not available',
                   isDark: isDark,
                 ),
               ),
@@ -84,7 +121,7 @@ extension _LocationTab on _HomeScreenState {
                 child: _progressMetric(
                   icon: Icons.sync_rounded,
                   label: 'Last Sync',
-                  value: '07:50 AM',
+                  value: 'No device sync',
                   isDark: isDark,
                 ),
               ),
@@ -93,7 +130,9 @@ extension _LocationTab on _HomeScreenState {
                 child: _progressMetric(
                   icon: Icons.verified_rounded,
                   label: 'Check-in',
-                  value: _checkedInToday ? 'Checked in' : 'Pending',
+                  value: _checkedInToday
+                      ? 'Checked in today'
+                      : 'No check-in today',
                   isDark: isDark,
                 ),
               ),
@@ -107,9 +146,16 @@ extension _LocationTab on _HomeScreenState {
                 context,
                 MaterialPageRoute(
                   builder: (_) => ProgressDetailsScreen(
-                    memberName: familyMembers.isEmpty
+                    memberName: _progressMemberId == null
                         ? 'All members'
-                        : familyMembers.first.name,
+                        : familyMembers
+                                  .where((m) => m.id == _progressMemberId)
+                                  .map((m) => m.name)
+                                  .firstOrNull ??
+                              'Selected member',
+                    latestCheckIn: _progressMemberId == null
+                        ? _lastDailyCheckIn
+                        : null,
                   ),
                 ),
               ),
@@ -121,58 +167,8 @@ extension _LocationTab on _HomeScreenState {
     );
   }
 
-  Widget _progressFilter({
-    required String label,
-    required IconData icon,
-    required bool isDark,
-  }) => Container(
-    height: 49,
-    padding: const EdgeInsets.symmetric(horizontal: 14),
-    decoration: BoxDecoration(
-      color: isDark ? kDarkCard : kLightSurface,
-      borderRadius: BorderRadius.circular(13),
-      border: Border.all(color: isDark ? Colors.white12 : kLightBorder),
-    ),
-    child: Row(
-      children: [
-        Icon(icon, color: isDark ? kEmerald : kLightPrimary, size: 20),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
-        const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
-      ],
-    ),
-  );
-
-  Widget _periodChip(String label, bool selected, bool isDark) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      decoration: BoxDecoration(
-        gradient: selected && !isDark ? kPrimaryGradient : null,
-        color: selected && isDark ? kEmerald : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        label,
-        style: TextStyle(
-          color: selected
-              ? Colors.white
-              : (isDark ? Colors.white60 : kLightMuted),
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    ),
-  );
-
-  Widget _screenTimeCard(bool isDark, Color titleColor, Color mutedColor) {
-    const bars = [30.0, 48.0, 72.0, 52.0, 82.0, 63.0];
-    const labels = ['8am', '10am', '12pm', '2pm', '4pm', '6pm'];
+  Widget _unavailableProgressCard(Color titleColor, Color mutedColor) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -222,7 +218,7 @@ extension _LocationTab on _HomeScreenState {
                       ),
                     ),
                     Text(
-                      '2h 30m',
+                      'Not available',
                       style: TextStyle(
                         color: titleColor,
                         fontSize: 24,
@@ -232,40 +228,13 @@ extension _LocationTab on _HomeScreenState {
                   ],
                 ),
               ),
-              Icon(
-                Icons.trending_down_rounded,
-                color: isDark ? kEmerald : kLightPrimary,
-              ),
+              const Icon(Icons.info_outline_rounded, color: kLightMuted),
             ],
           ),
-          const SizedBox(height: 18),
-          SizedBox(
-            height: 90,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(
-                bars.length,
-                (index) => Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Container(
-                      width: 16,
-                      height: bars[index],
-                      decoration: BoxDecoration(
-                        gradient: kPrimaryGradient,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      labels[index],
-                      style: TextStyle(fontSize: 8, color: mutedColor),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          const SizedBox(height: 12),
+          Text(
+            'No screen-time telemetry exists for the selected Circle, member and period ($_progressPeriod).',
+            style: TextStyle(color: mutedColor, fontSize: 11),
           ),
         ],
       ),

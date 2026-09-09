@@ -83,10 +83,21 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     );
     controller.dispose();
     if (value == null || value.isEmpty || value == widget.group.name) return;
-    await _service.renameGroup(widget.group, value);
-    if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Circle renamed.')));
+    try {
+      await _service.renameGroup(widget.group, value);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Circle renamed.')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Circle could not be renamed. Please try again.'),
+            backgroundColor: kEmergency,
+          ),
+        );
+      }
     }
   }
 
@@ -117,8 +128,19 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       ),
     );
     if (confirmed != true) return;
-    await _service.deleteGroup(widget.group);
-    if (mounted) Navigator.pop(context);
+    try {
+      await _service.deleteGroup(widget.group);
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Circle could not be deleted. Please try again.'),
+            backgroundColor: kEmergency,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -137,13 +159,20 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         LightSettingRow(
           icon: Icons.admin_panel_settings_rounded,
           title: 'Owner Information',
-          subtitle: widget.group.ownerId,
+          subtitle:
+              'Owner account • ${widget.group.ownerId.length > 8 ? widget.group.ownerId.substring(widget.group.ownerId.length - 8) : widget.group.ownerId}',
         ),
         const SizedBox(height: 9),
         LightSettingRow(
           icon: Icons.manage_accounts_rounded,
           title: 'Member Roles',
-          subtitle: 'Owner, parent, adult and child permissions',
+          subtitle:
+              'Owner, parent, adult and child permissions (not editable yet)',
+          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Member role editing is not connected yet.'),
+            ),
+          ),
         ),
         const SizedBox(height: 20),
         LightSettingRow(

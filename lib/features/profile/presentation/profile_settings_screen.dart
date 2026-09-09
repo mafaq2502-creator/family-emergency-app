@@ -21,9 +21,9 @@ class ProfileSettingsScreen extends StatelessWidget {
     final titleColor = isDark ? Colors.white : _navy;
     final muted = isDark ? _darkMuted : kLightMuted;
     return Scaffold(
-      backgroundColor: isDark ? _darkBackground : Colors.transparent,
+      backgroundColor: isDark ? _darkBackground : kLightBackground,
       appBar: AppBar(
-        backgroundColor: isDark ? _darkBackground : Colors.transparent,
+        backgroundColor: isDark ? _darkBackground : kLightBackground,
         foregroundColor: titleColor,
         elevation: 0,
         title: const Text(
@@ -155,9 +155,9 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
     final titleColor = isDark ? Colors.white : _navy;
     final muted = isDark ? _darkMuted : kLightMuted;
     return Scaffold(
-      backgroundColor: isDark ? _darkBackground : Colors.transparent,
+      backgroundColor: isDark ? _darkBackground : kLightBackground,
       appBar: AppBar(
-        backgroundColor: isDark ? _darkBackground : Colors.transparent,
+        backgroundColor: isDark ? _darkBackground : kLightBackground,
         foregroundColor: titleColor,
         elevation: 0,
         title: const Text(
