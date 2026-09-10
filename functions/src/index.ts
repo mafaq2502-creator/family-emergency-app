@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import {FieldValue, Timestamp} from 'firebase-admin/firestore';
 import { randomBytes } from 'node:crypto';
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
@@ -40,17 +41,17 @@ function ensureActiveGroup(group: admin.firestore.DocumentSnapshot): GroupData {
 
 function profileCircleCleanup(circleId: string, profileData: admin.firestore.DocumentData | undefined) {
   const update: Record<string, unknown> = {
-    circleIds: admin.firestore.FieldValue.arrayRemove(circleId),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    circleIds: FieldValue.arrayRemove(circleId),
+    updatedAt: FieldValue.serverTimestamp(),
   };
   if (profileData?.activeCircleId === circleId) {
-    update.activeCircleId = admin.firestore.FieldValue.delete();
+    update.activeCircleId = FieldValue.delete();
   }
   return update;
 }
 
 async function writeNotification(userId: string, groupId: string, title: string, body: string, type: string, emergencyId?: string) {
-  await db.collection('users').doc(userId).collection('notifications').add({groupId, title, body, type, emergencyId: emergencyId ?? null, isRead: false, createdAt: admin.firestore.FieldValue.serverTimestamp()});
+  await db.collection('users').doc(userId).collection('notifications').add({groupId, title, body, type, emergencyId: emergencyId ?? null, isRead: false, createdAt: FieldValue.serverTimestamp()});
 }
 
 export const sendEmergencyToRecipients = onDocumentCreated('groups/{groupId}/emergencies/{emergencyId}', async event => {
@@ -82,7 +83,7 @@ export const createCircleInvite = onCall(async request => {
   const code = randomBytes(6).toString('hex').slice(0, 10).toUpperCase();
   const inviteRef = groupRef.collection('invites').doc();
   const lookupRef = db.collection('inviteLookup').doc(code);
-  const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const expiresAt = Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60 * 1000);
   await db.runTransaction(async transaction => {
     const [group, existingLookup] = await Promise.all([
       transaction.get(groupRef),
@@ -99,7 +100,7 @@ export const createCircleInvite = onCall(async request => {
     if (existingLookup.exists) {
       throw new HttpsError('aborted', 'Please generate the invitation again.');
     }
-    const now = admin.firestore.FieldValue.serverTimestamp();
+    const now = FieldValue.serverTimestamp();
     transaction.set(inviteRef, {
       circleId, createdBy: userId, code, circleRole, status: 'active',
       expiresAt, maxUses: 20, useCount: 0, createdAt: now, updatedAt: now,
@@ -147,7 +148,7 @@ export const redeemCircleInvite = onCall(async request => {
     }
     const inviteData = invite.data() ?? {};
     const status = String(inviteData.status ?? '');
-    const expiresAt = inviteData.expiresAt as admin.firestore.Timestamp | undefined;
+    const expiresAt = inviteData.expiresAt as Timestamp | undefined;
     const maxUses = Number(inviteData.maxUses ?? 1);
     const useCount = Number(inviteData.useCount ?? 0);
     if (status !== 'active' || !expiresAt || expiresAt.toMillis() <= Date.now()) {
@@ -172,10 +173,10 @@ export const redeemCircleInvite = onCall(async request => {
       : {};
     roles[userId] = circleRole;
     const nextUseCount = useCount + 1;
-    const now = admin.firestore.FieldValue.serverTimestamp();
+    const now = FieldValue.serverTimestamp();
 
     transaction.update(groupRef, {
-      memberIds: admin.firestore.FieldValue.arrayUnion(userId),
+      memberIds: FieldValue.arrayUnion(userId),
       roles,
       updatedAt: now,
     });
@@ -198,7 +199,7 @@ export const redeemCircleInvite = onCall(async request => {
     transaction.set(profileRef, {
       onboardingCompleted: true,
       activeCircleId: circleId,
-      circleIds: admin.firestore.FieldValue.arrayUnion(circleId),
+      circleIds: FieldValue.arrayUnion(circleId),
       updatedAt: now,
     }, {merge: true});
 
@@ -236,9 +237,9 @@ export const removeCircleMember = onCall(async request => {
     }
 
     delete groupRoles[targetId];
-    const now = admin.firestore.FieldValue.serverTimestamp();
+    const now = FieldValue.serverTimestamp();
     transaction.update(groupRef, {
-      memberIds: admin.firestore.FieldValue.arrayRemove(targetId),
+      memberIds: FieldValue.arrayRemove(targetId),
       roles: groupRoles,
       emergencyRecipientIds: strings(groupData.emergencyRecipientIds).filter(id => id !== targetId),
       updatedAt: now,
@@ -271,9 +272,9 @@ export const leaveCircle = onCall(async request => {
     }
 
     delete groupRoles[userId];
-    const now = admin.firestore.FieldValue.serverTimestamp();
+    const now = FieldValue.serverTimestamp();
     transaction.update(groupRef, {
-      memberIds: admin.firestore.FieldValue.arrayRemove(userId),
+      memberIds: FieldValue.arrayRemove(userId),
       roles: groupRoles,
       emergencyRecipientIds: strings(groupData.emergencyRecipientIds).filter(id => id !== userId),
       updatedAt: now,
@@ -302,7 +303,7 @@ export const deleteCircle = onCall(async request => {
     }
     const profileRefs = memberships.docs.map(member => db.collection('users').doc(member.id));
     const profiles = await Promise.all(profileRefs.map(ref => transaction.get(ref)));
-    const now = admin.firestore.FieldValue.serverTimestamp();
+    const now = FieldValue.serverTimestamp();
     transaction.update(groupRef, {
       status: 'deleted', deletedAt: now, deletedBy: userId,
       memberIds: [], roles: {}, emergencyRecipientIds: [], updatedAt: now,

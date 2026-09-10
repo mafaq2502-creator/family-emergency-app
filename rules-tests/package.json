@@ -2,7 +2,8 @@
   "name": "alivecircle-firestore-rules-tests",
   "private": true,
   "scripts": {
-    "test": "firebase emulators:exec --config ../firebase.json --project demo-alivecircle --only firestore \"node --test firestore.rules.test.cjs\""
+    "test": "firebase emulators:exec --config ../firebase.json --project demo-alivecircle --only firestore \"node --test firestore.rules.test.cjs\"",
+    "test:lifecycle": "firebase emulators:exec --config ../firebase.json --project demo-alivecircle --only auth,firestore,functions \"node --test circle-lifecycle.integration.test.cjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",

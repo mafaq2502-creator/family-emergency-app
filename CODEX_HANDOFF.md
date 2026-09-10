@@ -34,6 +34,9 @@ Verification completed:
 - Full `flutter test --no-pub`: **185 passed, 0 failed**.
 - Focused Circle lifecycle/widget suite: **10 passed, 0 failed**.
 - Firestore emulator rules suite: **9 passed, 0 failed**.
+- Auth/Firestore/Functions lifecycle integration suite: **6 passed, 0 failed**.
+  It covers owner and parent removal, denied adult removal, denied owner leave,
+  adult leave, owner-only deletion, reference cleanup, and concurrent removal.
 - Functions TypeScript: `tsc --noEmit` passed.
 - Pixel_7 (`emulator-5554`) runtime: Home → Family Circles → Circle Detail →
   Member Detail and Circle Settings opened against the authenticated Firebase
@@ -42,14 +45,27 @@ Verification completed:
   runtime exception on these screens.
 - No production Circle/member data was mutated during runtime verification.
 
-Current Phase 5 status: **PARTIALLY COMPLETE**. Source implementation and local
-verification are complete, but the new callable Functions and updated Firestore
-rules are not deployed. Production remove/leave/delete therefore must not be
-claimed live. After explicit deployment approval, deploy the Functions and rules,
-then exercise create/rename/remove/leave/delete with disposable multi-account test
-data, including parent/adult/child authorization, concurrent actions, and network
-failure/retry behavior. Ownership transfer remains intentionally deferred to
-Phase 6+; an owner can delete a Circle but cannot leave it.
+Deployment decision: keep production project `familyemergencyapp` on the free
+Spark plan. Firestore rules were compiled and released successfully. The callable
+Functions implementation remains complete in source and is covered by local
+emulator tests, but it must not be deployed or activated until the user explicitly
+changes this decision in a future phase. A production inventory check confirms
+that the project currently has no deployed Functions, so no paid Functions feature
+is active.
+
+During real callable-emulator testing, `firebase-admin` v13 exposed an incompatible
+namespaced `admin.firestore.FieldValue` access. The implementation now imports
+`FieldValue` and `Timestamp` from `firebase-admin/firestore`; TypeScript compilation
+and all six lifecycle integration tests pass after the fix.
+
+Current Phase 5 status for the approved free-plan scope: **COMPLETE**. Application
+source, production Firestore rules, and local multi-account callable verification
+are complete. Production remove/leave/delete remain intentionally inactive while
+the project stays on Spark; do not request or perform a Blaze upgrade. If the user
+explicitly authorizes paid backend activation in a future phase, deploy the already
+completed Functions and verify their production inventory. Ownership transfer
+remains intentionally deferred to Phase 6+; an owner can delete a Circle but
+cannot leave it.
 
 Primary Phase 5 files:
 
@@ -64,9 +80,12 @@ Primary Phase 5 files:
 - `firestore.rules`
 - `test/circle_lifecycle_test.dart`
 - `rules-tests/firestore.rules.test.cjs`
+- `rules-tests/circle-lifecycle.integration.test.cjs`
 
 Generated `.pnpm-store` cache from the local Functions check was removed. No
-commit, push, Firebase deployment, or release build was performed.
+production data was changed by the integration tests. No commit, push, Functions
+deployment, or release build was performed; production Firestore rules were
+deployed with the user's explicit authorization.
 
 ## Issue-resolution completion — 2026-09-10
 
