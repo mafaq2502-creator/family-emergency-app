@@ -1,332 +1,365 @@
-// ignore_for_file: use_build_context_synchronously
-
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../../../core/domain/circle_error_mapper.dart';
+import '../../../core/domain/circle_policies.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../models/family_group.dart';
-import '../../../models/family_member.dart';
-import '../../../services/circle_join_service.dart';
-import '../../../services/group_service.dart';
 import '../../../core/widgets/light_ui.dart';
+import '../../../models/circle_membership.dart';
+import '../../../models/family_group.dart';
+import '../../../services/group_service.dart';
 import 'share_circle_screen.dart';
 
 class GroupSettingsScreen extends StatefulWidget {
   const GroupSettingsScreen({
     super.key,
     required this.group,
-    required this.members,
+    this.memberships = const [],
+    this.groupService,
+    this.viewerId,
   });
+
   final FamilyGroup group;
-  final List<FamilyMember> members;
+  final List<CircleMembership> memberships;
+  final GroupService? groupService;
+  final String? viewerId;
+
   @override
   State<GroupSettingsScreen> createState() => _GroupSettingsScreenState();
 }
 
 class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
-  final _service = GroupService();
-  final _inviteService = CircleJoinService();
-  late Set<String> _recipients;
-  bool _saving = false;
-  bool _creatingInvite = false;
-  CircleInviteResult? _invite;
-  @override
-  void initState() {
-    super.initState();
-    _recipients = widget.group.emergencyRecipientIds.toSet();
-  }
+  late final GroupService _service = widget.groupService ?? GroupService();
+  late final Set<String> _recipients = widget.group.emergencyRecipientIds
+      .toSet();
+  bool _busy = false;
 
-  Future<void> _createInvite() async {
-    if (_creatingInvite) return;
-    setState(() => _creatingInvite = true);
-    try {
-      final invite = await _inviteService.createInvite(widget.group.id);
-      if (!mounted) return;
-      setState(() => _invite = invite);
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invitation could not be created. Please try again.'),
-          backgroundColor: kEmergency,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _creatingInvite = false);
-    }
-  }
+  String? get _viewerId =>
+      widget.viewerId ?? FirebaseAuth.instance.currentUser?.uid;
 
-  Future<void> _renameCircle() async {
-    final controller = TextEditingController(text: widget.group.name);
-    final value = await showDialog<String>(
+  Future<void> _rename(FamilyGroup group) async {
+    if (_busy) return;
+    final controller = TextEditingController(text: group.name);
+    String? error;
+    final name = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.edit_rounded, color: kEmerald),
-        title: const Text('Rename Circle'),
-        content: TextField(
-          controller: controller,
-          maxLength: 60,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Circle name'),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          icon: const Icon(Icons.edit_rounded, color: kEmerald),
+          title: const Text('Rename Circle'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLength: CircleNamePolicy.maxLength,
+            decoration: InputDecoration(
+              labelText: 'Circle name',
+              errorText: error,
+            ),
+            onSubmitted: (_) {
+              final validation = CircleNamePolicy.validate(controller.text);
+              if (validation != null) {
+                setDialogState(() => error = validation);
+              } else {
+                Navigator.pop(dialogContext, controller.text.trim());
+              }
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final validation = CircleNamePolicy.validate(controller.text);
+                if (validation != null) {
+                  setDialogState(() => error = validation);
+                  return;
+                }
+                Navigator.pop(dialogContext, controller.text.trim());
+              },
+              child: const Text('Save'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
     controller.dispose();
-    if (value == null || value.isEmpty || value == widget.group.name) return;
-    try {
-      await _service.renameGroup(widget.group, value);
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Circle renamed.')));
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Circle could not be renamed. Please try again.'),
-            backgroundColor: kEmergency,
-          ),
-        );
-      }
+    if (name == null || name == group.name.trim() || !mounted) return;
+    await _run(
+      () => _service.renameGroup(group, name),
+      fallback: 'The Circle could not be renamed. Please try again.',
+      success: 'Circle renamed.',
+    );
+  }
+
+  Future<void> _leave(FamilyGroup group) async {
+    if (_busy || group.isOwner) return;
+    final confirmed = await _confirm(
+      title: 'Leave Circle?',
+      message:
+          'You will lose access to ${group.name} and its member information.',
+      action: 'Leave Circle',
+    );
+    if (!confirmed || !mounted) return;
+    final succeeded = await _run(
+      () => _service.leaveGroup(group),
+      fallback: 'You could not leave this Circle. Please try again.',
+    );
+    if (succeeded && mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 
-  Future<void> _deleteCircle() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.warning_amber_rounded, color: kEmergency),
-        title: const Text('Delete Circle?'),
-        content: Text(
-          '“${widget.group.name}” and its member and emergency records will be permanently removed.',
-          textAlign: TextAlign.center,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kEmergency,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete Circle'),
-          ),
-        ],
-      ),
+  Future<void> _delete(FamilyGroup group) async {
+    if (_busy || !group.isOwner) return;
+    final confirmed = await _confirm(
+      title: 'Delete Circle?',
+      message:
+          '${group.name} will be closed for every member. Its records will be retained as a protected lifecycle tombstone.',
+      action: 'Delete Circle',
     );
-    if (confirmed != true) return;
+    if (!confirmed || !mounted) return;
+    final succeeded = await _run(
+      () => _service.deleteGroup(group),
+      fallback: 'The Circle could not be deleted. Please try again.',
+    );
+    if (succeeded && mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+  }
+
+  Future<void> _saveRecipients(FamilyGroup group) async {
+    if (_recipients.isEmpty) return;
+    await _run(
+      () => _service.setEmergencyRecipients(group, _recipients.toList()),
+      fallback: 'Emergency recipients could not be saved. Please try again.',
+      success: 'Emergency recipients updated.',
+    );
+  }
+
+  Future<bool> _run(
+    Future<void> Function() action, {
+    required String fallback,
+    String? success,
+  }) async {
+    if (_busy) return false;
+    setState(() => _busy = true);
     try {
-      await _service.deleteGroup(widget.group);
-      if (mounted) Navigator.pop(context);
-    } catch (_) {
+      await action();
+      if (mounted && success != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(success), backgroundColor: kEmerald),
+        );
+      }
+      return true;
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Circle could not be deleted. Please try again.'),
+          SnackBar(
+            content: Text(CircleErrorMapper.message(error, fallback: fallback)),
             backgroundColor: kEmergency,
           ),
         );
       }
+      return false;
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
+
+  Future<bool> _confirm({
+    required String title,
+    required String message,
+    required String action,
+  }) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          icon: const Icon(Icons.warning_amber_rounded, color: kEmergency),
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: ElevatedButton.styleFrom(backgroundColor: kEmergency),
+              child: Text(action),
+            ),
+          ],
+        ),
+      ) ??
+      false;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Group Settings')),
-    body: ListView(
-      padding: const EdgeInsets.all(24),
+  Widget build(BuildContext context) {
+    final viewerId = _viewerId;
+    if (viewerId == null) {
+      return _unavailable('Please sign in again to manage this Circle.');
+    }
+    return StreamBuilder<FamilyGroup?>(
+      stream: _service.watchGroupForUser(widget.group.id, viewerId),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _unavailable(CircleErrorMapper.message(snapshot.error!));
+        }
+        if (!snapshot.hasData &&
+            snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: LightStateView(
+              icon: Icons.sync_rounded,
+              title: 'Loading settings',
+              message: 'Checking your current Circle permissions…',
+              busy: true,
+            ),
+          );
+        }
+        final group = snapshot.data;
+        if (group == null) {
+          return _unavailable(
+            'This Circle is no longer active or your access was removed.',
+          );
+        }
+        return _settings(group, viewerId);
+      },
+    );
+  }
+
+  Widget _settings(FamilyGroup group, String viewerId) => LightPage(
+    title: 'Circle Settings',
+    subtitle: group.name,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LightSettingRow(
-          icon: Icons.edit_rounded,
-          title: 'Rename Circle',
-          subtitle: widget.group.name,
-          onTap: _renameCircle,
-        ),
-        const SizedBox(height: 9),
+        if (_busy) const LinearProgressIndicator(minHeight: 2),
+        if (_busy) const SizedBox(height: 12),
+        if (CirclePermissionPolicy.canRename(group.role)) ...[
+          LightSettingRow(
+            icon: Icons.edit_rounded,
+            title: 'Rename Circle',
+            subtitle: group.name,
+            onTap: _busy ? null : () => _rename(group),
+          ),
+          const SizedBox(height: 9),
+        ],
         LightSettingRow(
           icon: Icons.admin_panel_settings_rounded,
-          title: 'Owner Information',
-          subtitle:
-              'Owner account • ${widget.group.ownerId.length > 8 ? widget.group.ownerId.substring(widget.group.ownerId.length - 8) : widget.group.ownerId}',
+          title: 'Your Circle role',
+          subtitle: group.role.value,
         ),
-        const SizedBox(height: 9),
-        LightSettingRow(
-          icon: Icons.manage_accounts_rounded,
-          title: 'Member Roles',
-          subtitle:
-              'Owner, parent, adult and child permissions (not editable yet)',
-          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Member role editing is not connected yet.'),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        LightSettingRow(
-          icon: Icons.ios_share_rounded,
-          title: 'Share Circle',
-          subtitle: 'QR code, invitation code and joining link',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ShareCircleScreen(group: widget.group),
-            ),
-          ),
-        ),
-        const SizedBox(height: 22),
-        const Text(
-          'Invite Family Members',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Generate a secure code that expires after seven days. Only registered AliveCircle users can redeem it.',
-        ),
-        const SizedBox(height: 12),
-        if (_invite case final invite?)
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.key_rounded, color: kEmerald),
-              title: SelectableText(
-                invite.code,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 2,
-                ),
-              ),
-              subtitle: Text(
-                'Expires ${invite.expiresAt.toLocal().toString().split('.').first}',
-              ),
-              trailing: IconButton(
-                tooltip: 'Copy invitation code',
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: invite.code));
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Invitation code copied.')),
-                  );
-                },
-                icon: const Icon(Icons.copy_rounded),
-              ),
-            ),
-          ),
-        SizedBox(
-          height: 48,
-          child: OutlinedButton.icon(
-            onPressed: _creatingInvite ? null : _createInvite,
-            icon: _creatingInvite
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.person_add_alt_1_rounded),
-            label: Text(
-              _invite == null
-                  ? 'Generate Invitation Code'
-                  : 'Generate New Code',
-            ),
-          ),
-        ),
-        const SizedBox(height: 28),
-        const Text(
-          'Emergency Notifications',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Choose active app members who receive SOS alerts from this group.',
-        ),
-        const SizedBox(height: 12),
-        ...widget.members
-            .where(
-              (m) => m.userId != null && m.status.toLowerCase() != 'pending',
-            )
-            .map((m) {
-              final id = m.userId!;
-              return CheckboxListTile(
-                value: _recipients.contains(id),
-                onChanged: (value) => setState(
-                  () => value == true
-                      ? _recipients.add(id)
-                      : _recipients.remove(id),
-                ),
-                title: Text(m.name),
-                subtitle: Text(m.email ?? 'Registered member'),
-              );
-            }),
-        const SizedBox(height: 18),
-        SizedBox(
-          height: 48,
-          child: ElevatedButton(
-            onPressed: _saving || _recipients.isEmpty
+        if (group.canManage) ...[
+          const SizedBox(height: 9),
+          LightSettingRow(
+            icon: Icons.ios_share_rounded,
+            title: 'Invite registered member',
+            subtitle: 'Generate a secure Phase 6 invitation code',
+            onTap: _busy
                 ? null
-                : () async {
-                    setState(() => _saving = true);
-                    try {
-                      await _service.setEmergencyRecipients(
-                        widget.group,
-                        _recipients.toList(),
-                      );
-                      if (mounted) Navigator.pop(context);
-                    } finally {
-                      if (mounted) setState(() => _saving = false);
-                    }
-                  },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kEmergency,
-              foregroundColor: Colors.white,
+                : () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ShareCircleScreen(group: group),
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 22),
+          const LightSectionTitle('Emergency recipients'),
+          StreamBuilder<List<CircleMembership>>(
+            stream: _service.watchMemberships(group.id),
+            initialData: widget.memberships.isEmpty ? null : widget.memberships,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Text(CircleErrorMapper.message(snapshot.error!));
+              }
+              if (!snapshot.hasData) {
+                return const LinearProgressIndicator(minHeight: 2);
+              }
+              final members = snapshot.data!;
+              if (members.isEmpty) {
+                return const Text(
+                  'No active registered members are available.',
+                );
+              }
+              return Column(
+                children: [
+                  for (final member in members)
+                    CheckboxListTile(
+                      value: _recipients.contains(member.userId),
+                      onChanged: _busy
+                          ? null
+                          : (value) => setState(
+                              () => value == true
+                                  ? _recipients.add(member.userId)
+                                  : _recipients.remove(member.userId),
+                            ),
+                      title: Text(member.displayName),
+                      subtitle: Text(
+                        '${member.relationship} • ${member.role.value}',
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton(
+              onPressed: _busy || _recipients.isEmpty
+                  ? null
+                  : () => _saveRecipients(group),
+              child: const Text('Save Emergency Recipients'),
             ),
-            child: Text(_saving ? 'Saving...' : 'Save Emergency Recipients'),
           ),
-        ),
-        const SizedBox(height: 28),
-        const LightSectionTitle('Circle management'),
-        LightSettingRow(
-          icon: Icons.logout_rounded,
-          title: 'Leave Circle',
-          subtitle: widget.group.isOwner
-              ? 'Transfer ownership before leaving'
-              : 'Leave this Circle',
-          destructive: true,
-          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Leave Circle is not connected yet.')),
+        ],
+        const SizedBox(height: 26),
+        const LightSectionTitle('Circle lifecycle'),
+        if (group.isOwner)
+          const LightSettingRow(
+            icon: Icons.logout_rounded,
+            title: 'Leave Circle',
+            subtitle: 'The owner must transfer ownership or delete the Circle',
+          )
+        else
+          LightSettingRow(
+            icon: Icons.logout_rounded,
+            title: 'Leave Circle',
+            subtitle: 'Remove your active membership from this Circle',
+            destructive: true,
+            onTap: _busy ? null : () => _leave(group),
           ),
-        ),
-        const SizedBox(height: 9),
-        LightSettingRow(
-          icon: Icons.swap_horiz_rounded,
-          title: 'Transfer Ownership',
-          subtitle: 'Choose another active adult or parent',
-          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Ownership transfer is not connected yet.'),
-            ),
+        if (group.isOwner) ...[
+          const SizedBox(height: 9),
+          const LightSettingRow(
+            icon: Icons.swap_horiz_rounded,
+            title: 'Transfer Ownership',
+            subtitle: 'Reserved for a later lifecycle extension',
           ),
-        ),
-        const SizedBox(height: 9),
-        LightSettingRow(
-          icon: Icons.delete_forever_rounded,
-          title: 'Delete Circle',
-          subtitle: 'Only the owner can permanently delete this Circle',
-          destructive: true,
-          onTap: widget.group.isOwner ? _deleteCircle : null,
-        ),
+          const SizedBox(height: 9),
+          LightSettingRow(
+            icon: Icons.delete_forever_rounded,
+            title: 'Delete Circle',
+            subtitle: 'Close this Circle for every member',
+            destructive: true,
+            onTap: _busy ? null : () => _delete(group),
+          ),
+        ],
       ],
+    ),
+  );
+
+  Widget _unavailable(String message) => Scaffold(
+    appBar: AppBar(title: const Text('Circle Settings')),
+    body: LightStateView(
+      icon: Icons.lock_outline_rounded,
+      title: 'Settings unavailable',
+      message: message,
+      actionLabel: 'Go back',
+      onAction: () => Navigator.maybePop(context),
     ),
   );
 }

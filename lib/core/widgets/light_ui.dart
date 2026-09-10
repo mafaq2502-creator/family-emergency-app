@@ -28,10 +28,10 @@ class LightPage extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 19,
               fontWeight: FontWeight.w800,
-              color: kLightNavy,
+              color: context.appHeading,
             ),
           ),
           if (subtitle != null)
@@ -39,7 +39,7 @@ class LightPage extends StatelessWidget {
               subtitle!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10, color: kLightMuted),
+              style: TextStyle(fontSize: 10, color: context.appMuted),
             ),
         ],
       ),
@@ -72,9 +72,9 @@ class LightCard extends StatelessWidget {
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: color ?? Colors.white,
+        color: color ?? context.appSurface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kLightBorder),
+        border: Border.all(color: context.appBorder),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0C0B715E),
@@ -83,7 +83,7 @@ class LightCard extends StatelessWidget {
           ),
         ],
       ),
-      child: child,
+      child: Material(color: Colors.transparent, child: child),
     );
     if (onTap == null) return card;
     return Material(
@@ -110,8 +110,8 @@ class LightSectionTitle extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: const TextStyle(
-              color: kLightNavy,
+            style: TextStyle(
+              color: context.appHeading,
               fontSize: 14,
               fontWeight: FontWeight.w800,
             ),
@@ -181,11 +181,11 @@ class LightAvatar extends StatelessWidget {
     children: [
       CircleAvatar(
         radius: radius,
-        backgroundColor: kLightSuccessSurface,
+        backgroundColor: context.appSuccessSurface,
         child: Text(
           name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase(),
           style: TextStyle(
-            color: kLightPrimary,
+            color: context.appPrimary,
             fontSize: radius * .7,
             fontWeight: FontWeight.w800,
           ),
@@ -199,9 +199,9 @@ class LightAvatar extends StatelessWidget {
             width: 11,
             height: 11,
             decoration: BoxDecoration(
-              color: online! ? kEmerald : kLightMuted,
+              color: online! ? kEmerald : context.appMuted,
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
+              border: Border.all(color: context.appSurface, width: 2),
             ),
           ),
         ),
@@ -230,7 +230,7 @@ class LightSettingRow extends StatelessWidget {
   Widget build(BuildContext context) => LightCard(
     padding: EdgeInsets.zero,
     onTap: onTap,
-    color: destructive ? const Color(0xFFFFF4F5) : null,
+    color: destructive ? context.appDangerSurface : null,
     child: ListTile(
       minLeadingWidth: 30,
       dense: true,
@@ -243,7 +243,7 @@ class LightSettingRow extends StatelessWidget {
         ),
         child: Icon(
           icon,
-          color: destructive ? kEmergency : kLightPrimary,
+          color: destructive ? kEmergency : context.appPrimary,
           size: 18,
         ),
       ),
@@ -252,7 +252,7 @@ class LightSettingRow extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          color: destructive ? kEmergency : kLightNavy,
+          color: destructive ? kEmergency : context.appHeading,
           fontSize: 12,
           fontWeight: FontWeight.w800,
         ),
@@ -263,13 +263,13 @@ class LightSettingRow extends StatelessWidget {
               subtitle!,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10, color: kLightMuted),
+              style: TextStyle(fontSize: 10, color: context.appMuted),
             ),
       trailing:
           trailing ??
           (onTap == null
               ? null
-              : const Icon(Icons.chevron_right_rounded, color: kLightMuted)),
+              : Icon(Icons.chevron_right_rounded, color: context.appMuted)),
     ),
   );
 }
@@ -301,8 +301,8 @@ class LightStateView extends StatelessWidget {
           Container(
             width: 68,
             height: 68,
-            decoration: const BoxDecoration(
-              color: kLightSuccessSurface,
+            decoration: BoxDecoration(
+              color: context.appSuccessSurface,
               shape: BoxShape.circle,
             ),
             child: busy
@@ -310,14 +310,14 @@ class LightStateView extends StatelessWidget {
                     padding: EdgeInsets.all(22),
                     child: CircularProgressIndicator(strokeWidth: 2.5),
                   )
-                : Icon(icon, color: kLightPrimary, size: 32),
+                : Icon(icon, color: context.appPrimary, size: 32),
           ),
           const SizedBox(height: 16),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: kLightNavy,
+            style: TextStyle(
+              color: context.appHeading,
               fontSize: 17,
               fontWeight: FontWeight.w800,
             ),
@@ -326,7 +326,7 @@ class LightStateView extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: kLightMuted, fontSize: 12),
+            style: TextStyle(color: context.appMuted, fontSize: 12),
           ),
           if (actionLabel != null && onAction != null) ...[
             const SizedBox(height: 18),

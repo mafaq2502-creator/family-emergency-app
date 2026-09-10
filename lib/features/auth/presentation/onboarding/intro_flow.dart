@@ -68,7 +68,7 @@ class _IntroFlowState extends State<IntroFlow> {
                 height: 7,
                 margin: const EdgeInsets.symmetric(horizontal: 3),
                 decoration: BoxDecoration(
-                  color: _page == index ? kEmerald : kLightBorder,
+                  color: _page == index ? kEmerald : context.appBorder,
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
@@ -113,8 +113,8 @@ class _IntroPage extends StatelessWidget {
               const SizedBox(height: 24),
               Text(
                 title,
-                style: const TextStyle(
-                  color: kLightNavy,
+                style: TextStyle(
+                  color: context.appHeading,
                   fontSize: 28,
                   height: 1.06,
                   fontWeight: FontWeight.w800,
@@ -123,8 +123,8 @@ class _IntroPage extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 description,
-                style: const TextStyle(
-                  color: kLightMuted,
+                style: TextStyle(
+                  color: context.appMuted,
                   fontSize: 13,
                   height: 1.5,
                 ),
@@ -160,8 +160,8 @@ class _FamilyLandscape extends StatelessWidget {
           bottom: -85,
           child: Container(
             height: 240,
-            decoration: const BoxDecoration(
-              color: Color(0xFFDDF7EF),
+            decoration: BoxDecoration(
+              color: context.appSurfaceMuted,
               shape: BoxShape.circle,
             ),
           ),
@@ -172,8 +172,8 @@ class _FamilyLandscape extends StatelessWidget {
           bottom: -110,
           child: Container(
             height: 230,
-            decoration: const BoxDecoration(
-              color: Color(0xFFB9EBDD),
+            decoration: BoxDecoration(
+              color: context.appSuccessSurface,
               shape: BoxShape.circle,
             ),
           ),
@@ -184,7 +184,7 @@ class _FamilyLandscape extends StatelessWidget {
             width: 132,
             height: 132,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.appSurface,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
@@ -193,7 +193,7 @@ class _FamilyLandscape extends StatelessWidget {
                 ),
               ],
             ),
-            child: Icon(icon, color: kLightPrimary, size: 72),
+            child: Icon(icon, color: context.appPrimary, size: 72),
           ),
         ),
         Positioned(
@@ -232,7 +232,7 @@ class StartupSplash extends StatelessWidget {
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: kLightMuted, fontSize: 12),
+                style: TextStyle(color: context.appMuted, fontSize: 12),
               ),
             ],
           ),

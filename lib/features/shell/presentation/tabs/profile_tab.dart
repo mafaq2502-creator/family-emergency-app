@@ -38,13 +38,13 @@ extension _ProfileTab on _HomeScreenState {
                 ),
                 CircleAvatar(
                   radius: 24,
-                  backgroundColor: kLightSuccessSurface,
+                  backgroundColor: context.appSuccessSurface,
                   child: Text(
                     _profileNameController.text.isEmpty
                         ? '?'
                         : _profileNameController.text[0].toUpperCase(),
-                    style: const TextStyle(
-                      color: kLightPrimary,
+                    style: TextStyle(
+                      color: context.appPrimary,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -90,7 +90,7 @@ extension _ProfileTab on _HomeScreenState {
               value: 'Free Plan',
               isDark: isDark,
               plan: true,
-              onTap: () => setState(() => _currentIndex = 3),
+              onTap: _openPlanTab,
             ),
             if (_selectedGroup != null) ...[
               const SizedBox(height: 7),
@@ -153,10 +153,9 @@ extension _ProfileTab on _HomeScreenState {
               ),
             ),
             const SizedBox(height: 8),
-            _themeSelector(
-              isDark ? kDarkCard : Colors.white,
-              titleColor,
-              mutedColor,
+            AppThemeModeSelector(
+              mode: appThemeMode.value,
+              onChanged: (mode) => appThemeMode.value = mode,
             ),
             const SizedBox(height: 22),
             SizedBox(
@@ -287,65 +286,5 @@ extension _ProfileTab on _HomeScreenState {
             onTap: onTap,
             child: row,
           );
-  }
-
-  Widget _themeSelector(Color cardColor, Color enabledText, Color mutedText) {
-    const choices = [
-      (ThemeMode.system, 'System', Icons.brightness_auto_rounded),
-      (ThemeMode.light, 'Light', Icons.light_mode_rounded),
-      (ThemeMode.dark, 'Dark', Icons.dark_mode_rounded),
-    ];
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: choices.map((choice) {
-          final selected = appThemeMode.value == choice.$1;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => appThemeMode.value = choice.$1,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  gradient:
-                      selected &&
-                          Theme.of(context).brightness == Brightness.light
-                      ? kPrimaryGradient
-                      : null,
-                  color:
-                      selected &&
-                          Theme.of(context).brightness == Brightness.dark
-                      ? kEmerald
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      choice.$3,
-                      size: 19,
-                      color: selected ? Colors.white : mutedText,
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      choice.$2,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: selected ? Colors.white : enabledText,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
   }
 }

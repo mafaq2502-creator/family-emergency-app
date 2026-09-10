@@ -7,11 +7,13 @@ extension _HomeTab on _HomeScreenState {
     final mutedColor = isDark ? Colors.white70 : kLightMuted;
     return SafeArea(
       child: LayoutBuilder(
-        builder: (context, viewport) => SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: viewport.maxHeight - 36),
-            child: IntrinsicHeight(
+        builder: (context, viewport) {
+          final contentWidth = viewport.maxWidth - 48;
+          final cardWidth = (contentWidth - 10) / 2;
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: viewport.maxHeight - 36),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -97,7 +99,7 @@ extension _HomeTab on _HomeScreenState {
                     ),
                   ),
                   if (_groups.isEmpty) ...[
-                    const Spacer(),
+                    SizedBox(height: (viewport.maxHeight - 330).clamp(28, 220)),
                     Center(
                       child: Text(
                         'No groups yet. Create one from Members.',
@@ -112,22 +114,17 @@ extension _HomeTab on _HomeScreenState {
                     // A Wrap is deliberately used here instead of a nested GridView.
                     // This tab lives inside a SingleChildScrollView; a nested viewport
                     // can receive an unbounded height after authentication and crash.
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final cardWidth = (constraints.maxWidth - 10) / 2;
-                        return Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: [
-                            for (final group in _groups)
-                              SizedBox(
-                                width: cardWidth,
-                                height: cardWidth / 1.25,
-                                child: _groupHomeCard(group, isDark),
-                              ),
-                          ],
-                        );
-                      },
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        for (final group in _groups)
+                          SizedBox(
+                            width: cardWidth,
+                            height: cardWidth / 1.25,
+                            child: _groupHomeCard(group, isDark),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 13),
                     _homeActions(isDark, mutedColor),
@@ -135,8 +132,8 @@ extension _HomeTab on _HomeScreenState {
                 ],
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -235,7 +232,7 @@ extension _HomeTab on _HomeScreenState {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.groups_rounded, color: kEmerald, size: 30),
+            const Icon(Icons.groups_rounded, color: kEmerald, size: 30),
             const Spacer(),
             Text(
               group.name,

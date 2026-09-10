@@ -65,22 +65,22 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
                 width: 122,
                 height: 122,
                 decoration: BoxDecoration(
-                  color: kLightSurfaceMuted,
+                  color: context.appSurfaceMuted,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: kEmerald, width: 2),
                 ),
-                child: const Column(
+                child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
                       Icons.qr_code_scanner_rounded,
                       size: 48,
-                      color: kLightMuted,
+                      color: context.appMuted,
                     ),
-                    SizedBox(height: 6),
+                    const SizedBox(height: 6),
                     Text(
                       'Unavailable',
-                      style: TextStyle(color: kLightMuted, fontSize: 10),
+                      style: TextStyle(color: context.appMuted, fontSize: 10),
                     ),
                   ],
                 ),
@@ -105,9 +105,9 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
           onChanged: (value) => setState(() => _consent = value == true),
           controlAffinity: ListTileControlAffinity.leading,
           contentPadding: EdgeInsets.zero,
-          title: const Text(
+          title: Text(
             'I understand that device data is shared only with consent.',
-            style: TextStyle(fontSize: 11, color: kLightNavy),
+            style: TextStyle(fontSize: 11, color: context.appHeading),
           ),
         ),
         const SizedBox(height: 6),
@@ -142,7 +142,7 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
               child: Text(number, style: const TextStyle(color: Colors.white)),
             ),
             const SizedBox(width: 10),
-            Icon(icon, size: 19, color: kLightPrimary),
+            Icon(icon, size: 19, color: context.appPrimary),
             const SizedBox(width: 9),
             Expanded(
               child: Column(
@@ -150,13 +150,13 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(fontSize: 10, color: kLightMuted),
+                    style: TextStyle(fontSize: 10, color: context.appMuted),
                   ),
                   Text(
                     value,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: kLightNavy,
+                    style: TextStyle(
+                      color: context.appHeading,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -186,21 +186,21 @@ class DeviceDetailScreen extends StatelessWidget {
           Container(
             width: 88,
             height: 88,
-            decoration: const BoxDecoration(
-              color: kLightSuccessSurface,
+            decoration: BoxDecoration(
+              color: context.appSuccessSurface,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.smartphone_rounded,
               size: 50,
-              color: kLightPrimary,
+              color: context.appPrimary,
             ),
           ),
           const SizedBox(height: 12),
           Text(
             name,
-            style: const TextStyle(
-              color: kLightNavy,
+            style: TextStyle(
+              color: context.appHeading,
               fontSize: 21,
               fontWeight: FontWeight.w800,
             ),
@@ -212,7 +212,7 @@ class DeviceDetailScreen extends StatelessWidget {
                 : online
                 ? 'Online'
                 : 'Offline / last seen unknown',
-            color: online ? kEmerald : kLightMuted,
+            color: online ? kEmerald : context.appMuted,
           ),
           const SizedBox(height: 22),
           _metric(

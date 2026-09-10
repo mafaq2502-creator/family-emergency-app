@@ -65,7 +65,7 @@ class _EmergencyEventsScreenState extends State<EmergencyEventsScreen> {
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: kLightSurfaceMuted,
+                color: context.appSurfaceMuted,
                 borderRadius: BorderRadius.circular(13),
               ),
               child: Row(
@@ -166,9 +166,9 @@ class _EmergencyEventsScreenState extends State<EmergencyEventsScreen> {
                                 padding: const EdgeInsets.only(top: 7),
                                 child: Text(
                                   'Sent ${MaterialLocalizations.of(context).formatMediumDate(event.createdAt!)} at ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(event.createdAt!))}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
-                                    color: Color(0xFF64748B),
+                                    color: context.appMuted,
                                   ),
                                 ),
                               ),
@@ -177,9 +177,9 @@ class _EmergencyEventsScreenState extends State<EmergencyEventsScreen> {
                                 padding: const EdgeInsets.only(top: 7),
                                 child: Text(
                                   'Acknowledged by ${event.acknowledgedByName}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
-                                    color: Color(0xFF64748B),
+                                    color: context.appMuted,
                                   ),
                                 ),
                               ),
@@ -265,7 +265,7 @@ class _EmergencyEventsScreenState extends State<EmergencyEventsScreen> {
             label,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: selected ? Colors.white : kLightMuted,
+              color: selected ? Colors.white : context.appMuted,
               fontSize: 10,
               fontWeight: FontWeight.w800,
             ),

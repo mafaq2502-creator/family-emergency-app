@@ -21,6 +21,8 @@ class UserProfile {
     this.lastDailyCheckIn,
     this.createdAt,
     this.updatedAt,
+    this.activeCircleId,
+    this.circleIds = const [],
   });
 
   final String uid;
@@ -39,6 +41,8 @@ class UserProfile {
   final DateTime? lastDailyCheckIn;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String? activeCircleId;
+  final List<String> circleIds;
 
   bool get needsProfileCompletion => !profileCompleted;
 
@@ -97,6 +101,8 @@ class UserProfile {
       lastDailyCheckIn: _date(source['lastDailyCheckInAt']),
       createdAt: _date(source['createdAt']),
       updatedAt: _date(source['updatedAt']),
+      activeCircleId: _string(source['activeCircleId']),
+      circleIds: _stringList(source['circleIds']),
     );
   }
 

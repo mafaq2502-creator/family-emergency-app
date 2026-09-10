@@ -5,10 +5,12 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'dart:async';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/domain/circle_error_mapper.dart';
+import '../../../core/domain/circle_policies.dart';
 import '../../../core/theme/theme_mode_controller.dart';
 import '../../../core/widgets/light_ui.dart';
+import '../../../core/widgets/app_theme_mode_selector.dart';
 import '../../../models/family_member.dart';
-import '../../../models/notification_settings.dart';
 import '../../../models/family_group.dart';
 import '../../../models/circle_role.dart';
 import '../../../models/app_notification.dart';
@@ -19,20 +21,18 @@ import '../../../services/emergency_service.dart';
 import '../../../services/app_notification_service.dart';
 import '../../../services/auth_service.dart';
 import '../../members/presentation/member_profile_screen.dart';
-import '../../members/presentation/member_notification_settings_editor.dart';
 import '../../groups/presentation/group_settings_screen.dart';
 import '../../groups/presentation/group_members_screen.dart';
-import '../../groups/presentation/share_circle_screen.dart';
 import '../../notifications/presentation/notification_settings_screen.dart';
 import '../../notifications/presentation/notification_banner.dart';
 import '../../profile/presentation/profile_settings_screen.dart';
 import '../../profile/presentation/account_settings_screen.dart';
 import '../../progress/presentation/progress_detail_screens.dart';
+import 'tabs/plan_tab.dart';
 
 part 'tabs/home_tab.dart';
 part 'tabs/members_tab.dart';
 part 'tabs/location_tab.dart';
-part 'tabs/plan_tab.dart';
 part 'tabs/profile_tab.dart';
 
 // ====================== HOME SCREEN ======================
@@ -52,9 +52,24 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _timer;
   Timer? _groupRetryTimer;
   bool _groupLoadErrorShown = false;
+  bool _isCreatingGroup = false;
   bool _showOwnedCircles = true;
   String _progressPeriod = 'Today';
   String? _progressMemberId;
+
+  void _selectProgressGroup(FamilyGroup? group) {
+    setState(() {
+      _selectedGroup = group;
+      _progressMemberId = null;
+    });
+    _watchMembers();
+  }
+
+  void _selectProgressMember(String? id) =>
+      setState(() => _progressMemberId = id);
+  void _selectProgressPeriod(String period) =>
+      setState(() => _progressPeriod = period);
+  void _openPlanTab() => setState(() => _currentIndex = 3);
 
   void _setCircleScope(bool owned) {
     setState(() => _showOwnedCircles = owned);
@@ -162,32 +177,55 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _createGroup() async {
+    if (_isCreatingGroup) return;
+    setState(() => _isCreatingGroup = true);
     final controller = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create group'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Group name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-    if (name == null || name.isEmpty) return;
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
     try {
+      final formKey = GlobalKey<FormState>();
+      final name = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Create Circle'),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              controller: controller,
+              autofocus: true,
+              maxLength: CircleNamePolicy.maxLength,
+              validator: CircleNamePolicy.validate,
+              decoration: const InputDecoration(labelText: 'Circle name'),
+              onFieldSubmitted: (_) {
+                if (formKey.currentState?.validate() == true) {
+                  Navigator.pop(
+                    dialogContext,
+                    CircleNamePolicy.normalize(controller.text),
+                  );
+                }
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (formKey.currentState?.validate() == true) {
+                  Navigator.pop(
+                    dialogContext,
+                    CircleNamePolicy.normalize(controller.text),
+                  );
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      );
+      if (name == null || !mounted) return;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
       final groupId = await _groupService.createGroup(user, name);
       if (!mounted) return;
       final createdGroup = FamilyGroup(
@@ -196,6 +234,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ownerId: user.uid,
         role: CircleRole.owner,
         emergencyRecipientIds: [user.uid],
+        memberIds: [user.uid],
       );
       setState(() {
         _groups = [
@@ -210,58 +249,33 @@ class _HomeScreenState extends State<HomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('$name created.'), backgroundColor: kEmerald),
       );
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Could not create group. Check Firestore rules and connection.',
+              CircleErrorMapper.message(
+                error,
+                fallback:
+                    'Could not create the family Circle. Please try again.',
+              ),
             ),
             backgroundColor: kEmergency,
           ),
         );
       }
+    } finally {
+      controller.dispose();
+      if (mounted) setState(() => _isCreatingGroup = false);
     }
   }
-
-  Widget _groupSelector() => Row(
-    children: [
-      Expanded(
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<FamilyGroup>(
-            value: _selectedGroup,
-            hint: const Text('Select group'),
-            isExpanded: true,
-            items: _groups
-                .map(
-                  (group) =>
-                      DropdownMenuItem(value: group, child: Text(group.name)),
-                )
-                .toList(),
-            onChanged: (group) {
-              setState(() => _selectedGroup = group);
-              _watchMembers();
-            },
-          ),
-        ),
-      ),
-      IconButton(
-        onPressed: _createGroup,
-        icon: const Icon(Icons.add_circle_outline_rounded, color: kEmerald),
-        tooltip: 'Add group',
-      ),
-    ],
-  );
 
   void _openGroupSettings() {
     final group = _selectedGroup;
     if (group == null || !group.canManage) return;
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) =>
-            GroupSettingsScreen(group: group, members: familyMembers),
-      ),
+      MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group)),
     );
   }
 
@@ -544,210 +558,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (confirmed == true) await AuthService().signOut();
   }
 
-  void _showAddMemberDialog() {
-    final nameController = TextEditingController();
-    final emailController = TextEditingController();
-    String? selectedRelation;
-    bool locationAccess = true;
-    bool batteryAccess = true;
-    NotificationSettings memberNotifications = const NotificationSettings();
-
-    final List<String> relations = [
-      'Father',
-      'Mother',
-      'Husband',
-      'Wife',
-      'Son',
-      'Daughter',
-      'Grandfather',
-      'Grandmother',
-      'Grandson',
-      'Granddaughter',
-      'Brother',
-      'Sister',
-    ];
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: const Text(
-                'Add Family Member',
-                style: TextStyle(color: kLightNavy),
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: nameController,
-                      decoration: InputDecoration(
-                        labelText: 'Name',
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        labelText: 'Email',
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedRelation,
-                      dropdownColor: Colors.white,
-                      decoration: InputDecoration(
-                        labelText: 'Relationship',
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      style: const TextStyle(color: kLightNavy),
-                      items: relations
-                          .map(
-                            (r) => DropdownMenuItem(value: r, child: Text(r)),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        setDialogState(() => selectedRelation = value);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Access Permissions',
-                        style: TextStyle(
-                          color: kLightNavy,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    SwitchListTile(
-                      title: const Text(
-                        'Location',
-                        style: TextStyle(color: kLightNavy),
-                      ),
-                      value: locationAccess,
-                      activeThumbColor: kEmerald,
-                      onChanged: (value) {
-                        setDialogState(() => locationAccess = value);
-                      },
-                    ),
-                    MemberNotificationSettingsEditor(
-                      settings: memberNotifications,
-                      onChanged: (settings) =>
-                          setDialogState(() => memberNotifications = settings),
-                    ),
-                    SwitchListTile(
-                      title: const Text(
-                        'Battery Status',
-                        style: TextStyle(color: kLightNavy),
-                      ),
-                      value: batteryAccess,
-                      activeThumbColor: kEmerald,
-                      onChanged: (value) {
-                        setDialogState(() => batteryAccess = value);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (nameController.text.trim().isEmpty ||
-                        emailController.text.trim().isEmpty ||
-                        selectedRelation == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please fill all fields'),
-                          backgroundColor: Colors.redAccent,
-                        ),
-                      );
-                      return;
-                    }
-
-                    final member = FamilyMember(
-                      name: nameController.text.trim(),
-                      status: 'Pending',
-                      email: emailController.text.trim(),
-                      relation: selectedRelation,
-                      locationAccess: locationAccess,
-                      batteryAccess: batteryAccess,
-                      notificationSettings: memberNotifications,
-                    );
-                    final group = _selectedGroup;
-                    if (group == null || !group.canManage) return;
-                    try {
-                      await _memberService.createInGroup(group.id, member);
-                    } catch (_) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Could not save member. Check your connection and Firestore setup.',
-                            ),
-                            backgroundColor: kEmergency,
-                          ),
-                        );
-                      }
-                      return;
-                    }
-
-                    if (!context.mounted) return;
-                    Navigator.pop(context);
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '${nameController.text.trim()} added successfully',
-                        ),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: kEmerald),
-                  child: const Text(
-                    'Add Member',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
   @override
   void dispose() {
     _groupsSubscription?.cancel();
@@ -775,7 +585,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildFamilyTab(),
             _buildLocationTab(),
             _buildHomeTab(),
-            _buildPlanTab(),
+            const PlanSelectionContent(),
             _buildProfileTab(),
           ],
         ),

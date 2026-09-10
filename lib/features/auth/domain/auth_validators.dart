@@ -1,3 +1,5 @@
+import '../../../core/domain/circle_policies.dart';
+
 class AuthValidators {
   const AuthValidators._();
 
@@ -115,18 +117,7 @@ class AuthValidators {
   }
 
   static String? circleName(String? value) {
-    final normalized = value?.trim() ?? '';
-    if (normalized.isEmpty) return 'Please enter a family Circle name.';
-    if (normalized.length < 2) {
-      return 'Circle name must contain at least 2 characters.';
-    }
-    if (normalized.length > 60) {
-      return 'Circle name must be 60 characters or fewer.';
-    }
-    if (_controlCharacters.hasMatch(normalized)) {
-      return 'Please enter a valid Circle name.';
-    }
-    return null;
+    return CircleNamePolicy.validate(value);
   }
 
   static String normalizeInviteCode(String value) =>

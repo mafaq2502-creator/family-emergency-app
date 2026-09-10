@@ -66,8 +66,8 @@ class EmergencyDetailScreen extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             event.senderName,
-            style: const TextStyle(
-              color: kLightNavy,
+            style: TextStyle(
+              color: context.appHeading,
               fontSize: 22,
               fontWeight: FontWeight.w800,
             ),

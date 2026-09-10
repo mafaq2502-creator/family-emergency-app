@@ -24,9 +24,9 @@ class ProgressPeriodSelector extends StatelessWidget {
             label: Text(period),
             selected: period == value,
             onSelected: (_) => onChanged(period),
-            selectedColor: kLightPrimary,
+            selectedColor: context.appPrimary,
             labelStyle: TextStyle(
-              color: period == value ? Colors.white : kLightMuted,
+              color: period == value ? Colors.white : context.appMuted,
               fontSize: 11,
               fontWeight: FontWeight.w800,
             ),
@@ -68,15 +68,15 @@ class _ScreenTimeDetailScreenState extends State<ScreenTimeDetailScreen> {
         ),
         const SizedBox(height: 18),
         const LightSectionTitle('App Usage'),
-        const LightCard(
+        LightCard(
           child: Row(
             children: [
-              Icon(Icons.apps_rounded, color: kLightMuted),
-              SizedBox(width: 11),
+              Icon(Icons.apps_rounded, color: context.appMuted),
+              const SizedBox(width: 11),
               Expanded(
                 child: Text(
                   'App-by-app usage will appear after a supported device is paired.',
-                  style: TextStyle(color: kLightMuted, fontSize: 12),
+                  style: TextStyle(color: context.appMuted, fontSize: 12),
                 ),
               ),
             ],
@@ -134,8 +134,8 @@ class _CheckInHistoryScreenState extends State<CheckInHistoryScreen> {
                         Text(
                           MaterialLocalizations.of(context)
                               .formatTimeOfDay(TimeOfDay.fromDateTime(checkIn)),
-                          style: const TextStyle(
-                            color: kLightMuted,
+                          style: TextStyle(
+                            color: context.appMuted,
                             fontSize: 11,
                           ),
                         ),
@@ -155,10 +155,10 @@ class _CheckInHistoryScreenState extends State<CheckInHistoryScreen> {
                   : 'Historical check-in storage is not connected for $_period.',
             ),
           const SizedBox(height: 12),
-          const Center(
+          Center(
             child: Text(
               'Times are displayed in the device’s local timezone.',
-              style: TextStyle(color: kLightMuted, fontSize: 11),
+              style: TextStyle(color: context.appMuted, fontSize: 11),
             ),
           ),
         ],

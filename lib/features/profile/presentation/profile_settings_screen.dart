@@ -65,7 +65,7 @@ class ProfileSettingsScreen extends StatelessWidget {
             ),
           ]),
           const SizedBox(height: 20),
-          Text(
+          const Text(
             'Danger zone',
             style: TextStyle(
               fontSize: 13,

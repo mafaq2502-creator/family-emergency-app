@@ -51,13 +51,7 @@ extension _LocationTab on _HomeScreenState {
                   ),
                 )
                 .toList(),
-            onChanged: (group) {
-              setState(() {
-                _selectedGroup = group;
-                _progressMemberId = null;
-              });
-              _watchMembers();
-            },
+            onChanged: _selectProgressGroup,
           ),
           const SizedBox(height: 10),
           DropdownButtonFormField<String?>(
@@ -83,12 +77,12 @@ extension _LocationTab on _HomeScreenState {
                     ),
                   ),
             ],
-            onChanged: (value) => setState(() => _progressMemberId = value),
+            onChanged: _selectProgressMember,
           ),
           const SizedBox(height: 12),
           ProgressPeriodSelector(
             value: _progressPeriod,
-            onChanged: (value) => setState(() => _progressPeriod = value),
+            onChanged: _selectProgressPeriod,
           ),
           const SizedBox(height: 15),
           _unavailableProgressCard(titleColor, mutedColor),
@@ -228,7 +222,7 @@ extension _LocationTab on _HomeScreenState {
                   ],
                 ),
               ),
-              const Icon(Icons.info_outline_rounded, color: kLightMuted),
+              Icon(Icons.info_outline_rounded, color: context.appMuted),
             ],
           ),
           const SizedBox(height: 12),

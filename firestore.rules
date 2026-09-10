@@ -18,7 +18,9 @@ service cloud.firestore {
     }
 
     function isMember(groupId) {
-      return signedIn() && request.auth.uid in group(groupId).data.memberIds;
+      return signedIn() &&
+        (!('status' in group(groupId).data) || group(groupId).data.status == 'active') &&
+        request.auth.uid in group(groupId).data.memberIds;
     }
 
     function role(groupId) {
@@ -37,12 +39,13 @@ service cloud.firestore {
     function validGroupCreate() {
       return request.resource.data.keys().hasAll([
           'name', 'ownerId', 'memberIds', 'roles',
-          'emergencyRecipientIds', 'createdAt', 'updatedAt'
+          'emergencyRecipientIds', 'status', 'createdAt', 'updatedAt'
         ]) &&
         request.resource.data.ownerId == request.auth.uid &&
         request.resource.data.memberIds == [request.auth.uid] &&
         request.resource.data.roles[request.auth.uid] == 'owner' &&
-        request.resource.data.emergencyRecipientIds == [request.auth.uid];
+        request.resource.data.emergencyRecipientIds == [request.auth.uid] &&
+        request.resource.data.status == 'active';
     }
 
     match /users/{userId} {
@@ -68,31 +71,29 @@ service cloud.firestore {
     }
 
     match /groups/{groupId} {
-      allow read: if signedIn() &&
-        request.auth.uid in resource.data.memberIds;
+      allow read: if isMember(groupId);
       allow create: if signedIn() && validGroupCreate();
       allow update: if isCircleManager(groupId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'name', 'emergencyRecipientIds', 'updatedAt'
-        ]);
-      allow delete: if isOwner(groupId);
+        ]) &&
+        request.resource.data.emergencyRecipientIds.size() > 0 &&
+        request.resource.data.emergencyRecipientIds.hasOnly(resource.data.memberIds);
+      // Lifecycle removal is a server transaction so member/profile references
+      // cannot be left partially updated.
+      allow delete: if false;
 
       match /memberships/{userId} {
         allow read: if isMember(groupId);
         allow create: if signedIn() &&
           request.resource.data.userId == userId &&
-          request.resource.data.status in ['pending', 'active'] &&
-          (
-            (request.auth.uid == userId &&
-              groupAfter(groupId).data.ownerId == request.auth.uid &&
-              request.resource.data.circleRole == 'owner') ||
-            isCircleManager(groupId)
-          );
-        allow update: if isCircleManager(groupId) &&
-          request.resource.data.userId == resource.data.userId;
-        allow delete: if isCircleManager(groupId) ||
-          (signedIn() && request.auth.uid == userId &&
-            resource.data.circleRole != 'owner');
+          request.resource.data.status == 'active' &&
+          request.auth.uid == userId &&
+          groupAfter(groupId).data.ownerId == request.auth.uid &&
+          request.resource.data.circleRole == 'owner';
+        // Invites, removal, leaving, and role changes require coordinated group,
+        // membership, and profile writes and are performed by Cloud Functions.
+        allow update, delete: if false;
       }
 
       // Kept temporarily for the current UI while registered-user

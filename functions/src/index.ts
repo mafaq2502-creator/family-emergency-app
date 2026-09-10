@@ -6,6 +6,49 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 admin.initializeApp();
 const db = admin.firestore();
 
+type GroupData = {
+  ownerId?: unknown;
+  memberIds?: unknown;
+  roles?: unknown;
+  emergencyRecipientIds?: unknown;
+  status?: unknown;
+};
+
+function strings(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.length > 0) : [];
+}
+
+function roles(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+}
+
+function requireCircleId(data: unknown): string {
+  const circleId = String((data as {circleId?: unknown} | null)?.circleId ?? '').trim();
+  if (!circleId || circleId.length > 128) throw new HttpsError('invalid-argument', 'The Circle ID is invalid.');
+  return circleId;
+}
+
+function ensureActiveGroup(group: admin.firestore.DocumentSnapshot): GroupData {
+  if (!group.exists) throw new HttpsError('not-found', 'This family Circle is no longer available.');
+  const data = group.data() as GroupData;
+  if (data.status !== undefined && data.status !== 'active') {
+    throw new HttpsError('failed-precondition', 'This family Circle is no longer active.');
+  }
+  return data;
+}
+
+function profileCircleCleanup(circleId: string, profileData: admin.firestore.DocumentData | undefined) {
+  const update: Record<string, unknown> = {
+    circleIds: admin.firestore.FieldValue.arrayRemove(circleId),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  if (profileData?.activeCircleId === circleId) {
+    update.activeCircleId = admin.firestore.FieldValue.delete();
+  }
+  return update;
+}
+
 async function writeNotification(userId: string, groupId: string, title: string, body: string, type: string, emergencyId?: string) {
   await db.collection('users').doc(userId).collection('notifications').add({groupId, title, body, type, emergencyId: emergencyId ?? null, isRead: false, createdAt: admin.firestore.FieldValue.serverTimestamp()});
 }
@@ -48,7 +91,9 @@ export const createCircleInvite = onCall(async request => {
     if (!group.exists) throw new HttpsError('not-found', 'Circle not found.');
     const groupData = group.data() ?? {};
     const roles = groupData.roles as Record<string, string> | undefined;
-    if (groupData.ownerId !== userId && roles?.[userId] !== 'parent') {
+    const memberIds = strings(groupData.memberIds);
+    if (!memberIds.includes(userId) ||
+        (groupData.ownerId !== userId && roles?.[userId] !== 'parent')) {
       throw new HttpsError('permission-denied', 'Only the Circle owner or a parent can create invitations.');
     }
     if (existingLookup.exists) {
@@ -112,7 +157,7 @@ export const redeemCircleInvite = onCall(async request => {
       throw new HttpsError('failed-precondition', 'This invitation has already been used.');
     }
 
-    const groupData = group.data() ?? {};
+    const groupData = ensureActiveGroup(group) as admin.firestore.DocumentData;
     const memberIds = Array.isArray(groupData.memberIds) ? groupData.memberIds as string[] : [];
     if (memberIds.includes(userId) || membership.exists) {
       throw new HttpsError('already-exists', 'You already belong to this Circle.');
@@ -152,9 +197,122 @@ export const redeemCircleInvite = onCall(async request => {
     });
     transaction.set(profileRef, {
       onboardingCompleted: true,
+      activeCircleId: circleId,
+      circleIds: admin.firestore.FieldValue.arrayUnion(circleId),
       updatedAt: now,
     }, {merge: true});
 
     return {circleId};
   });
+});
+
+export const removeCircleMember = onCall(async request => {
+  const actorId = request.auth?.uid;
+  if (!actorId) throw new HttpsError('unauthenticated', 'Please sign in again.');
+  const circleId = requireCircleId(request.data);
+  const targetId = String(request.data?.memberUserId ?? '').trim();
+  if (!targetId || targetId.length > 128) throw new HttpsError('invalid-argument', 'The member ID is invalid.');
+  if (targetId === actorId) throw new HttpsError('failed-precondition', 'Use Leave Circle to remove your own membership.');
+
+  await db.runTransaction(async transaction => {
+    const groupRef = db.collection('groups').doc(circleId);
+    const membershipRef = groupRef.collection('memberships').doc(targetId);
+    const profileRef = db.collection('users').doc(targetId);
+    const [group, membership, profile] = await Promise.all([
+      transaction.get(groupRef), transaction.get(membershipRef), transaction.get(profileRef),
+    ]);
+    const groupData = ensureActiveGroup(group);
+    const groupRoles = roles(groupData.roles);
+    const actorRole = groupRoles[actorId];
+    const targetRole = groupRoles[targetId];
+    const actorCanRemove = strings(groupData.memberIds).includes(actorId) &&
+      (actorRole === 'owner' ||
+        (actorRole === 'parent' &&
+          (targetRole === 'adult' || targetRole === 'child')));
+    if (!actorCanRemove) throw new HttpsError('permission-denied', 'You cannot remove this Circle member.');
+    if (targetRole === 'owner') throw new HttpsError('failed-precondition', 'The Circle owner cannot be removed.');
+    if (!membership.exists || membership.data()?.status !== 'active') {
+      throw new HttpsError('not-found', 'This member is no longer part of the Circle.');
+    }
+
+    delete groupRoles[targetId];
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    transaction.update(groupRef, {
+      memberIds: admin.firestore.FieldValue.arrayRemove(targetId),
+      roles: groupRoles,
+      emergencyRecipientIds: strings(groupData.emergencyRecipientIds).filter(id => id !== targetId),
+      updatedAt: now,
+    });
+    transaction.update(membershipRef, {status: 'removed', endedAt: now, endedBy: actorId, updatedAt: now});
+    if (profile.exists) transaction.set(profileRef, profileCircleCleanup(circleId, profile.data()), {merge: true});
+  });
+  return {circleId, memberUserId: targetId};
+});
+
+export const leaveCircle = onCall(async request => {
+  const userId = request.auth?.uid;
+  if (!userId) throw new HttpsError('unauthenticated', 'Please sign in again.');
+  const circleId = requireCircleId(request.data);
+
+  await db.runTransaction(async transaction => {
+    const groupRef = db.collection('groups').doc(circleId);
+    const membershipRef = groupRef.collection('memberships').doc(userId);
+    const profileRef = db.collection('users').doc(userId);
+    const [group, membership, profile] = await Promise.all([
+      transaction.get(groupRef), transaction.get(membershipRef), transaction.get(profileRef),
+    ]);
+    const groupData = ensureActiveGroup(group);
+    const groupRoles = roles(groupData.roles);
+    if (groupData.ownerId === userId || groupRoles[userId] === 'owner') {
+      throw new HttpsError('failed-precondition', 'The owner must delete the Circle or transfer ownership before leaving.');
+    }
+    if (!strings(groupData.memberIds).includes(userId) || !membership.exists || membership.data()?.status !== 'active') {
+      throw new HttpsError('not-found', 'You are no longer a member of this Circle.');
+    }
+
+    delete groupRoles[userId];
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    transaction.update(groupRef, {
+      memberIds: admin.firestore.FieldValue.arrayRemove(userId),
+      roles: groupRoles,
+      emergencyRecipientIds: strings(groupData.emergencyRecipientIds).filter(id => id !== userId),
+      updatedAt: now,
+    });
+    transaction.update(membershipRef, {status: 'left', endedAt: now, endedBy: userId, updatedAt: now});
+    if (profile.exists) transaction.set(profileRef, profileCircleCleanup(circleId, profile.data()), {merge: true});
+  });
+  return {circleId};
+});
+
+export const deleteCircle = onCall(async request => {
+  const userId = request.auth?.uid;
+  if (!userId) throw new HttpsError('unauthenticated', 'Please sign in again.');
+  const circleId = requireCircleId(request.data);
+
+  await db.runTransaction(async transaction => {
+    const groupRef = db.collection('groups').doc(circleId);
+    const membershipsQuery = groupRef.collection('memberships');
+    const [group, memberships] = await Promise.all([
+      transaction.get(groupRef), transaction.get(membershipsQuery),
+    ]);
+    const groupData = ensureActiveGroup(group);
+    if (!strings(groupData.memberIds).includes(userId) ||
+        groupData.ownerId !== userId || roles(groupData.roles)[userId] !== 'owner') {
+      throw new HttpsError('permission-denied', 'Only the Circle owner can delete this Circle.');
+    }
+    const profileRefs = memberships.docs.map(member => db.collection('users').doc(member.id));
+    const profiles = await Promise.all(profileRefs.map(ref => transaction.get(ref)));
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    transaction.update(groupRef, {
+      status: 'deleted', deletedAt: now, deletedBy: userId,
+      memberIds: [], roles: {}, emergencyRecipientIds: [], updatedAt: now,
+    });
+    memberships.docs.forEach(member => {
+      transaction.update(member.ref, {status: 'removed', endedAt: now, endedBy: userId, updatedAt: now});
+    });
+    profiles.forEach((profile, index) => {
+      if (profile.exists) transaction.set(profileRefs[index], profileCircleCleanup(circleId, profile.data()), {merge: true});
+    });
+  });
+  return {circleId};
 });

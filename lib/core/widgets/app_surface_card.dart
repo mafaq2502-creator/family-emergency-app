@@ -35,7 +35,12 @@ class AppSurfaceCard extends StatelessWidget {
                 ),
               ],
       ),
-      child: child,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(radius),
+        clipBehavior: Clip.antiAlias,
+        child: child,
+      ),
     );
   }
 }

@@ -117,7 +117,7 @@ class _AuthGateState extends State<AuthGate> {
                 return CircleOnboardingScreen(
                   user: user,
                   groupService: _groupService,
-                  authService: _authService,
+                  onSignOut: _authService.signOut,
                   onCompleted: _refresh,
                 );
               case AuthDestination.home:

@@ -58,7 +58,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: kLightSurfaceMuted,
+              color: context.appSurfaceMuted,
               borderRadius: BorderRadius.circular(13),
             ),
             child: Row(
@@ -83,7 +83,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
                             style: TextStyle(
                               color: _tab == entry.$1
                                   ? Colors.white
-                                  : kLightMuted,
+                                  : context.appMuted,
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
                             ),
@@ -101,7 +101,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
             const SizedBox(height: 10),
             Text(
               'Expires ${MaterialLocalizations.of(context).formatMediumDate(_invite!.expiresAt)}',
-              style: const TextStyle(color: kLightMuted, fontSize: 11),
+              style: TextStyle(color: context.appMuted, fontSize: 11),
             ),
           ],
           const SizedBox(height: 18),
@@ -163,8 +163,8 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
                 Expanded(
                   child: SelectableText(
                     code,
-                    style: const TextStyle(
-                      color: kLightNavy,
+                    style: TextStyle(
+                      color: context.appHeading,
                       fontSize: 20,
                       letterSpacing: 2,
                       fontWeight: FontWeight.w800,

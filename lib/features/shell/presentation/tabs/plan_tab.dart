@@ -1,7 +1,12 @@
-part of '../family_shell.dart';
+import 'package:flutter/material.dart';
 
-extension _PlanTab on _HomeScreenState {
-  Widget _buildPlanTab() {
+import '../../../../core/theme/app_colors.dart';
+
+class PlanSelectionContent extends StatelessWidget {
+  const PlanSelectionContent({super.key});
+
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark ? Colors.white : kLightNavy;
     final mutedColor = isDark ? Colors.white60 : kLightMuted;
@@ -23,12 +28,12 @@ extension _PlanTab on _HomeScreenState {
             style: TextStyle(fontSize: 12, color: mutedColor),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 430,
+          IntrinsicHeight(
             child: Row(
               children: [
                 Expanded(
                   child: _planCard(
+                    context: context,
                     title: 'Free',
                     subtitle: 'Basic features for\nsmall families.',
                     price: '\$0',
@@ -44,6 +49,7 @@ extension _PlanTab on _HomeScreenState {
                 const SizedBox(width: 9),
                 Expanded(
                   child: _planCard(
+                    context: context,
                     title: 'Premium',
                     subtitle: 'Advanced features\nfor complete safety.',
                     price: '\$4.99',
@@ -64,6 +70,7 @@ extension _PlanTab on _HomeScreenState {
   }
 
   Widget _planCard({
+    required BuildContext context,
     required String title,
     required String subtitle,
     required String price,
@@ -85,7 +92,9 @@ extension _PlanTab on _HomeScreenState {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: selected
+              color: isDark
+                  ? kDarkCardElevated
+                  : selected
                   ? const Color(0xFFEAF4FF)
                   : const Color(0xFFFFF4D9),
               shape: BoxShape.circle,
@@ -118,7 +127,9 @@ extension _PlanTab on _HomeScreenState {
           ),
           const SizedBox(height: 10),
           RichText(
+            textScaler: MediaQuery.textScalerOf(context),
             text: TextSpan(
+              style: DefaultTextStyle.of(context).style,
               children: [
                 TextSpan(
                   text: price,
@@ -163,9 +174,10 @@ extension _PlanTab on _HomeScreenState {
               ),
             ),
           const Spacer(),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            height: 35,
+
             child: ElevatedButton(
               onPressed: selected
                   ? null
@@ -177,12 +189,14 @@ extension _PlanTab on _HomeScreenState {
                       ),
                     ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: selected ? const Color(0xFFF1F3F4) : kEmerald,
+                backgroundColor: selected
+                    ? context.appSurfaceMuted
+                    : kLightPrimary,
                 foregroundColor: selected
                     ? const Color(0xFF64748B)
                     : Colors.white,
-                disabledBackgroundColor: const Color(0xFFF1F3F4),
-                disabledForegroundColor: const Color(0xFF64748B),
+                disabledBackgroundColor: context.appSurfaceMuted,
+                disabledForegroundColor: context.appMuted,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(9),

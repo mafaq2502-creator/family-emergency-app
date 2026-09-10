@@ -16,30 +16,41 @@ class AppPageBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (Theme.of(context).brightness == Brightness.dark) {
-      return ColoredBox(color: kDarkBackground, child: child);
-    }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ColoredBox(
-      color: kLightBackground,
+      color: isDark ? kDarkBackground : kLightBackground,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (showTopDecoration) ...[
-            const Positioned(
+          Positioned(
               top: -58,
               right: -54,
-              child: _SoftOrb(size: 160, color: Color(0x1F70E8D0)),
+            child: _SoftOrb(
+              size: 160,
+              color: !isDark && showTopDecoration
+                  ? const Color(0x1F70E8D0)
+                  : Colors.transparent,
             ),
-            const Positioned(
+          ),
+          Positioned(
               top: 70,
               left: -60,
-              child: _SoftOrb(size: 130, color: Color(0x1470E8D0)),
+            child: _SoftOrb(
+              size: 130,
+              color: !isDark && showTopDecoration
+                  ? const Color(0x1470E8D0)
+                  : Colors.transparent,
             ),
-          ],
-          if (showBottomDecoration)
-            const Positioned.fill(
-              child: IgnorePointer(child: CustomPaint(painter: _HillPainter())),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _HillPainter(
+                  visible: !isDark && showBottomDecoration,
+                ),
+              ),
             ),
+          ),
           child,
         ],
       ),
@@ -62,10 +73,13 @@ class _SoftOrb extends StatelessWidget {
 }
 
 class _HillPainter extends CustomPainter {
-  const _HillPainter();
+  const _HillPainter({required this.visible});
+
+  final bool visible;
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (!visible) return;
     final rear = Paint()..color = const Color(0x237DE3D0);
     final front = Paint()..color = const Color(0x2E3CC9AF);
     final rearPath = Path()
@@ -107,5 +121,6 @@ class _HillPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _HillPainter oldDelegate) =>
+      oldDelegate.visible != visible;
 }

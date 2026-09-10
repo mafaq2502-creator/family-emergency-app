@@ -122,7 +122,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     canPop: !_dirty,
     onPopInvokedWithResult: (didPop, _) async {
       if (didPop) return;
-      if (await _confirmExit() && mounted) Navigator.pop(context);
+      if (await _confirmExit() && context.mounted) Navigator.pop(context);
     },
     child: LightPage(
       title: 'Account Settings',
@@ -207,11 +207,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Center(
+            Center(
               child: Text(
                 'Email, phone and country come from your verified account.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: kLightMuted, fontSize: 10),
+                style: TextStyle(color: context.appMuted, fontSize: 10),
               ),
             ),
           ],

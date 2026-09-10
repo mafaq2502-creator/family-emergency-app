@@ -14,6 +14,8 @@ class CircleMembership {
     this.email,
     this.photoUrl,
     this.joinedAt,
+    this.updatedAt,
+    this.endedAt,
   });
 
   final String userId;
@@ -24,23 +26,27 @@ class CircleMembership {
   final String? email;
   final String? photoUrl;
   final DateTime? joinedAt;
+  final DateTime? updatedAt;
+  final DateTime? endedAt;
 
   bool get isActive => status == MembershipStatus.active;
 
   factory CircleMembership.fromMap(String id, Map<String, dynamic> map) {
     final statusName = map['status']?.toString();
     return CircleMembership(
-      userId: map['userId'] as String? ?? id,
-      displayName: map['displayName'] as String? ?? '',
-      relationship: map['relationship'] as String? ?? 'Family member',
+      userId: _string(map['userId']) ?? id,
+      displayName: _string(map['displayName']) ?? 'Family member',
+      relationship: _string(map['relationship']) ?? 'Not specified',
       role: CircleRole.fromValue(map['circleRole']),
       status: MembershipStatus.values.firstWhere(
         (value) => value.name == statusName,
         orElse: () => MembershipStatus.pending,
       ),
-      email: map['email'] as String?,
-      photoUrl: map['photoUrl'] as String?,
-      joinedAt: (map['joinedAt'] as Timestamp?)?.toDate(),
+      email: _string(map['email']),
+      photoUrl: _string(map['photoUrl']),
+      joinedAt: _date(map['joinedAt']),
+      updatedAt: _date(map['updatedAt']),
+      endedAt: _date(map['endedAt']),
     );
   }
 
@@ -53,4 +59,12 @@ class CircleMembership {
     if (email != null) 'email': email,
     if (photoUrl != null) 'photoUrl': photoUrl,
   };
+
+  static String? _string(Object? value) {
+    if (value is! String || value.trim().isEmpty) return null;
+    return value.trim();
+  }
+
+  static DateTime? _date(Object? value) =>
+      value is Timestamp ? value.toDate() : null;
 }

@@ -149,19 +149,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 child: Column(
                   children: [
                     const SizedBox(height: 37),
-                    const Text(
+                    Text(
                       'Create Your Account',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: kLightNavy,
+                        color: context.appHeading,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
+                    Text(
                       'Join Family Emergency to keep\nyour loved ones safe.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: kLightMuted),
+                      style: TextStyle(fontSize: 13, color: context.appMuted),
                     ),
                     const SizedBox(height: 16),
                     _field(
@@ -245,16 +245,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 ? Icons.check_box_rounded
                                 : Icons.check_box_outline_blank_rounded,
                             size: 20,
-                            color: _acceptedTerms ? kEmerald : kLightMuted,
+                            color: _acceptedTerms ? kEmerald : context.appMuted,
                           ),
                           const SizedBox(width: 7),
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               'I agree to the Terms & Conditions\nand Privacy Policy',
                               style: TextStyle(
                                 fontSize: 12,
                                 height: 1.35,
-                                color: Color(0xFF314761),
+                                color: context.appMuted,
                               ),
                             ),
                           ),
@@ -305,17 +305,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Row(
+                    Row(
                       children: [
-                        Expanded(child: Divider()),
+                        const Expanded(child: Divider()),
                         Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Text(
                             'OR',
-                            style: TextStyle(fontSize: 12, color: kLightMuted),
+                            style: TextStyle(fontSize: 12, color: context.appMuted),
                           ),
                         ),
-                        Expanded(child: Divider()),
+                        const Expanded(child: Divider()),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -360,14 +360,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        const Text(
+                        Text(
                           'Already have an account? ',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF52647D),
+                            color: context.appMuted,
                           ),
                         ),
                         TextButton(
@@ -421,7 +422,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     icon: Icon(
       hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined,
       size: 19,
-      color: kLightMuted,
+      color: context.appMuted,
     ),
   );
 

@@ -66,7 +66,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                 Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: kLightSurfaceMuted,
+                    color: context.appSurfaceMuted,
                     borderRadius: BorderRadius.circular(13),
                   ),
                   child: Row(
@@ -183,9 +183,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         trailing: item.isRead
-                            ? const Icon(
+                            ? Icon(
                                 Icons.done_all_rounded,
-                                color: kLightMuted,
+                                color: context.appMuted,
                                 size: 18,
                               )
                             : const LightStatusChip(label: 'New'),
@@ -215,7 +215,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.white : kLightMuted,
+            color: selected ? Colors.white : context.appMuted,
             fontSize: 11,
             fontWeight: FontWeight.w800,
           ),

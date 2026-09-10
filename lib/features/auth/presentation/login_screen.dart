@@ -152,26 +152,32 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-                      Row(
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          SizedBox(
-                            width: 34,
-                            height: 40,
-                            child: Checkbox(
-                              value: _rememberMe,
-                              activeColor: kLightPrimary,
-                              onChanged: _loading
-                                  ? null
-                                  : (value) => setState(
-                                      () => _rememberMe = value ?? false,
-                                    ),
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 34,
+                                height: 40,
+                                child: Checkbox(
+                                  value: _rememberMe,
+                                  activeColor: kLightPrimary,
+                                  onChanged: _loading
+                                      ? null
+                                      : (value) => setState(
+                                          () => _rememberMe = value ?? false,
+                                        ),
+                                ),
+                              ),
+                              Text(
+                                'Remember me',
+                                style: TextStyle(color: muted, fontSize: 12),
+                              ),
+                            ],
                           ),
-                          Text(
-                            'Remember me',
-                            style: TextStyle(color: muted, fontSize: 12),
-                          ),
-                          const Spacer(),
                           TextButton(
                             onPressed: _loading
                                 ? null

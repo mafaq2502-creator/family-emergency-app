@@ -1,5 +1,143 @@
 # Family Emergency App — Codex Handoff
 
+## Phase 5 — Circle lifecycle and member details (2026-09-10)
+
+Phase 5 is implemented locally on `main` at the existing dirty working tree. The
+earlier Light/Dark work below is preserved. Do not discard or overwrite it.
+
+Implemented:
+
+- Shared Circle-name policy: trim, 2–60 characters, Unicode/punctuation support,
+  control-character rejection, and the same validation in onboarding and shell.
+- Robust Circle, membership, and user-profile parsing with least-privilege and
+  unavailable-state fallbacks for missing or malformed Firestore data.
+- Atomic Circle creation with owner membership plus `activeCircleId`/`circleIds`
+  profile references.
+- Live Circle list/detail/settings/member-detail streams. Detail routes close
+  safely when the Circle is deleted or access is revoked.
+- Registered memberships are now the source for member lists. Rows open Member
+  Detail with UID, name, email, relationship, role, and status; device/progress
+  values remain explicitly unavailable instead of being fabricated.
+- Role-aware rename, remove-member, leave, and soft-delete flows with confirmation,
+  in-flight guards, readable errors, and safe navigation after lifecycle changes.
+- Callable backend operations `removeCircleMember`, `leaveCircle`, and
+  `deleteCircle` coordinate Circle, membership, and profile references in
+  transactions. Owners cannot leave; parents cannot remove owners/parents;
+  normal members cannot remove anyone.
+- Firestore rules require active Circle membership for reads, reject direct
+  lifecycle/membership mutations, constrain manager edits, and require emergency
+  recipients to be current member IDs.
+
+Verification completed:
+
+- `flutter analyze --no-pub`: no issues.
+- Full `flutter test --no-pub`: **185 passed, 0 failed**.
+- Focused Circle lifecycle/widget suite: **10 passed, 0 failed**.
+- Firestore emulator rules suite: **9 passed, 0 failed**.
+- Functions TypeScript: `tsc --noEmit` passed.
+- Pixel_7 (`emulator-5554`) runtime: Home → Family Circles → Circle Detail →
+  Member Detail and Circle Settings opened against the authenticated Firebase
+  account. The active owner, one-member count, relationship, email, role, and
+  owner actions rendered correctly. Filtered logcat showed no Flutter or Android
+  runtime exception on these screens.
+- No production Circle/member data was mutated during runtime verification.
+
+Current Phase 5 status: **PARTIALLY COMPLETE**. Source implementation and local
+verification are complete, but the new callable Functions and updated Firestore
+rules are not deployed. Production remove/leave/delete therefore must not be
+claimed live. After explicit deployment approval, deploy the Functions and rules,
+then exercise create/rename/remove/leave/delete with disposable multi-account test
+data, including parent/adult/child authorization, concurrent actions, and network
+failure/retry behavior. Ownership transfer remains intentionally deferred to
+Phase 6+; an owner can delete a Circle but cannot leave it.
+
+Primary Phase 5 files:
+
+- `lib/core/domain/circle_policies.dart`
+- `lib/core/domain/circle_error_mapper.dart`
+- `lib/services/group_service.dart`
+- `lib/features/groups/presentation/group_members_screen.dart`
+- `lib/features/groups/presentation/group_settings_screen.dart`
+- `lib/features/members/presentation/circle_member_detail_screen.dart`
+- `lib/features/shell/presentation/tabs/members_tab.dart`
+- `functions/src/index.ts`
+- `firestore.rules`
+- `test/circle_lifecycle_test.dart`
+- `rules-tests/firestore.rules.test.cjs`
+
+Generated `.pnpm-store` cache from the local Functions check was removed. No
+commit, push, Firebase deployment, or release build was performed.
+
+## Issue-resolution completion — 2026-09-10
+
+The reported Phase 1 follow-up defects are fixed in the D-drive workspace:
+
+- Theme switching keeps the Navigator under one stable background widget tree,
+  preventing the Flutter `_dependents.isEmpty` assertion seen when selecting Dark.
+- Home no longer combines `IntrinsicHeight` with a nested `LayoutBuilder`. A live
+  authenticated group now renders its card, check-in and Emergency actions instead
+  of leaving the shell body blank.
+- Profile uses a reusable three-choice `System | Light | Dark` selector. Every
+  label remains visible and the selected choice has an explicit emerald gradient.
+- Circle onboarding tabs now follow the reference's compact underline treatment.
+  Create and Join retain independent Form keys; invalid required fields add a red
+  marker to the corresponding child tab and show field text only inside that tab.
+- The wider Light/Dark responsive implementation described below remains intact.
+
+Final verification: `flutter analyze --no-pub` reports no issues and the complete
+`flutter test --no-pub` suite passes **175 tests**. The updated debug app was built,
+installed and launched on Pixel_7 (`emulator-5554`). Live emulator checks confirmed
+the populated Home screen renders, System/Light/Dark labels are visible, and Dark
+selection completes without a Flutter exception. Captures are in ignored build
+output: `build/ui-verification/emulator-fixed.png`, `profile-fixed.png`, and
+`profile-dark-fixed.png`.
+
+## Latest continuation — Phase 1 Light/Dark verification (2026-09-09)
+
+This section supersedes the older no-Dark/no-emulator constraints below. The user
+explicitly requested Phase 1 (Light verification, Dark implementation, responsive
+verification), then an emulator app run. Release APK/AAB and backend deployment
+remain outside this phase. Continue only from the D-drive repository.
+
+The shared chat `https://chatgpt.com/s/cx_6aa1985198a48191956a1bda5e6c88b3`
+was read in the browser. Its final turn stopped during Phase 1 without a final
+completion message. Existing local changes were retained and verification resumed.
+
+Implemented in this phase:
+- Context-based semantic palette for headings, body/muted text, cards, borders,
+  primary actions, success and danger surfaces. Shared Light widgets now support
+  both themes without changing their public constructors or backend contracts.
+- Dark Material styling for fields, buttons, dialogs, menus, sheets and snackbars.
+- Theme-aware intro, device/progress, sharing, account, Circle and notification UI.
+- Fixed compact/large-text login and signup wrapping; fixed Material ancestors for
+  visible ListTile ink effects. Plan content is independently testable and uses
+  intrinsic card heights; prices inherit the app font and respect text scaling.
+- Moved shell state mutations into State methods and corrected the account
+  async-context guard; retained existing persistence and navigation callbacks.
+
+Verification so far:
+- Full `flutter test --no-pub`: **173 tests passed**.
+- `flutter analyze --no-pub`: **No issues found**.
+- Additional real-font capture run: **138 theme tests passed**, covering 17
+  standalone screens in Light/Dark, 320x568/430x932, 1.0/1.5 text scales, below-fold
+  scrolling, theme switching/System brightness, account keyboard and exit dialog.
+- `build/ui-verification/` contains 34 430x932 screen renders (ignored build output).
+  Capture uses `--dart-define=CAPTURE_UI=true` and requires
+  `build/ui-verification/fonts/Manrope.ttf` downloaded from the official Google
+  Fonts repo (`ofl/manrope/Manrope[wght].ttf`). Normal tests need no font download.
+- Real-font screenshots reviewed include login, signup, account, plan, sharing,
+  device and intro. Reference landscape illustrations remain vector/icon
+  placeholders, not pixel-identical final artwork. Authenticated Firebase-driven
+  screen/state coverage still needs emulator inspection; 17-screen tests are not
+  proof of all 28 screens or live backend behavior.
+- Pixel_7 is connected as `emulator-5554`. `flutter run -d emulator-5554` is in
+  progress through Gradle assembleDebug; do not claim launch until confirmed.
+
+Next: finish emulator launch, inspect the visible app and available authenticated
+screens, record actual launch/visual results here. Any further uncovered UI defects
+should be fixed and tested before claiming full Phase 1 completion.
+
+
 Last reviewed: 2026-09-09  
 Authoritative workspace: `D:\My Projects\family_emergency_app`  
 Current branch: `main`  
