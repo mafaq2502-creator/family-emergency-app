@@ -39,6 +39,7 @@ class AppTextFormField extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? kDarkMuted : kLightMuted;
     return TextFormField(
+      autovalidateMode: AutovalidateMode.onUnfocus,
       controller: controller,
       enabled: enabled,
       keyboardType: keyboardType,

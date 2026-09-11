@@ -1,4 +1,3 @@
-import 'package:country_picker/country_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -36,9 +35,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _email;
-  late final TextEditingController _phone;
   String? _relationship;
-  Country _country = CountryService().findByCode('PK')!;
   bool _busy = false;
 
   @override
@@ -48,32 +45,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     _email = TextEditingController(
       text: widget.user.email ?? widget.existingProfile.email,
     );
-    _phone = TextEditingController(text: widget.existingProfile.phone);
     _relationship =
         AuthValidators.relationships.contains(
           widget.existingProfile.relationship,
         )
         ? widget.existingProfile.relationship
         : null;
-    final country = CountryService().findByCode(
-      widget.existingProfile.phoneCountryIso,
-    );
-    if (country != null) _country = country;
   }
 
   @override
   void dispose() {
     _name.dispose();
     _email.dispose();
-    _phone.dispose();
     super.dispose();
-  }
-
-  String _normalizedPhone() {
-    final raw = _phone.text.trim();
-    final digits = AuthValidators.digitsOnly(raw);
-    if (raw.startsWith('+')) return '+$digits';
-    return '+${_country.phoneCode}$digits';
   }
 
   Future<void> _save() async {
@@ -83,9 +67,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       await widget.profileService.completeProfile(
         widget.user,
         name: _name.text.trim(),
-        phone: _normalizedPhone(),
-        countryIso: _country.countryCode,
-        countryCode: '+${_country.phoneCode}',
+        signupPhone: widget.existingProfile.phone,
         relationship: _relationship!,
       );
       if (mounted) widget.onCompleted();
@@ -117,7 +99,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       body: SafeArea(
         child: Form(
           key: _formKey,
-          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
             children: [
@@ -172,7 +153,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 validator: AuthValidators.name,
                 enabled: !_busy,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 18),
               AppTextFormField(
                 controller: _email,
                 label: 'Email',
@@ -180,45 +161,18 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 prefixIcon: Icons.mail_outline_rounded,
                 enabled: false,
               ),
-              const SizedBox(height: 12),
-              AppTextFormField(
-                controller: _phone,
-                label: 'Phone Number',
-                placeholder: 'Enter your phone number',
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.next,
-                enabled: !_busy,
-                prefix: InkWell(
-                  onTap: _busy
-                      ? null
-                      : () => showCountryPicker(
-                          context: context,
-                          showPhoneCode: true,
-                          favorite: const ['PK', 'AE', 'SA', 'GB', 'US'],
-                          onSelect: (country) =>
-                              setState(() => _country = country),
-                        ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(_country.flagEmoji),
-                        const SizedBox(width: 5),
-                        Text('+${_country.phoneCode}'),
-                        const Icon(Icons.arrow_drop_down_rounded),
-                      ],
-                    ),
-                  ),
+              if (widget.existingProfile.phone.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.phone_outlined),
+                  title: const Text('Signup phone number'),
+                  subtitle: Text(widget.existingProfile.phone),
                 ),
-                validator: (value) => AuthValidators.phone(
-                  value?.trim().startsWith('+') == true
-                      ? value
-                      : '+${_country.phoneCode}${value ?? ''}',
-                ),
-              ),
-              const SizedBox(height: 12),
+              ],
+              const SizedBox(height: 18),
               DropdownButtonFormField<String>(
+                autovalidateMode: AutovalidateMode.onUnfocus,
                 initialValue: _relationship,
                 isExpanded: true,
                 decoration: const InputDecoration(

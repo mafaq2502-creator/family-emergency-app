@@ -12,7 +12,6 @@ class FakeAuthActions implements AuthActions {
   int loginCalls = 0;
   int resetCalls = 0;
   int googleCalls = 0;
-  int appleCalls = 0;
   int signupCalls = 0;
   Completer<void>? loginCompleter;
   Completer<void>? signupCompleter;
@@ -35,9 +34,6 @@ class FakeAuthActions implements AuthActions {
   }
 
   @override
-  Future<void> signInWithApple() async => appleCalls++;
-
-  @override
   Future<void> signInWithGoogle() async => googleCalls++;
 
   @override
@@ -58,6 +54,18 @@ class FakeAuthActions implements AuthActions {
 }
 
 void main() {
+  testWidgets('Apple sign-in is absent from login and signup', (tester) async {
+    final auth = FakeAuthActions();
+    await tester.pumpWidget(MaterialApp(home: LoginScreen(authService: auth)));
+    expect(find.textContaining('Apple'), findsNothing);
+    expect(find.text('Continue with Google'), findsOneWidget);
+
+    await tester.pumpWidget(MaterialApp(home: SignUpScreen(authService: auth)));
+    await tester.pump();
+    expect(find.textContaining('Apple'), findsNothing);
+    expect(find.text('Sign up with Google'), findsOneWidget);
+  });
+
   testWidgets('login blocks invalid data before contacting Firebase', (
     tester,
   ) async {

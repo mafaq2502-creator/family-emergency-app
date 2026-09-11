@@ -1,5 +1,818 @@
 # Family Emergency App — Codex Handoff
 
+## Testing verification flow, blur validation, and rebuilt APK (2026-09-12)
+
+Status: **COMPLETE.** The testing APK now keeps the verification screen visible
+for an unverified account and enables Next. Selecting Next bypasses verification
+for that in-memory authenticated session and proceeds to onboarding. It does not
+alter Firebase Auth's `emailVerified` value. Signing out and signing in again, or
+restarting the app, clears the session bypass and shows verification again while
+the Firebase email remains unverified.
+
+- Release builds remain strict by default. Testing bypass is enabled only when
+  compiled with `--dart-define=AUTO_VERIFY_EMAIL_FOR_TESTING=true`; debug builds
+  enable it by default.
+- `AuthGate` stores the bypass for the current user and current widget/session
+  only, then clears it when authentication returns to signed out.
+- Required fields across the existing app forms now use
+  `AutovalidateMode.onUnfocus`. A field does not show an error while the user is
+  entering it for the first time; an invalid field validates after focus moves
+  elsewhere. Explicit form submission still validates the complete form.
+- `flutter analyze`: **No issues found**.
+- Focused verification/auth/form tests: **14 passed, 0 failed**.
+- Final full `flutter test`: **272 passed, 0 failed**.
+- Build command:
+  `flutter build apk --release --dart-define=AUTO_VERIFY_EMAIL_FOR_TESTING=true`.
+- Artifact: `build/app/outputs/flutter-apk/app-release.apk`.
+- Size: **75,095,317 bytes (71.62 MB)**.
+- SHA-256: `6BAC3E2CE849E720F64CDFD160A0811519A988A68A5A6EB7668345C8F1998E56`.
+- Android `apksigner` verification passed using APK Signature Scheme v2 with
+  one signer. The current release configuration uses the Android debug
+  certificate, so this APK is suitable for testing rather than Play Store
+  publishing.
+- Flutter reported a future Kotlin Gradle Plugin migration warning; it did not
+  affect this build.
+- No emulator or device installation was run.
+
+## Temporary Apple Sign-In disablement (2026-09-12)
+
+Status: **DISABLED in the app code and UI.** Email/password and Google Sign-In
+remain active.
+
+- Removed `signInWithApple()` from `AuthActions` and `AuthService`.
+- Removed `AppleAuthProvider`, Apple scopes, popup/provider authentication,
+  first-user profile preparation, and Apple verification-email handling from the
+  client authentication service.
+- Removed Continue with Apple from Login and Sign up with Apple from Signup.
+- Removed the Apple method/counter from auth test fakes and added a widget test
+  that confirms Apple is absent from both screens while Google remains visible.
+- Existing `apple.com` provider-name rendering in Profile Security is retained so
+  any historical Apple-created account remains readable and can sign out; there
+  is no route in the app to start a new Apple authentication attempt.
+- Firebase Console's Apple provider switch was not changed because the requested
+  external Chrome browser was unavailable to Computer Use in this session. This
+  does not expose Apple login in the app. When Chrome control is available, the
+  console switch can also be turned off under Authentication → Sign-in method.
+- `flutter analyze`: **No issues found**.
+- Targeted auth/verification tests: **10 passed, 0 failed**.
+- Final full `flutter test`: **271 passed, 0 failed**.
+- No emulator or APK build was run.
+
+## Superseded testing mode — automatic email verification bypass (2026-09-12)
+
+Status: **SUPERSEDED by the latest section above.** The earlier implementation
+skipped the verification screen in non-release builds. The current implementation
+shows the screen and makes Next an explicit, current-session testing bypass. A
+release build remains strict unless the testing dart-define is explicitly set.
+
+## Post-Phase 8 — Email verification gate and one-time onboarding (2026-09-12)
+
+Status: **COMPLETE in code and automated tests.** No Firebase billing change,
+Cloud Function, rules deployment, Android emulator, or APK build was required.
+
+### Implemented behavior
+
+- Email/password signup now calls Firebase Auth `sendEmailVerification()` after
+  account creation and before the user can enter onboarding.
+- A signed-in user with a non-null unverified Firebase email is intercepted by
+  `AuthGate` before profile/Circle resolution and shown a centered Verify Email
+  card. The card displays the destination email, Check Verification, resend,
+  Cancel, and Next actions.
+- Next remains disabled until `User.reload()` reports `emailVerified == true`.
+  The app checks once when the card opens and again whenever the app resumes, so
+  returning from the email link updates the state. A manual Check Verification
+  action covers browsers/platforms that do not produce a normal resume event.
+- Successful verification forces an ID-token refresh before enabling Next.
+  Selecting Next returns to `AuthGate`, which routes a new user through the
+  existing profile/Circle onboarding flow.
+- Cancel signs out safely. If the app is closed, the persisted Firebase session
+  returns to the verification gate; if the user later signs in again, the same
+  gate remains until Firebase reports the email verified.
+- Resend uses Firebase Auth and has a 60-second UI cooldown to reduce accidental
+  repeated email requests. Provider/network/throttling failures use the existing
+  safe auth error mapping.
+- A first-time Google/Apple account receives this extra Firebase email step only
+  if that provider returns a non-null email which Firebase marks unverified.
+  Google/Apple normally return provider-verified emails, so those trusted sessions
+  continue without a redundant email link.
+- `AuthDestinationResolver` now honors persisted `onboardingCompleted`: a user
+  who completed onboarding once is routed Home even if all Circles were later
+  removed. Incomplete new users still resume the correct onboarding step, while
+  legacy users with an active Circle still route Home.
+
+### Files changed/created
+
+- Changed `lib/services/auth_service.dart`
+- Changed `lib/features/auth/presentation/auth_gate.dart`
+- Changed `lib/features/auth/domain/auth_destination.dart`
+- Created `lib/features/auth/presentation/email_verification_screen.dart`
+- Created `test/email_verification_flow_test.dart`
+- Updated `test/signup_preparation_test.dart`, `test/auth_routing_test.dart`, and
+  `test/theme_verification_test.dart`
+
+### Verification performed
+
+- Automated tests confirm the signup service sends exactly one verification
+  email, Next is disabled before verification, Firebase-confirmed verification
+  enables Next, resend and Cancel call the authenticated service, and completed
+  onboarding does not reopen without a Circle.
+- The verification card passed the existing Light/Dark responsive matrix at
+  320×568 and 430×932 with text scales 1.0 and 1.5.
+- `flutter analyze`: **No issues found**.
+- Final full `flutter test`: **269 passed, 0 failed**.
+- A real inbox/link round trip was not performed because no runtime account was
+  created and the user requested no emulator/APK build. Manual verification for
+  the next user-approved build: create an email/password account, confirm the
+  Firebase verification email arrives, verify Next is disabled, open Verify Email
+  in the email, return to the app, check verification, select Next, finish
+  onboarding, restart/sign in again, and confirm onboarding is not repeated.
+
+## Phase 8 — Device Pairing & Heartbeat (2026-09-12)
+
+Status: **COMPLETE within the current Firebase client architecture.** The tested
+Firestore rules and indexes are deployed to production project
+`familyemergencyapp`. Firebase remains on the Spark/free plan; no paid feature,
+Cloud Function, Android emulator, APK build, or Phase 9 work was started. Preserve
+all uncommitted Phase 1–7 work together with these Phase 8 changes.
+
+### 1. Files modified
+
+- `firestore.rules`
+- `lib/features/devices/presentation/device_screens.dart`
+- `lib/features/groups/presentation/group_members_screen.dart`
+- `lib/features/members/presentation/circle_member_detail_screen.dart`
+- `lib/features/members/presentation/member_profile_screen.dart`
+- `lib/features/shell/presentation/family_shell.dart`
+- `lib/features/shell/presentation/tabs/profile_tab.dart`
+- `lib/models/paired_device.dart`
+- `rules-tests/package.json`
+- `test/circle_lifecycle_test.dart`
+- `test/light_theme_responsiveness_test.dart`
+- `test/theme_verification_test.dart`
+- `CODEX_HANDOFF.md`
+
+### 2. Files created
+
+- `lib/core/domain/device_policies.dart`
+- `lib/models/device_pairing_request.dart`
+- `lib/services/device_service.dart`
+- `lib/services/device_heartbeat_controller.dart`
+- `rules-tests/device.rules.test.cjs`
+- `test/device_domain_test.dart`
+- `test/device_flow_test.dart`
+- `test/support/fake_device_service.dart`
+
+### 3. Database/schema changes
+
+- Canonical installation: `users/{ownerUid}/devices/{installationId}`. The path
+  and `ownerUserId` bind an installation to its authenticated Firebase account.
+- Circle projection: `groups/{circleId}/devices/{ownerUid_installationId}`. It
+  records only the association needed for Circle-scoped device display and future
+  telemetry authorization; it does not duplicate authentication or profile data.
+- Pairing request: `devicePairingRequests/{24CharacterSecret}` with owner,
+  installation, minimal display metadata, status, expiry, and use/revocation audit
+  fields.
+- Device removal is soft (`revoked` or `unpaired`). User profiles, memberships,
+  Circles, SOS history, and future telemetry references are never cascaded away.
+- Existing automatic single-field indexes cover Phase 8 queries; no additional
+  composite index was required.
+
+### 4. Migrations
+
+No destructive migration was needed. All Phase 8 collections/subcollections are
+created lazily and optional, so populated Phase 1–7 users and Circles remain
+valid. A reinstall intentionally creates a new installation record; an old record
+remains auditable until the user revokes it.
+
+### 5. New/changed APIs
+
+`DeviceActions`/`DeviceService` provides registration, account-device and
+member-device streams, pairing-code create/revoke/consume, heartbeat, rename,
+account revocation, and Circle unpair operations. These are authenticated
+Firestore operations rather than a new HTTP endpoint. Firestore rules provide the
+server-side ownership, field allow-list, timestamp, rate, and transaction checks.
+No Cloud Function was deployed.
+
+### 6. Device registration implementation
+
+After authenticated `HomeScreen` starts, `DeviceHeartbeatController` registers
+the installation. A cryptographically generated 32-character installation ID is
+stored in SharedPreferences and used as the deterministic document ID; no IMEI,
+serial, advertising ID, name, or model is used as identity. Registration uses a
+transaction and is idempotent across launches/logins. A reinstall/app-data clear
+correctly produces a new identity. Safe platform/app metadata is refreshed using
+server timestamps without permitting ownership changes.
+
+### 7. Pairing implementation
+
+The intended member opens Profile → My Devices → Pair This Device to a Circle and
+generates a code/QR. This is the device owner's consent. A Circle owner/parent
+opens the registered member's Circle Member Detail, selects Pair Member Device,
+scans or enters the code, confirms the intended-device consent, and submits. One
+Firestore transaction validates authority, target membership, code state, expiry,
+and installation ownership; it creates the deterministic Circle association and
+marks the request used atomically. Cancel Pairing Code revokes an unused request.
+
+### 8. Pairing token security
+
+Codes contain 24 cryptographically random characters from an unambiguous
+32-character alphabet, expire after 10 minutes, are single-use, and contain no UID,
+device ID, auth token, or reusable credential. Only the exact-token document can
+be fetched; listing requests is denied. Rules reject malformed, expired, used,
+revoked, wrong-installation, wrong-member, outsider, non-manager, reassignment,
+and replay attempts. QR parsing accepts only
+`familyemergency://pair-device?code=...`, keeping Circle-invite QR data separate.
+No pairing secret is logged.
+
+### 9. Heartbeat implementation
+
+The authenticated current installation updates its canonical device and active
+Circle projections in place. Heartbeat writes use Firestore server timestamps for
+`lastHeartbeatAt`, `lastSeenAt`, and `updatedAt`; they refresh allowed platform/app
+metadata and never append heartbeat rows. Network/backend failures are caught and
+retried only at the next normal interval. App startup is never blocked by a failed
+heartbeat/registration request.
+
+### 10. Heartbeat interval/thresholds
+
+- Foreground interval: 15 minutes.
+- Resume: one immediate guarded heartbeat, then the 15-minute schedule restarts.
+- Backend minimum interval: 1 minute, enforced by rules to reject spam/rapid
+  duplicates.
+- Online through 20 minutes after the latest heartbeat.
+- Stale after 20 minutes through 60 minutes.
+- Offline after 60 minutes or when no heartbeat exists.
+
+All values live in `DevicePolicy`; screens do not define their own thresholds.
+
+### 11. Online/stale/offline logic
+
+`PairedDevice.presenceAt()` is the single domain calculation. It prefers
+`lastHeartbeatAt`, falls back to legacy `lastSeenAt`, compares UTC instants, and
+returns Online/Stale/Offline from the thresholds above. Revoked and Unpaired take
+priority regardless of how recent an older heartbeat is. UI converts timestamps
+to local time only for display.
+
+### 12. Device revocation/removal behavior
+
+Account-device revoke changes canonical and Circle records to `revoked` with
+server audit timestamps. Rules then reject further heartbeat. Circle unpair marks
+only that Circle projection `unpaired`, leaving the account installation and other
+Circle associations intact. Rename persists to canonical and existing projections
+atomically, trims whitespace, rejects empty names, and caps names at 80 characters.
+Duplicate display names are allowed because display names are never identifiers.
+
+### 13. Session integration
+
+Phase 7 Firebase Auth remains the only authentication/session system. Installation
+identity is separate from Auth session history and Circle pairing. The shell owns
+one lifecycle controller and disposes it when the authenticated shell is removed.
+Current-device revocation shows an explicit warning and signs out locally; remote
+revocation is watched while online and also triggers sign-out. The listener starts
+even if initial registration is temporarily offline. Auth sign-out removes the
+shell, cancels the timer/listener, and prevents further authenticated heartbeat.
+
+### 14. FCM preparation
+
+The canonical `users/{uid}/devices/{installationId}` location matches the existing
+backend's documented future FCM target and provides a stable installation record
+to which a token can later be attached/refreshed. Phase 8 does not add
+`firebase_messaging`, store a token, or send SOS notifications. Phase 12 must add a
+dedicated token-update operation and narrow rule allow-list before enabling it.
+
+### 15. Phase 9/10 compatibility preparation
+
+The deterministic installation ID plus Circle projection provides unambiguous
+`ownerUserId`, `circleId`, `installationId`, and server-time association keys for
+future screen-time and consent-based location documents. Phase 8 collects neither
+screen-time nor location and requests no new location permission.
+
+### 16. Routes/redirects verified
+
+Profile now opens My Devices → Device List → Device Detail/Pairing Code. Registered
+Circle Member Detail shows authorized devices → Device Detail and manager-only
+Pair Member Device. Existing `Navigator` routing and `AuthGate` remain unchanged;
+all entry points originate inside the authenticated shell. Legacy manual member
+profiles now explain that pairing requires a registered Circle account instead of
+opening an unusable device flow. Scanner input is handled only inside the
+authenticated pairing screen; no unauthenticated OS deep-link route was added.
+
+### 17. Positive tests executed and results
+
+Flutter tests verify stable installation identity across service recreation,
+current-device identification, QR/code rendering and expiry, valid pairing,
+duplicate-submit blocking, online/stale/offline transitions, resume heartbeat,
+remote revoke logout callback, real member-device display boundaries, and Phase
+1–7 flows. The final complete Flutter run passed **257/257**.
+
+### 18. Negative tests executed and results
+
+Flutter/domain tests cover malformed/wrong-flow pairing input, empty code,
+duplicate submission, non-manager privacy, revoked status overriding fresh
+heartbeat, and startup/network-safe lifecycle behavior. Rules tests reject no-auth
+registration/heartbeat, missing or malformed installation data, oversized names,
+cross-user reads/writes, owner reassignment, expired/used/wrong-member pairing,
+non-manager approval, rapid heartbeat, revoked heartbeat, and unauthorized device
+visibility. Error, loading, retry, empty, pairing-expiry, revoked, and no-device
+states are implemented without fake records.
+
+### 19. DB/integration tests and results
+
+Firestore emulator ran the combined Phase 1–8 rules suite: **34 passed, 0
+failed**. Phase 8's 8 database tests verify deterministic canonical registration,
+ownership and allow-lists, secure request creation, atomic manager consumption,
+replay/incorrect-member denial, heartbeat ownership/rate control, revocation and
+soft unpair, Circle preservation, and owner/manager visibility. Pairing failure
+rolls back because request consumption and association creation are one
+transaction.
+
+### 20. Authorization/IDOR tests and results
+
+User A cannot list/read User B's canonical devices, rename/heartbeat/revoke them,
+change `ownerUserId`, or pair a device to User B without manager authority and an
+active target membership. Normal Circle members cannot read another member's
+device projection. Device owners can see their own Circle projection and Circle
+owners/parents can manage active-member projections. Both UI privacy and deployed
+Firestore authorization enforce these boundaries.
+
+### 21. Regression tests and results
+
+The final **257/257** Flutter suite covers launch, first-run behavior, auth forms,
+signup preparation, account/address/security flows, Circle lifecycle, member
+detail/removal, secure invite/QR/join approval, existing local state, responsive
+screens, themes, and Phase 8. All passed. The combined Firestore Phase 1–8 rules
+suite passed **34/34**. No existing Phase 1–7 schema relation was removed.
+
+### 22. Flutter analyze/test result
+
+- `flutter analyze`: **No issues found**.
+- `flutter test`: **257 passed, 0 failed**.
+- Formatter completed on all Phase 8 Dart sources/tests.
+- Android emulator and APK build were intentionally not run per user instruction.
+
+### 23. Backend test result
+
+- Functions TypeScript: `tsc --noEmit` passed.
+- Firestore rules emulator: **34 passed, 0 failed**.
+- Production deploy on 2026-09-12: Firestore rules compiled, indexes deployed,
+  and rules released successfully to `familyemergencyapp`.
+- Cloud Functions were not deployed and billing was not enabled.
+
+### 24. UI alignment/overflow review
+
+Device List, pairing code/QR, pairing form, Device Detail, member-device section,
+rename/revoke states, long names, timestamps, status chips, empty/error states, and
+dialogs were added with the existing Light Theme components. Automated widget
+rendering passed in light/dark themes at 320×568 and 430×932, text scales 1.0 and
+1.5. The focused compact-phone suite also passed long member/device names and a
+240-pixel keyboard inset without RenderFlex/layout exceptions.
+
+### 25. Known limitations/TODOs
+
+- Mobile OSes do not guarantee background execution. Phase 8 sends foreground and
+  resume heartbeats; it does not claim continuous background presence.
+- Firebase client Auth cannot selectively invalidate one device's refresh token.
+  Revocation is enforced for Phase 8 Firestore device operations and triggers app
+  sign-out when the installation next receives the snapshot. A future trusted
+  session/token backend would be needed for cryptographic per-device session
+  revocation across every Firebase API.
+- Platform and app version are registered. OS version/model/manufacturer remain
+  “Not reported” until a future vetted metadata package is introduced; no private
+  permanent hardware identifier is collected.
+- FCM token storage/delivery, screen-time, and location remain their later phases.
+- Physical two-phone camera scanning, process kill/reinstall, real production test
+  accounts, offline restoration, and remote revocation timing were not manually
+  exercised because the user requested no emulator/APK build and no physical test
+  devices/accounts were supplied. Implementation and automated rules/widget/domain
+  coverage exist. Manual verification: install the next user-approved build on two
+  phones; sign in as an active member on phone A and a Circle manager on phone B;
+  confirm My Devices shows This Device; generate a code on A; pair it from B's
+  registered Member Detail; reopen A and verify no duplicate; background/resume A
+  and inspect server heartbeat timestamps; rename/unpair/revoke from the permitted
+  screens; verify a normal member cannot view another member's devices and a
+  revoked current device signs out when online.
+
+Do not start Phase 9 automatically.
+
+## Product plan decision — recorded 2026-09-11
+
+The agreed future entitlement model has three tiers. This is a product/schema
+decision only; billing, payment providers, paid Firebase features, and entitlement
+enforcement are not active yet.
+
+- **Free Member:** may join up to 2 active Circles and use essential member safety
+  features. Cannot create/own a Circle. Core SOS access must not be paywalled.
+- **Plus:** may own up to **5 Circles**. Each Circle supports the owner plus up to
+  **10 added members** (11 active memberships total). Plus is the first paid tier.
+- **Pro (future program):** may own up to **25 Circles**. Each Circle supports the
+  owner plus up to **50 added members** (51 active memberships total). Pro remains
+  hidden/inactive until its later product phase.
+- Subscription belongs to the account, while `owner`, `parent`, `adult`, and
+  `child` roles remain scoped independently per Circle. A Plus/Pro owner can be a
+  free-role member inside someone else's Circle, and a former free member who
+  upgrades can own separate Circles without changing existing memberships.
+- The future backend should store server-owned account entitlements and enforce
+  active-membership/owned-Circle limits transactionally. Expiry must preserve
+  existing data and core SOS access while blocking new Circle/member creation and
+  pausing paid monitoring features. Do not trust client-supplied plan fields.
+
+## Phase 7 — Profile Restructuring & Real Security Flows (2026-09-11)
+
+Status: **COMPLETE for the capabilities supported by the current Firebase Auth
+client architecture.** Firestore rules and indexes are deployed to production.
+No Firebase billing upgrade, paid feature, Cloud Function deployment, Android
+emulator run, app runtime, or APK build was performed. Do not start Phase 8
+automatically.
+
+This section is the current source of truth and supersedes older notes later in
+this file that describe Profile Security as a demo or say Firebase rules may be
+undeployed. All pre-existing Phase 1–6 working-tree changes remain uncommitted and
+must be preserved.
+
+### 1. Files modified
+
+- `firestore.rules`
+- `lib/features/auth/domain/auth_error_mapper.dart`
+- `lib/features/profile/presentation/account_settings_screen.dart`
+- `lib/features/profile/presentation/profile_settings_screen.dart`
+- `lib/features/shell/presentation/family_shell.dart`
+- `lib/features/shell/presentation/tabs/profile_tab.dart`
+- `lib/services/profile_service.dart`
+- `rules-tests/firestore.rules.test.cjs`
+- `test/theme_verification_test.dart`
+
+### 2. New files created
+
+- `lib/services/account_security_service.dart`
+- `test/account_security_service_test.dart`
+- `test/security_flow_test.dart`
+- `test/support/fake_security_service.dart`
+
+### 3. Database/schema changes
+
+- Kept one canonical private profile at `users/{authUid}`; no parallel profile,
+  session, refresh-token, or security-event collection was added.
+- Profile writes now have a server-side top-level field allow-list. Document UID
+  must match the authenticated path UID, canonical email must match the Firebase
+  Auth token email, `createdAt` is immutable, name/phone lengths and relationship
+  values are constrained, and address keys, value types, lengths, and country ISO
+  format are validated.
+- A user's name/relationship edit updates their profile and every active Circle
+  membership identity in one Firestore batch. Membership rules use `getAfter()`
+  to require exact agreement with the authenticated user's resulting profile;
+  roles and Circle ownership cannot be changed through this path.
+- No Phase 7 index was required. Deletion readiness reuses the existing active
+  Circle membership query/index.
+
+### 4. Migrations added
+
+- None. The existing schema was extended only through optional existing fields
+  and stricter write validation. There is no destructive migration. Production
+  user/group data had already been manually cleared by the user before Phase 7.
+
+### 5. API endpoints added or changed
+
+- No HTTP or callable endpoint was added. Security actions use Firebase Auth's
+  authenticated current-user operations: password credential reauthentication,
+  `updatePassword`, `verifyBeforeUpdateEmail`, email verification, token refresh,
+  and local Firebase sign-out.
+- No Cloud Function was deployed, preserving the Firebase Spark/free plan.
+
+### 6. Profile flows completed
+
+- Profile now separates signed-in identity, Account Settings, Security,
+  notifications, Circle/plan navigation, theme, and logout.
+- Account Settings edits only the current authenticated user's name,
+  relationship, and optional address. Name is trimmed, required, and capped at
+  80 characters. Address fields are capped at 200 characters. Save is guarded
+  against repeat submission and unsaved edits retain Save/Discard/Keep Editing.
+- Saved name/relationship propagates atomically to active membership displays,
+  refreshes the shell/profile view, and updates the Firebase Auth display name.
+- Existing Firebase/Auth profile image URL is rendered with an initial fallback.
+  Image upload/editing is not exposed because Firebase Storage/upload validation
+  is not part of the current architecture.
+
+### 7. Security flows completed
+
+- Replaced the old demo security/deletion UI with real provider-aware controls.
+- Password accounts can change password only after current-password
+  reauthentication. New/confirm validation, different-password enforcement,
+  8–128 character policy, provider/network errors, duplicate-submit protection,
+  visibility toggles, and sensitive-field clearing are implemented.
+- Password accounts can request a normalized new email only after
+  reauthentication. Firebase sends verification before changing the canonical
+  Auth email; the old email remains active on failure or until verification.
+  Refresh forces a Firebase ID-token refresh and safely synchronizes the verified
+  canonical email to Firestore.
+- Email verification status and a real verification-email action are shown.
+  Provider-managed accounts do not receive unsupported password/email controls.
+- Security errors are user-safe; duplicate-email handling does not identify the
+  other account. Source audit found no password/token logging or persistence.
+
+### 8. Session and logout behavior
+
+- Security displays the current Firebase session as “This device”, provider,
+  account creation time, and Firebase last-sign-in metadata.
+- Firebase client SDK does not provide a trustworthy per-device active-session
+  list or selective “logout other devices” operation. Those controls are not
+  faked; the UI explicitly states the limitation. No spoofable sessions collection
+  was introduced ahead of Phase 8.
+- Normal logout keeps the existing confirmation, clears the UID-scoped signup
+  draft, signs out Firebase locally, performs Google provider cleanup best-effort,
+  and lets `AuthGate` replace the authenticated shell with Login. A user cannot
+  navigate Back into the disposed authenticated shell.
+
+### 9. Routes and redirects verified
+
+- Existing direct `Navigator` routes are reused: Profile → Account Settings →
+  Security → Change Password/Change Email/Delete Account Preparation.
+- All Phase 7 routes originate inside the authenticated `HomeScreen`; there are
+  no named/deep protected routes in the current app. `AuthGate` remains the single
+  auth source of truth and returns logged-out users to Intro only on the first
+  install launch, otherwise Login.
+
+### 10. Positive tests executed
+
+- Real service tests verify password reauthentication occurs before Firebase
+  password update, email normalization/reauthentication starts Firebase's
+  verified-before-update flow, and logout clears auth plus signup draft.
+- Widget tests verify supported security controls, current-session presentation,
+  verification-pending email behavior, and Circle-owner deletion blocking.
+- The full Flutter regression suite passed **232/232** on 2026-09-11.
+
+### 11. Negative tests executed
+
+- Password tests cover weak/identical values before reauthentication, mismatched
+  form data, repeated submit, and wrong-current-password safe error mapping and
+  field clearing. Provider-only accounts hide unsupported controls.
+- Rules tests reject unauthenticated/cross-user access, UID/email/role tampering,
+  unexpected profile fields, oversized names, invalid relationships, malformed or
+  oversized address values, invalid country ISO, and unsynchronized membership
+  identity changes.
+- UI tests cover missing profile/error/retry behavior through the existing auth
+  and screen suites. Provider-network failures are handled but were not sent to a
+  real production account because no test credentials were supplied.
+
+### 12. Database tests and result
+
+- Firestore emulator ran the combined database/rules suites against an isolated
+  demo project: **26 passed, 0 failed**. Tests include canonical single-profile
+  creation, IDOR denial, atomic profile/membership identity propagation, caller-
+  scoped deletion dependency lookup, existing Circle access/integrity, and the
+  full Phase 6 invite/join approval/rejection/concurrency regression.
+
+### 13. Authorization/IDOR tests and result
+
+- Authenticated User A can read/update only `users/A`; reads and updates of
+  `users/B` fail. Path UID manipulation, profile email tampering, unexpected
+  identity fields, self-membership spoofing, outsider Circle queries, and another
+  user's deletion-dependency query all fail in the emulator suite.
+- Password/email operations accept no client UID and operate only on
+  `FirebaseAuth.currentUser`, preventing a request-body/route IDOR path.
+
+### 14. Regression tests and result
+
+- Full Flutter suite: **232 passed, 0 failed**. It includes launch/intro/auth,
+  validation, profile/address, Circle lifecycle, secure invite/QR/manual join,
+  pending/approve/reject flows, member screens, theme, and responsive coverage.
+- Combined Firestore Phase 1–7 rules suite: **26 passed, 0 failed**.
+- Existing production rules/index deployment completed successfully after the
+  final rules test. Phase 6 authorization behavior remains covered.
+
+### 15. Flutter analyzer/test result
+
+- `flutter analyze --no-pub`: **No issues found** (125.5 seconds).
+- `flutter test --no-pub`: **232 passed, 0 failed** (64 seconds).
+- `git diff --check`: no whitespace errors; only expected LF/CRLF warnings.
+
+### 16. Backend test result
+
+- Functions TypeScript `tsc --noEmit`: **passed**.
+- Firestore rules compiled and the local emulator suite passed **26/26**.
+- Final `firestore.rules` and `firestore.indexes.json` deployment to production
+  project `familyemergencyapp`: **successful**. No Functions/billing change.
+
+### 17. UI overflow/alignment review result
+
+- Phase 7 security, password, email-change, deletion-preparation, and account
+  screens were rendered in automated widget review at **320×568** and **430×932**,
+  Light and Dark themes, and **1.0/1.5** text scales. Initial and bottom-scrolled
+  frames produced no Flutter layout exception or RenderFlex overflow.
+- Long current email is ellipsized in the Profile row. Long email, no avatar,
+  validation/error messages, loading, and deletion dependency states are covered.
+- Android emulator/device visual inspection was not performed because the user
+  explicitly said it is not required. No APK was built.
+
+### 18. Known limitations and manual checks
+
+- Multi-device session listing/revocation cannot be implemented securely through
+  the current Firebase client SDK. A future trusted backend can add server-owned
+  sessions and token revocation; Phase 7 deliberately does not create fake device
+  records or mix in Phase 8 pairing/heartbeat logic.
+- Hard account deletion is intentionally disabled until a trusted backend cleanup
+  transaction and product retention/ownership policy exist. The current real
+  readiness check lists owned active Circles and prevents orphan-producing deletion.
+- Profile image upload is not implemented because no validated Storage pipeline is
+  configured. Existing Auth/provider photo URLs display correctly.
+- Real password/email verification was not executed against a production user;
+  service/provider calls were verified with mocks and authorization/database logic
+  with the Firestore emulator. Manual provider verification requires a disposable
+  password account: change password, re-login with the new password, request an
+  email change, open Firebase's verification link, restart/refresh Security, and
+  confirm both Auth and `users/{uid}.email` show the verified address.
+- No Android emulator, physical-device run, APK, Functions deploy, paid Firebase
+  feature, or Phase 8 work was performed.
+
+## Login, first launch and form fixes — 2026-09-11
+
+- Reproduced the reported post-login error in rules tests: `hasAnyGroup` queried
+  groups using only `memberIds`, while the read rule called `isMember(groupId)`
+  through `get()` and required active status. The list query failed with
+  `permission-denied`; AuthGate incorrectly presented it as a connection problem.
+- Both startup lookup and Circle subscription now query `memberIds` + active
+  `status`. Group reads authorize against `resource.data`; deleted groups and
+  outsiders remain denied. Added the composite index. Rules and indexes deployed
+  successfully to `familyemergencyapp` on Spark, without Functions/billing changes.
+  Legacy groups without `status: active` are excluded; do not restore obsolete data.
+- Signup/provider authentication now exposes a profile-preparation future so
+  AuthGate waits for the profile write before choosing onboarding. A UID-scoped
+  in-memory signup draft preserves name/phone if initial profile creation fails.
+  Recovery preserves that phone when creating the missing document. No passwords
+  are retained in this draft. Startup errors use the actual Firebase error mapping.
+- Removed Form-wide auto-validation throughout the app. Individual fields validate
+  only after their own edits; explicit Submit/Save still validates the whole form.
+  Increased compact form gaps to 18 logical pixels across auth/profile/member forms.
+- `IntroPreferences` uses shared_preferences to persist `intro_seen` immediately
+  on first launch. Later signed-out launches go to Login; authenticated sessions
+  continue to the appropriate account screen. Clearing app storage/reinstalling
+  resets this local preference. Intro completion is no longer a static run-only flag.
+- Onboarding receives the persisted signup name/phone. Profile setup prefills name
+  and displays phone read-only; Circle onboarding displays both. Phone entry remains
+  signup-only. Address/country work below is preserved.
+- Full Flutter suite passed 205 tests; security suite passed 22 tests, including
+  the previously failing login query, empty/new-account results, and access denials.
+  Final targeted onboarding/first-launch suite passed all 5 tests. Production
+  `groups(memberIds CONTAINS, status ASCENDING)` index is confirmed READY.
+- Dependencies resolved successfully. Windows plugin junctions were created under
+  ignored `windows/flutter/ephemeral/.plugin_symlinks` to avoid requiring Developer
+  Mode; no machine settings changed. No Android emulator or APK build was run.
+  The APK below is obsolete: an updated APK is required for these app/query fixes.
+  End-to-end verification on the user's signed-in phone remains a manual check.
+
+## Country names and account address — 2026-09-11
+
+- Signup and the new Account Settings > Address tab share `CountryNameField`:
+  country lists and selected values show full country names. ISO codes remain
+  internal persistence values; signup keeps the dialing prefix in the phone input.
+- Phone input is now only in signup. Removed it from profile completion/recovery,
+  Account Settings, the legacy profile form, and member editing. Existing phone
+  data and member contact display are preserved. Provider profile completion no
+  longer requires a phone, and completion does not overwrite signup phone data.
+- Profile Settings > Account Settings now has Personal and Address tabs. Optional
+  address fields: street, apartment/address line 2, city, state/province, postal
+  code, country. Saved to `users/{uid}.address` with keys `line1`, `line2`, `city`,
+  `region`, `postalCode`, `countryIso`; profile parsing tolerates old/malformed data.
+- Address changes participate in unsaved-change protection. Failed saves keep
+  edits available for retry; personal and address persistence are independent.
+- Verification: full Flutter suite passed 200 tests before final member input
+  cleanup and the additional country-selection test. Final targeted address and
+  Circle lifecycle suite passed all 14 tests; `flutter analyze` found no issues.
+- No emulator or Firebase/billing changes. The APK recorded below predates these
+  UI changes; rebuild it when an updated installable APK is requested. Live address
+  persistence on a signed-in device remains a manual check.
+
+## Latest APK rebuild — 2026-09-11, 11:26 PKT
+
+After the user deleted the previous APK, `flutter build apk --release` succeeded
+again (79.7 seconds). Verified artifact:
+`D:\My Projects\family_emergency_app\build\app\outputs\flutter-apk\app-release.apk`.
+Size: 74,534,192 bytes (71.08 MiB). SHA-256:
+`27D5DEBE225589B7FAF55F57DAF651080C8AD1D7B9B7521953A858FED56BC1C2`.
+`apksigner verify --verbose` passed (v2). The existing debug-key signing for
+release-mode testing is unchanged. No emulator/device run was performed.
+
+## Phase 6 — Secure invite, QR, join request, and approval (2026-09-11)
+
+Phase 6 is implemented in the current uncommitted working tree. Preserve every
+listed change. The production project remains on Firebase Spark/free: tested
+Firestore rules were deployed, no Cloud Function was deployed, and no billing or
+paid Firebase feature was enabled.
+
+Implemented lifecycle:
+
+- Circle owners and parents can generate a cryptographically secure 24-character
+  invite using `Random.secure`. Codes use an unambiguous alphabet, are displayed
+  in groups of four, expire after seven days, allow at most 20 approvals, require
+  approval, and can be revoked or regenerated.
+- `circleInvites/{token}` is the invite lookup. Authenticated users may only get a
+  document when they already know its exact high-entropy token. Invite collection
+  listing is manager-only. Firestore rules use `request.time` for expiration.
+- QR codes contain only `familyemergency://join?code={token}`. Manual input and QR
+  payloads share one strict parser. The scanner guards duplicate callbacks and
+  presents camera-denied, unavailable-camera, and initialization error states.
+- A valid invite creates one pending document at
+  `groups/{circleId}/joinRequests/{requesterUid}`. It does not create membership.
+  Pending onboarding state survives restarts through `pendingJoinCircleId` and
+  `pendingJoinInviteId` profile fields and can be cancelled. The authenticated
+  main shell also resumes this state for already-onboarded users.
+- Owners/parents can approve or reject pending requests. Approval is one atomic
+  Firestore transaction updating the Circle member/role cache, membership,
+  request, invite usage/status, and user profile. Rules validate the same
+  coordinated `getAfter` state and restrict the new role to `adult` or `child`.
+- Existing members are detected before request creation. Removed/inactive members
+  may rejoin only by creating a fresh valid request and receiving manager approval.
+- Existing-member and approved-request outcomes return the Circle ID to the shell;
+  the shell waits for the authorized Circle snapshot and opens Circle Detail.
+- Share/QR, manual join, pending state, review list, approval/rejection dialogs,
+  Circle/member entry points, and onboarding routing are connected to the existing
+  light UI and service architecture. A displayed invite automatically changes to
+  expired state at its cutoff, even if no Firestore snapshot changes.
+- The obsolete immediate-join `createCircleInvite` and `redeemCircleInvite`
+  implementations were removed, together with the unused nested `invites` and
+  `inviteLookup` rule blocks. Future-upgrade Phase 5 lifecycle Functions and
+  third-party authentication dependencies were preserved. No Function is deployed.
+
+Primary files:
+
+- `lib/core/domain/invite_code_policy.dart`
+- `lib/models/circle_invite.dart`
+- `lib/models/circle_join_request.dart`
+- `lib/services/circle_join_service.dart`
+- `lib/features/groups/presentation/share_circle_screen.dart`
+- `lib/features/groups/presentation/qr_scanner_screen.dart`
+- `lib/features/groups/presentation/join_circle_screen.dart`
+- `lib/features/groups/presentation/join_requests_screen.dart`
+- `lib/features/auth/presentation/onboarding/circle_onboarding_screen.dart`
+- `firestore.rules`
+- `rules-tests/invite.rules.test.cjs`
+- `test/invite_domain_test.dart`
+- `test/invite_widget_test.dart`
+
+Verification completed:
+
+- `flutter analyze --no-pub`: **No issues found**.
+- Full `flutter test --no-pub`: **197 passed, 0 failed**.
+- Focused Phase 6 plus responsive UI run: **12 passed, 0 failed**.
+- Combined Firestore emulator rules suite: **20 passed, 0 failed** (the Phase 6
+  invite subset is **11 passed, 0 failed**).
+- Phase 6 rules include direct self-membership/self-approval denials, unauthorized
+  invite/review denial, revoked/expired rejection, atomic final-use exhaustion,
+  authorized rejection without membership, double-approval concurrency, and
+  approve/reject race coverage.
+- Functions TypeScript `tsc --noEmit`: passed.
+- Layout tests cover 320x568 and 430x932 viewports, 1.0 and 1.5 text scale,
+  long Circle/requester/relationship/email values, invite QR/code/link, and
+  pending/review states. No RenderFlex or layout exception was observed.
+- `git diff --check`: no whitespace error; only expected LF/CRLF warnings.
+- Production `familyemergencyapp`: `firestore.rules` compiled, uploaded, and
+  released successfully again after the refactor on 2026-09-11.
+- User later overrode the earlier no-APK restriction. `flutter build apk
+  --release` completed in 773.8 seconds and produced
+  `build/app/outputs/flutter-apk/app-release.apk` (74,534,192 bytes / 71.08 MiB,
+  SHA-256 `27D5DEBE225589B7FAF55F57DAF651080C8AD1D7B9B7521953A858FED56BC1C2`).
+  Android build-tools 37.0.0 `apksigner verify` passed using APK Signature v2.
+  The current Gradle release configuration deliberately uses the Android debug
+  signing key, so this APK is installable for testing but is not Play Store
+  production-signed. No emulator or device run was performed.
+
+### Production old-user cleanup and refactor (2026-09-11)
+
+- A count-only Firebase Authentication audit found **3** old accounts. All three
+  were permanently batch-deleted; the follow-up API check returned **0 remaining**.
+  No Auth export was retained and no email/UID was printed.
+- Firestore audit found **2** orphan `users` documents and **2** `groups`
+  documents. Both Circles were verified to be fully owned by and composed only of
+  those orphan user profiles. `circleInvites` and `inviteLookup` were already empty.
+- The user subsequently reported manually deleting the remaining `users` and
+  `groups` collections in Firebase Console. Treat the production app data as a
+  fresh start. This manual deletion was not independently observed by Codex;
+  remember that deleting parent documents does not necessarily remove orphaned
+  subcollections, although current rules make them inaccessible without a live
+  parent Circle/user document.
+- Refactor removed 138 lines of unreachable legacy immediate-membership Function
+  logic, unused crypto/timestamp imports, two obsolete Firestore rule paths, and
+  exposed internal helper surface. Repeated invite revocation timestamps now use
+  one server transform. Required future Firebase upgrade lifecycle Functions,
+  Cloud Functions dependency, and Google/Apple authentication code remain intact.
+- Post-refactor verification: Flutter analyzer clean; Flutter **197/197**; combined
+  rules **20/20**; Functions TypeScript compile passed; refactored production rules
+  deployed successfully. The release-mode APK described above was subsequently
+  built; no emulator or app runtime was performed.
+
+Current status: **PARTIALLY COMPLETE** against the original Phase 6 acceptance
+text, solely because no emulator/device app runtime was performed. Real camera
+permission/scanning, platform share sheet, clipboard, and
+multi-account production UI behavior therefore remain unverified on a device.
+Source, static analysis, widget/domain tests, concurrency tests, Firestore rule
+tests, free-plan rules deployment, and an installable release-mode APK are
+complete. Do not launch an emulator unless the user changes that instruction.
+
+Exact next step when device/runtime work is authorized: run the installed app on
+two authenticated accounts and verify generate → scan/manual validation → pending
+→ approve/reject → membership/redirect, plus camera denied/permanently denied,
+share/clipboard, revoked/expired while open, and app-restart states. Functions
+must remain undeployed while the project stays on Spark/free.
+
 ## Phase 5 — Circle lifecycle and member details (2026-09-10)
 
 Phase 5 is implemented locally on `main` at the existing dirty working tree. The

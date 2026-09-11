@@ -114,11 +114,14 @@ void main() {
     expect(AuthValidators.circleName(' '), isNotNull);
     expect(AuthValidators.circleName('a'), isNotNull);
     expect(AuthValidators.circleName('a' * 61), isNotNull);
-    expect(AuthValidators.inviteCode('ab-12 cd'), isNull);
-    expect(AuthValidators.normalizeInviteCode(' ab-12 cd '), 'AB12CD');
+    expect(AuthValidators.inviteCode('abcd-efgh-jklm-npqr-stuv-2345'), isNull);
+    expect(
+      AuthValidators.normalizeInviteCode(' abcd-efgh-jklm-npqr-stuv-2345 '),
+      'ABCDEFGHJKLMNPQRSTUV2345',
+    );
     expect(AuthValidators.inviteCode(null), isNotNull);
-    expect(AuthValidators.inviteCode('ABCDE'), isNotNull);
+    expect(AuthValidators.inviteCode('ABCDEFGH'), isNotNull);
     expect(AuthValidators.inviteCode('ABC_123'), isNotNull);
-    expect(AuthValidators.inviteCode('A' * 13), isNotNull);
+    expect(AuthValidators.inviteCode('A' * 25), isNotNull);
   });
 }

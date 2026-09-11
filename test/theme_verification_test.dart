@@ -9,6 +9,7 @@ import 'package:family_emergency_app/core/widgets/app_theme_mode_selector.dart';
 import 'package:family_emergency_app/features/auth/presentation/login_screen.dart';
 import 'package:family_emergency_app/features/auth/presentation/signup_screen.dart';
 import 'package:family_emergency_app/features/auth/presentation/forgot_password_screen.dart';
+import 'package:family_emergency_app/features/auth/presentation/email_verification_screen.dart';
 import 'package:family_emergency_app/features/auth/presentation/onboarding/intro_flow.dart';
 import 'package:family_emergency_app/features/auth/presentation/onboarding/circle_onboarding_screen.dart';
 import 'package:family_emergency_app/features/devices/presentation/device_screens.dart';
@@ -21,7 +22,9 @@ import 'package:family_emergency_app/features/progress/presentation/progress_det
 import 'package:family_emergency_app/models/circle_role.dart';
 import 'package:family_emergency_app/models/family_group.dart';
 import 'package:family_emergency_app/models/family_member.dart';
+import 'package:family_emergency_app/models/paired_device.dart';
 import 'package:family_emergency_app/services/group_service.dart';
+import 'package:family_emergency_app/services/auth_service.dart';
 import 'package:family_emergency_app/services/circle_join_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -31,6 +34,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'auth_form_test.dart' show FakeAuthActions;
+import 'support/fake_circle_join_service.dart';
+import 'support/fake_security_service.dart';
+import 'support/fake_device_service.dart';
 
 class _FakeUser implements User {
   @override
@@ -42,7 +48,21 @@ class _FakeUser implements User {
 
 class _FakeCircleJoin implements CircleJoinActions {
   @override
-  Future<String> joinWithCode(String code) async => 'unused';
+  Future<JoinSubmissionResult> joinWithCode(String code) async =>
+      const JoinSubmissionResult(
+        circleId: 'unused',
+        circleName: 'Unused Circle',
+        status: JoinSubmissionStatus.pending,
+      );
+}
+
+class _FakeEmailVerification implements EmailVerificationActions {
+  @override
+  Future<bool> refreshEmailVerification() async => false;
+  @override
+  Future<void> sendEmailVerification() async {}
+  @override
+  Future<void> signOut() async {}
 }
 
 const _member = FamilyMember(
@@ -55,13 +75,13 @@ const _group = FamilyGroup(
   name: 'Our extended family Circle',
   ownerId: 'owner',
   role: CircleRole.owner,
+  memberIds: ['owner', 'member-1'],
 );
 
 AccountSettingsScreen _account() => AccountSettingsScreen(
   initialName: _member.name,
   email: 'a.long.email.address@example.com',
-  phone: '+92 300 1234567',
-  country: 'PK +92',
+  onSaveAddress: (_) async => true,
   relationship: 'Self',
   relationships: const ['Self', 'Father', 'Mother'],
   onSave: (_, _) async => true,
@@ -98,17 +118,46 @@ void main() {
     'signup': () => SignUpScreen(authService: FakeAuthActions()),
     'reset_password': () =>
         ForgotPasswordScreen(authService: FakeAuthActions()),
+    'verify_email': () => EmailVerificationScreen(
+      email: 'a.very.long.account.email.address@example.com',
+      verification: _FakeEmailVerification(),
+      onContinue: (_) {},
+    ),
     'account': _account,
-    'security': () => const ProfileSettingsScreen(),
-    'update_password': () => const UpdatePasswordScreen(),
+    'security': () =>
+        ProfileSettingsScreen(securityService: FakeSecurityService()),
+    'update_password': () =>
+        UpdatePasswordScreen(securityService: FakeSecurityService()),
+    'change_email': () => ChangeEmailScreen(
+      securityService: FakeSecurityService(),
+      currentEmail: 'a.very.long.account.email.address@example.com',
+    ),
+    'delete_account_preparation': () => AccountDeletionPreparationScreen(
+      securityService: FakeSecurityService(),
+    ),
     'member': () => const MemberProfileScreen(member: _member),
     'member_notifications': () =>
         MemberNotificationSettingsScreen(member: _member, onSave: (_) async {}),
-    'share': () => const ShareCircleScreen(group: _group),
-    'pair_device': () =>
-        const DevicePairingScreen(member: _member, group: _group),
-    'device': () =>
-        const DeviceDetailScreen(memberName: 'A very long family member name'),
+    'share': () =>
+        ShareCircleScreen(group: _group, joinService: FakeCircleJoinService()),
+    'my_devices': () => DeviceListScreen(deviceService: FakeDeviceService()),
+    'pairing_code': () =>
+        DevicePairingCodeScreen(deviceService: FakeDeviceService()),
+    'pair_device': () => DevicePairingScreen(
+      group: _group,
+      memberUserId: 'member-1',
+      memberName: _member.name,
+      deviceService: FakeDeviceService(),
+    ),
+    'device': () => DeviceDetailScreen(
+      memberName: _member.name,
+      device: fakeDevice(
+        name: 'A very long Android device name for layout verification',
+        status: DevicePairingStatus.paired,
+      ),
+      deviceService: FakeDeviceService(),
+      accountDevice: true,
+    ),
     'progress': () => const ProgressDetailsScreen(
       memberName: 'A very long family member name',
     ),
@@ -282,7 +331,7 @@ void main() {
     expect(find.text('Please enter a family Circle name.'), findsNothing);
     await tester.tap(find.text('Join Family Circle'));
     await tester.pump();
-    expect(find.text('Please enter an invitation code.'), findsOneWidget);
+    expect(find.text('Enter an invitation code.'), findsOneWidget);
     expect(find.byKey(const ValueKey('circle-tab-error-1')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

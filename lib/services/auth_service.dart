@@ -1,6 +1,9 @@
+import 'dart:async';
+
+import '../models/user_profile.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../features/auth/domain/auth_error_mapper.dart';
@@ -22,21 +25,35 @@ abstract interface class AuthActions {
 
   Future<void> signInWithGoogle();
 
-  Future<void> signInWithApple();
-
   Future<void> sendPasswordResetEmail(String email);
 }
 
-class AuthService implements AuthActions {
+abstract interface class EmailVerificationActions {
+  Future<void> sendEmailVerification();
+  Future<bool> refreshEmailVerification();
+  Future<void> signOut();
+}
+
+class AuthService implements AuthActions, EmailVerificationActions {
   AuthService({
-    this._auth,
+    FirebaseAuth? auth,
     FirebaseFirestore? firestore,
     ProfileService? profileService,
-  }) : _profileService =
+    // Keep the injection parameter public while the client stays private.
+    // ignore: prefer_initializing_formals
+  }) : _auth = auth,
+       _profileService =
            profileService ??
            ProfileService(firestore: firestore ?? FirebaseFirestore.instance);
 
   static Future<void>? _googleInitialization;
+  Completer<void>? _profilePreparation;
+  UserProfile? signupDraft;
+
+  Future<void> waitForProfilePreparation() async {
+    await _profilePreparation?.future;
+  }
+
   FirebaseAuth? _auth;
   final ProfileService _profileService;
 
@@ -60,48 +77,34 @@ class AuthService implements AuthActions {
 
   @override
   Future<void> signInWithGoogle() async {
-    await (_googleInitialization ??= GoogleSignIn.instance.initialize());
-    final account = await GoogleSignIn.instance.authenticate();
-    final credential = GoogleAuthProvider.credential(
-      idToken: account.authentication.idToken,
-    );
-    final result = await _authClient.signInWithCredential(credential);
-    final user = result.user;
-    if (user == null) {
-      throw FirebaseAuthException(
-        code: 'missing-user',
-        message: 'Google authentication did not return a user.',
-      );
-    }
+    _profilePreparation = Completer<void>();
     try {
-      await _profileService.ensureProviderProfile(user);
-    } catch (error) {
-      throw ProfileCreationException(error);
-    }
-  }
-
-  @override
-  Future<void> signInWithApple() async {
-    final provider = AppleAuthProvider()
-      ..addScope('email')
-      ..addScope('name');
-    final UserCredential result;
-    if (kIsWeb) {
-      result = await _authClient.signInWithPopup(provider);
-    } else {
-      result = await _authClient.signInWithProvider(provider);
-    }
-    final user = result.user;
-    if (user == null) {
-      throw FirebaseAuthException(
-        code: 'missing-user',
-        message: 'Apple authentication did not return a user.',
+      await (_googleInitialization ??= GoogleSignIn.instance.initialize());
+      final account = await GoogleSignIn.instance.authenticate();
+      final credential = GoogleAuthProvider.credential(
+        idToken: account.authentication.idToken,
       );
-    }
-    try {
-      await _profileService.ensureProviderProfile(user);
-    } catch (error) {
-      throw ProfileCreationException(error);
+      final result = await _authClient.signInWithCredential(credential);
+      final user = result.user;
+      if (user == null) {
+        throw FirebaseAuthException(
+          code: 'missing-user',
+          message: 'Google authentication did not return a user.',
+        );
+      }
+      if (result.additionalUserInfo?.isNewUser == true &&
+          user.email != null &&
+          user.emailVerified != true) {
+        await user.sendEmailVerification();
+      }
+      try {
+        await _profileService.ensureProviderProfile(user);
+      } catch (error) {
+        throw ProfileCreationException(error);
+      }
+    } finally {
+      _profilePreparation?.complete();
+      _profilePreparation = null;
     }
   }
 
@@ -115,34 +118,74 @@ class AuthService implements AuthActions {
     required String countryCode,
     required String relationship,
   }) async {
-    final credential = await _authClient.createUserWithEmailAndPassword(
-      email: AuthValidators.normalizeEmail(email),
-      password: password,
-    );
-    final user = credential.user;
-    if (user == null) {
-      throw FirebaseAuthException(
-        code: 'missing-user',
-        message: 'Account creation did not return a user.',
-      );
-    }
-    await user.updateDisplayName(name.trim());
+    _profilePreparation = Completer<void>();
     try {
-      await _profileService.createEmailProfile(
-        user,
-        name: name,
-        email: email,
-        phone: phone,
-        countryIso: countryIso,
-        countryCode: countryCode,
-        relationship: relationship,
+      final credential = await _authClient.createUserWithEmailAndPassword(
+        email: AuthValidators.normalizeEmail(email),
+        password: password,
       );
-    } catch (error) {
-      throw ProfileCreationException(error);
+      final user = credential.user;
+      if (user == null) {
+        throw FirebaseAuthException(
+          code: 'missing-user',
+          message: 'Account creation did not return a user.',
+        );
+      }
+      signupDraft = UserProfile.fromData(
+        uid: user.uid,
+        data: null,
+        fallbackName: name,
+        fallbackEmail: email,
+        fallbackPhone: phone,
+      );
+      await user.updateDisplayName(name.trim());
+      if (user.emailVerified != true) {
+        await user.sendEmailVerification();
+      }
+      try {
+        await _profileService.createEmailProfile(
+          user,
+          name: name,
+          email: email,
+          phone: phone,
+          countryIso: countryIso,
+          countryCode: countryCode,
+          relationship: relationship,
+        );
+      } catch (error) {
+        throw ProfileCreationException(error);
+      }
+    } finally {
+      _profilePreparation?.complete();
+      _profilePreparation = null;
     }
   }
 
+  @override
+  Future<void> sendEmailVerification() async {
+    final user = currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(code: 'user-not-found');
+    }
+    if (user.emailVerified != true) await user.sendEmailVerification();
+  }
+
+  @override
+  Future<bool> refreshEmailVerification() async {
+    final user = currentUser;
+    if (user == null) return false;
+    await user.reload();
+    final refreshed = currentUser;
+    if (refreshed?.emailVerified == true) {
+      await refreshed?.getIdToken(true);
+      return true;
+    }
+    return false;
+  }
+
+  @override
   Future<void> signOut() async {
+    signupDraft = null;
     await _authClient.signOut();
     try {
       await GoogleSignIn.instance.signOut();

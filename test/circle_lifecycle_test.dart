@@ -12,6 +12,8 @@ import 'package:family_emergency_app/services/group_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/fake_device_service.dart';
+
 const owner = CircleMembership(
   userId: 'owner-1',
   displayName: 'Circle Owner',
@@ -221,6 +223,7 @@ void main() {
             group: service.group,
             viewerId: owner.userId,
             groupService: service,
+            deviceService: FakeDeviceService(),
           ),
         ),
       );
@@ -281,6 +284,7 @@ void main() {
           group: service.group,
           viewerId: owner.userId,
           groupService: service,
+          deviceService: FakeDeviceService(),
         ),
       ),
     );

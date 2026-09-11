@@ -18,6 +18,18 @@ class ProfileService {
     return UserProfile.fromFirestore(user, snapshot.data());
   }
 
+  Future<void> syncCanonicalIdentity(User user) async {
+    final email = user.email?.trim();
+    if (email == null || email.isEmpty) return;
+    final reference = _documentFor(user);
+    final snapshot = await reference.get();
+    if (!snapshot.exists || snapshot.data()?['email'] == email) return;
+    await reference.set({
+      'email': email,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   Future<void> createEmailProfile(
     User user, {
     required String name,
@@ -31,7 +43,7 @@ class ProfileService {
     return _documentFor(user).set({
       'uid': user.uid,
       'name': name.trim(),
-      'email': email.trim(),
+      'email': user.email?.trim() ?? email.trim().toLowerCase(),
       'phone': phone.trim(),
       'phoneCountryIso': countryIso,
       'phoneCountryCode': countryCode,
@@ -104,10 +116,8 @@ class ProfileService {
   Future<void> completeProfile(
     User user, {
     required String name,
-    required String phone,
-    required String countryIso,
-    required String countryCode,
     required String relationship,
+    String? signupPhone,
   }) async {
     final reference = _documentFor(user);
     final snapshot = await reference.get();
@@ -115,9 +125,11 @@ class ProfileService {
       'uid': user.uid,
       'name': name.trim(),
       'email': user.email?.trim() ?? '',
-      'phone': phone.trim(),
-      'phoneCountryIso': countryIso,
-      'phoneCountryCode': countryCode,
+      if ((snapshot.data()?['phone'] == null ||
+              snapshot.data()?['phone'] == '') &&
+          signupPhone != null &&
+          signupPhone.trim().isNotEmpty)
+        'phone': signupPhone.trim(),
       'relationship': relationship,
       if (user.photoURL != null) 'photoUrl': user.photoURL,
       'providerIds': user.providerData
@@ -145,13 +157,36 @@ class ProfileService {
     required String name,
     required String? relationship,
   }) async {
-    await _documentFor(user).set({
+    final groups = await _firestore
+        .collection('groups')
+        .where('memberIds', arrayContains: user.uid)
+        .where('status', isEqualTo: 'active')
+        .get();
+    final batch = _firestore.batch();
+    batch.set(_documentFor(user), {
       'name': name.trim(),
       'relationship': relationship,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+    for (final group in groups.docs) {
+      final membership = group.reference
+          .collection('memberships')
+          .doc(user.uid);
+      batch.set(membership, {
+        'displayName': name.trim(),
+        'relationship': relationship,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+    await batch.commit();
     await user.updateDisplayName(name.trim());
   }
+
+  Future<void> saveAddress(User user, Map<String, String> address) =>
+      _documentFor(user).set({
+        'address': address,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
   Future<void> recordDailyCheckIn(
     User user, {

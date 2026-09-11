@@ -39,6 +39,10 @@ extension _ProfileTab on _HomeScreenState {
                 CircleAvatar(
                   radius: 24,
                   backgroundColor: context.appSuccessSurface,
+                  foregroundImage:
+                      _profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty
+                      ? NetworkImage(_profilePhotoUrl!)
+                      : null,
                   child: Text(
                     _profileNameController.text.isEmpty
                         ? '?'
@@ -53,10 +57,19 @@ extension _ProfileTab on _HomeScreenState {
             ),
             const SizedBox(height: 15),
             _profileRow(
+              icon: Icons.verified_user_outlined,
+              iconColor: kEmerald,
+              label: 'Signed-in Account',
+              value: _profileEmail.isEmpty ? 'Authenticated' : _profileEmail,
+              isDark: isDark,
+              showTrailing: false,
+            ),
+            const SizedBox(height: 7),
+            _profileRow(
               icon: Icons.manage_accounts_rounded,
               iconColor: kEmerald,
               label: 'Account Settings',
-              value: 'Name, email, phone and relationship',
+              value: 'Personal information and address',
               isDark: isDark,
               onTap: () async {
                 final result = await Navigator.push<bool>(
@@ -65,15 +78,15 @@ extension _ProfileTab on _HomeScreenState {
                     builder: (_) => AccountSettingsScreen(
                       initialName: _profileNameController.text,
                       email: _profileEmail,
-                      phone: _profilePhone,
-                      country: _profileCountry,
+                      initialAddress: _profileAddress,
+                      onSaveAddress: _saveAccountAddress,
                       relationship: _profileRole,
                       relationships: _HomeScreenState._roles,
                       onSave: _saveAccountSettings,
                       onUpdatePassword: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const UpdatePasswordScreen(),
+                          builder: (_) => const ProfileSettingsScreen(),
                         ),
                       ),
                     ),
@@ -133,14 +146,26 @@ extension _ProfileTab on _HomeScreenState {
             _profileRow(
               icon: Icons.manage_accounts_rounded,
               iconColor: const Color(0xFF7C3AED),
-              label: 'Profile Settings',
-              value: 'Password and account security',
+              label: 'Security',
+              value: 'Password, email and current session',
               isDark: isDark,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => const ProfileSettingsScreen(),
                 ),
+              ),
+            ),
+            const SizedBox(height: 7),
+            _profileRow(
+              icon: Icons.devices_rounded,
+              iconColor: const Color(0xFF2563EB),
+              label: 'My Devices',
+              value: 'Registration, heartbeat and Circle pairing',
+              isDark: isDark,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DeviceListScreen()),
               ),
             ),
             const SizedBox(height: 18),
@@ -255,12 +280,16 @@ extension _ProfileTab on _HomeScreenState {
                             color: Color(0xFFFFAE00),
                           ),
                         if (plan) const SizedBox(width: 3),
-                        Text(
-                          value,
-                          style: TextStyle(
-                            fontSize: 11,
-                            height: 1,
-                            color: mutedColor,
+                        Expanded(
+                          child: Text(
+                            value,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              height: 1,
+                              color: mutedColor,
+                            ),
                           ),
                         ),
                       ],

@@ -14,6 +14,7 @@ class UserProfile {
     required this.notificationSettings,
     required this.profileCompleted,
     required this.onboardingCompleted,
+    this.address = const {},
     this.phoneCountryIso,
     this.phoneCountryCode,
     this.photoUrl,
@@ -23,8 +24,11 @@ class UserProfile {
     this.updatedAt,
     this.activeCircleId,
     this.circleIds = const [],
+    this.pendingJoinCircleId,
+    this.pendingJoinInviteId,
   });
 
+  final Map<String, String> address;
   final String uid;
   final bool exists;
   final String name;
@@ -43,6 +47,8 @@ class UserProfile {
   final DateTime? updatedAt;
   final String? activeCircleId;
   final List<String> circleIds;
+  final String? pendingJoinCircleId;
+  final String? pendingJoinInviteId;
 
   bool get needsProfileCompletion => !profileCompleted;
 
@@ -74,10 +80,7 @@ class UserProfile {
     final relationship =
         _string(source['relationship']) ?? _string(source['role']);
     final safelyComplete =
-        name.isNotEmpty &&
-        email.isNotEmpty &&
-        phone.isNotEmpty &&
-        relationship != null;
+        name.isNotEmpty && email.isNotEmpty && relationship != null;
 
     return UserProfile(
       uid: uid,
@@ -85,6 +88,18 @@ class UserProfile {
       name: name,
       email: email,
       phone: phone,
+      address: {
+        if (source['address'] is Map)
+          for (final key in const [
+            'line1',
+            'line2',
+            'city',
+            'region',
+            'postalCode',
+            'countryIso',
+          ])
+            key: _string((source['address'] as Map)[key]) ?? '',
+      },
       relationship: relationship,
       phoneCountryIso: _string(source['phoneCountryIso']),
       phoneCountryCode: _string(source['phoneCountryCode']),
@@ -103,6 +118,8 @@ class UserProfile {
       updatedAt: _date(source['updatedAt']),
       activeCircleId: _string(source['activeCircleId']),
       circleIds: _stringList(source['circleIds']),
+      pendingJoinCircleId: _string(source['pendingJoinCircleId']),
+      pendingJoinInviteId: _string(source['pendingJoinInviteId']),
     );
   }
 

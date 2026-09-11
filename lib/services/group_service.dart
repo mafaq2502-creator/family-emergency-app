@@ -22,6 +22,7 @@ class GroupService {
   Stream<List<FamilyGroup>> watchGroups(User user) => _client
       .collection('groups')
       .where('memberIds', arrayContains: user.uid)
+      .where('status', isEqualTo: 'active')
       .snapshots()
       .map(
         (snapshot) => snapshot.docs
@@ -93,6 +94,7 @@ class GroupService {
     final snapshot = await _client
         .collection('groups')
         .where('memberIds', arrayContains: user.uid)
+        .where('status', isEqualTo: 'active')
         .limit(1)
         .get();
     return snapshot.docs.isNotEmpty;

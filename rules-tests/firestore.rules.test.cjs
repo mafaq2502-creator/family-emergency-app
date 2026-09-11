@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { after, before, beforeEach, test } = require('node:test');
 const { assertFails, assertSucceeds, initializeTestEnvironment } = require('@firebase/rules-unit-testing');
-const { doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } = require('firebase/firestore');
+const { collection, query, where, limit, getDocs, doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } = require('firebase/firestore');
 
 let testEnvironment;
 
@@ -30,10 +30,43 @@ beforeEach(async () => {
       userId: 'adult-1', displayName: 'Adult', relationship: 'Sibling', circleRole: 'adult',
       status: 'active', joinedAt: serverTimestamp(), updatedAt: serverTimestamp(),
     });
+    for (const [id, name, relationship] of [
+      ['owner-1', 'Owner', 'Self'],
+      ['adult-1', 'Adult', 'Other'],
+    ]) {
+      await setDoc(doc(db, `users/${id}`), {
+        uid: id, name, email: `${id}@example.test`, relationship,
+        profileCompleted: true, onboardingCompleted: true,
+        circleIds: ['circle-1'], activeCircleId: 'circle-1',
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      });
+    }
   });
 });
 
 after(async () => testEnvironment.cleanup());
+
+test('login can query active Circles and safely return an empty result for a new account', async () => {
+  for (const uid of ['owner-1', 'new-user']) {
+    const db = testEnvironment.authenticatedContext(uid).firestore();
+    await assertSucceeds(getDocs(query(collection(db, 'groups'),
+      where('memberIds', 'array-contains', uid), where('status', '==', 'active'), limit(1))));
+  }
+});
+
+test('Circle listing rejects outsiders, unfiltered queries and deleted Circles', async () => {
+  const db = testEnvironment.authenticatedContext('outsider').firestore();
+  await assertFails(getDocs(collection(db, 'groups')));
+  await assertFails(getDocs(query(collection(db, 'groups'),
+    where('memberIds', 'array-contains', 'owner-1'), where('status', '==', 'active'))));
+  await testEnvironment.withSecurityRulesDisabled(async (context) => {
+    await updateDoc(doc(context.firestore(), 'groups/circle-1'), {status: 'deleted'});
+  });
+  const owner = testEnvironment.authenticatedContext('owner-1').firestore();
+  const result = await assertSucceeds(getDocs(query(collection(owner, 'groups'),
+    where('memberIds', 'array-contains', 'owner-1'), where('status', '==', 'active'))));
+  require('node:assert/strict').equal(result.size, 0);
+});
 
 test('Circle documents are visible only to cached members', async () => {
   const owner = testEnvironment.authenticatedContext('owner-1').firestore();
@@ -44,6 +77,68 @@ test('Circle documents are visible only to cached members', async () => {
   await assertSucceeds(getDoc(doc(adult, 'groups/circle-1')));
   await assertFails(getDoc(doc(outsider, 'groups/circle-1')));
   await assertFails(getDoc(doc(anonymous, 'groups/circle-1')));
+});
+
+test('profile ownership blocks IDOR and unexpected identity fields', async () => {
+  const owner = testEnvironment.authenticatedContext('owner-1', {email: 'owner-1@example.test'}).firestore();
+  const adult = testEnvironment.authenticatedContext('adult-1', {email: 'adult-1@example.test'}).firestore();
+  await assertSucceeds(getDoc(doc(owner, 'users/owner-1')));
+  await assertFails(getDoc(doc(owner, 'users/adult-1')));
+  await assertFails(updateDoc(doc(owner, 'users/adult-1'), {name: 'Taken over'}));
+  await assertFails(updateDoc(doc(owner, 'users/owner-1'), {ownerId: 'adult-1'}));
+  await assertFails(updateDoc(doc(owner, 'users/owner-1'), {email: 'adult-1@example.test'}));
+  await assertSucceeds(updateDoc(doc(adult, 'users/adult-1'), {
+    name: 'Adult Updated', relationship: 'Brother', updatedAt: serverTimestamp(),
+  }));
+});
+
+test('profile and own membership identity update atomically', async () => {
+  const adult = testEnvironment.authenticatedContext('adult-1', {email: 'adult-1@example.test'}).firestore();
+  const batch = writeBatch(adult);
+  batch.update(doc(adult, 'users/adult-1'), {
+    name: 'Adult Updated', relationship: 'Brother', updatedAt: serverTimestamp(),
+  });
+  batch.update(doc(adult, 'groups/circle-1/memberships/adult-1'), {
+    displayName: 'Adult Updated', relationship: 'Brother', updatedAt: serverTimestamp(),
+  });
+  await assertSucceeds(batch.commit());
+  await assertFails(updateDoc(doc(adult, 'groups/circle-1/memberships/adult-1'), {
+    displayName: 'Spoofed', relationship: 'Brother', updatedAt: serverTimestamp(),
+  }));
+  const group = await getDoc(doc(adult, 'groups/circle-1'));
+  require('node:assert/strict').equal(group.data().roles['adult-1'], 'adult');
+});
+
+test('profile creation is canonical, owner-scoped and server validated', async () => {
+  const user = testEnvironment.authenticatedContext('new-user', {email: 'new@example.test'}).firestore();
+  const outsider = testEnvironment.authenticatedContext('outsider', {email: 'outside@example.test'}).firestore();
+  const valid = {
+    uid: 'new-user', name: 'New User', email: 'new@example.test',
+    relationship: 'Self', profileCompleted: true, onboardingCompleted: false,
+    createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  };
+  await assertSucceeds(setDoc(doc(user, 'users/new-user'), valid));
+  await assertFails(setDoc(doc(outsider, 'users/another-user'), {...valid, uid: 'another-user'}));
+  await assertFails(updateDoc(doc(user, 'users/new-user'), {uid: 'another-user'}));
+  await assertFails(updateDoc(doc(user, 'users/new-user'), {name: 'x'.repeat(81)}));
+  await assertFails(updateDoc(doc(user, 'users/new-user'), {relationship: 'Administrator'}));
+  await assertFails(updateDoc(doc(user, 'users/new-user'), {address: {city: 42}}));
+  await assertFails(updateDoc(doc(user, 'users/new-user'), {address: {line1: 'x'.repeat(201)}}));
+  await assertFails(updateDoc(doc(user, 'users/new-user'), {address: {countryIso: 'Pakistan'}}));
+  await assertSucceeds(updateDoc(doc(user, 'users/new-user'), {
+    address: {city: 'Lahore', countryIso: 'PK'}, updatedAt: serverTimestamp(),
+  }));
+});
+
+test('deletion dependency query returns only the caller membership scope', async () => {
+  const owner = testEnvironment.authenticatedContext('owner-1').firestore();
+  const outsider = testEnvironment.authenticatedContext('outsider').firestore();
+  const own = query(collection(owner, 'groups'), where('memberIds', 'array-contains', 'owner-1'),
+    where('status', '==', 'active'), limit(20));
+  const other = query(collection(outsider, 'groups'), where('memberIds', 'array-contains', 'owner-1'),
+    where('status', '==', 'active'), limit(20));
+  await assertSucceeds(getDocs(own));
+  await assertFails(getDocs(other));
 });
 
 test('only a Circle manager can rename a Circle', async () => {

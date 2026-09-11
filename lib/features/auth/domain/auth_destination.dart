@@ -19,7 +19,9 @@ class AuthDestinationResolver {
         AuthValidators.relationship(profile.relationship) != null) {
       return AuthDestination.profileSetup;
     }
-    if (!hasActiveCircle) return AuthDestination.circleSetup;
+    if (!hasActiveCircle && !profile.onboardingCompleted) {
+      return AuthDestination.circleSetup;
+    }
     return AuthDestination.home;
   }
 }

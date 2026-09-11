@@ -34,6 +34,7 @@ void main() {
     final invite = CircleInvite(
       id: 'invite-1',
       circleId: 'circle-1',
+      circleName: 'Khan Family',
       createdBy: 'owner-1',
       code: 'ABC123',
       role: CircleRole.adult,

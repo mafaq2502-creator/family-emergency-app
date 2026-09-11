@@ -6,9 +6,13 @@ import '../../../models/user_profile.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/group_service.dart';
 import '../../../services/profile_service.dart';
+import '../../../services/intro_preferences.dart';
+import '../domain/auth_error_mapper.dart';
+import '../domain/email_verification_policy.dart';
 import '../../shell/presentation/family_shell.dart';
 import '../domain/auth_destination.dart';
 import 'login_screen.dart';
+import 'email_verification_screen.dart';
 import 'onboarding/circle_onboarding_screen.dart';
 import 'onboarding/intro_flow.dart';
 import 'onboarding/profile_setup_screen.dart';
@@ -30,16 +34,22 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-  static bool _introSeenThisRun = false;
+  bool _introDismissed = false;
+  late Future<bool> _firstLaunch = IntroPreferences().claimFirstLaunch();
   late final AuthService _authService = widget.authService ?? AuthService();
   late final ProfileService _profileService =
       widget.profileService ?? ProfileService();
   late final GroupService _groupService = widget.groupService ?? GroupService();
   String? _resolvedUid;
   Future<_SessionResolution>? _resolution;
+  String? _verificationBypassUid;
 
   Future<_SessionResolution> _resolve(User user) async {
-    final profile = await _profileService.load(user);
+    await _authService.waitForProfilePreparation();
+    var profile = await _profileService.load(user);
+    if (!profile.exists && _authService.signupDraft?.uid == user.uid) {
+      profile = _authService.signupDraft!;
+    }
     final hasCircle = profile.profileCompleted
         ? await _groupService.hasAnyGroup(user)
         : false;
@@ -56,75 +66,127 @@ class _AuthGateState extends State<AuthGate> {
 
   void _refresh() {
     if (!mounted) return;
-    setState(() => _resolution = null);
+    setState(() {
+      _resolution = null;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: _authService.authStateChanges(),
-      builder: (context, authSnapshot) {
-        if (authSnapshot.connectionState == ConnectionState.waiting) {
-          return const StartupSplash(message: 'Checking your session…');
+    return FutureBuilder<bool>(
+      future: _firstLaunch,
+      builder: (context, introSnapshot) {
+        if (introSnapshot.connectionState != ConnectionState.done) {
+          return const StartupSplash();
         }
-        if (authSnapshot.hasError) {
-          return _StartupErrorScreen(onRetry: _refresh);
+        if (introSnapshot.hasError) {
+          return _StartupErrorScreen(
+            message: 'Could not load app preferences. Please retry.',
+            onRetry: () => setState(
+              () => _firstLaunch = IntroPreferences().claimFirstLaunch(),
+            ),
+          );
         }
-        final user = authSnapshot.data;
-        if (user == null) {
-          _resolvedUid = null;
-          _resolution = null;
-          if (!_introSeenThisRun) {
-            return IntroFlow(
-              onFinished: () => setState(() => _introSeenThisRun = true),
-            );
-          }
-          return LoginScreen(authService: _authService);
-        }
-
-        return FutureBuilder<_SessionResolution>(
-          future: _resolutionFor(user),
-          builder: (context, profileSnapshot) {
-            if (profileSnapshot.connectionState != ConnectionState.done) {
-              return const StartupSplash(message: 'Preparing your account…');
+        return StreamBuilder<User?>(
+          stream: _authService.authStateChanges(),
+          builder: (context, authSnapshot) {
+            if (authSnapshot.connectionState == ConnectionState.waiting) {
+              return const StartupSplash(message: 'Checking your session…');
             }
-            if (profileSnapshot.hasError || profileSnapshot.data == null) {
-              return _StartupErrorScreen(
-                message: 'We could not load your profile. Check your connection and retry.',
-                onRetry: _refresh,
-                onSignOut: _authService.signOut,
+            if (authSnapshot.hasError) {
+              return _StartupErrorScreen(onRetry: _refresh);
+            }
+            final user = _authService.currentUser ?? authSnapshot.data;
+            if (user == null) {
+              _resolvedUid = null;
+              _resolution = null;
+              _verificationBypassUid = null;
+              if (introSnapshot.data == true && !_introDismissed) {
+                return IntroFlow(
+                  onFinished: () => setState(() => _introDismissed = true),
+                );
+              }
+              return LoginScreen(authService: _authService);
+            }
+
+            if (EmailVerificationPolicy.shouldBlock(
+              hasEmail: user.email != null,
+              emailVerified: user.emailVerified == true,
+              bypassedForCurrentSession: _verificationBypassUid == user.uid,
+            )) {
+              _resolvedUid = null;
+              _resolution = null;
+              return EmailVerificationScreen(
+                key: ValueKey('verify-${user.uid}'),
+                email: user.email!,
+                verification: _authService,
+                allowTestingBypass:
+                    EmailVerificationPolicy.autoVerifyForTesting,
+                onContinue: (firebaseVerified) {
+                  if (!firebaseVerified) {
+                    _verificationBypassUid = user.uid;
+                  }
+                  _refresh();
+                },
               );
             }
 
-            final resolution = profileSnapshot.data!;
-            final destination = AuthDestinationResolver.resolve(
-              signedIn: true,
-              profile: resolution.profile,
-              hasActiveCircle: resolution.hasCircle,
+            return FutureBuilder<_SessionResolution>(
+              future: _resolutionFor(user),
+              builder: (context, profileSnapshot) {
+                if (profileSnapshot.connectionState != ConnectionState.done) {
+                  return const StartupSplash(
+                    message: 'Preparing your account…',
+                  );
+                }
+                if (profileSnapshot.hasError || profileSnapshot.data == null) {
+                  return _StartupErrorScreen(
+                    message: AuthErrorMapper.message(
+                      profileSnapshot.error ??
+                          StateError('Missing account data'),
+                      fallback:
+                          'We could not prepare your account. Please retry.',
+                    ),
+                    onRetry: _refresh,
+                    onSignOut: _authService.signOut,
+                  );
+                }
+
+                final resolution = profileSnapshot.data!;
+                final destination = AuthDestinationResolver.resolve(
+                  signedIn: true,
+                  profile: resolution.profile,
+                  hasActiveCircle: resolution.hasCircle,
+                );
+                switch (destination) {
+                  case AuthDestination.profileRecovery:
+                  case AuthDestination.profileSetup:
+                    return ProfileSetupScreen(
+                      user: user,
+                      existingProfile: resolution.profile,
+                      isRecovery:
+                          destination == AuthDestination.profileRecovery,
+                      profileService: _profileService,
+                      authService: _authService,
+                      onCompleted: _refresh,
+                    );
+                  case AuthDestination.circleSetup:
+                    return CircleOnboardingScreen(
+                      user: user,
+                      groupService: _groupService,
+                      pendingCircleId: resolution.profile.pendingJoinCircleId,
+                      profileName: resolution.profile.name,
+                      profilePhone: resolution.profile.phone,
+                      onSignOut: _authService.signOut,
+                      onCompleted: _refresh,
+                    );
+                  case AuthDestination.home:
+                    return HomeScreen(key: ValueKey(user.uid));
+                  case AuthDestination.login:
+                    return LoginScreen(authService: _authService);
+                }
+              },
             );
-            switch (destination) {
-              case AuthDestination.profileRecovery:
-              case AuthDestination.profileSetup:
-                return ProfileSetupScreen(
-                  user: user,
-                  existingProfile: resolution.profile,
-                  isRecovery: destination == AuthDestination.profileRecovery,
-                  profileService: _profileService,
-                  authService: _authService,
-                  onCompleted: _refresh,
-                );
-              case AuthDestination.circleSetup:
-                return CircleOnboardingScreen(
-                  user: user,
-                  groupService: _groupService,
-                  onSignOut: _authService.signOut,
-                  onCompleted: _refresh,
-                );
-              case AuthDestination.home:
-                return HomeScreen(key: ValueKey(user.uid));
-              case AuthDestination.login:
-                return LoginScreen(authService: _authService);
-            }
           },
         );
       },

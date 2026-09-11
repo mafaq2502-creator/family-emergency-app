@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_text_form_field.dart';
+import '../../../../core/widgets/light_ui.dart';
+import '../../../../models/circle_join_request.dart';
 import '../../../../services/circle_join_service.dart';
 import '../../../../services/group_service.dart';
+import '../../../groups/presentation/qr_scanner_screen.dart';
 import '../../domain/auth_error_mapper.dart';
 import '../../domain/auth_validators.dart';
 
@@ -17,12 +20,18 @@ class CircleOnboardingScreen extends StatefulWidget {
     required this.onSignOut,
     required this.onCompleted,
     this.joinService,
+    this.pendingCircleId,
+    this.profileName = '',
+    this.profilePhone = '',
   });
 
   final User user;
   final GroupService groupService;
   final Future<void> Function() onSignOut;
   final CircleJoinActions? joinService;
+  final String? pendingCircleId;
+  final String profileName;
+  final String profilePhone;
   final VoidCallback onCompleted;
 
   @override
@@ -40,10 +49,13 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
   bool _busy = false;
   late final TabController _tabController;
   final List<bool> _tabHasValidationError = [false, false];
+  String? _pendingCircleId;
+  String? _pendingCircleName;
 
   @override
   void initState() {
     super.initState();
+    _pendingCircleId = widget.pendingCircleId;
     _tabController = TabController(length: 2, vsync: this);
   }
 
@@ -98,8 +110,16 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
     }
     setState(() => _busy = true);
     try {
-      await _joinService.joinWithCode(_inviteCode.text);
-      if (mounted) widget.onCompleted();
+      final result = await _joinService.joinWithCode(_inviteCode.text);
+      if (!mounted) return;
+      if (result.status == JoinSubmissionStatus.existingMember) {
+        widget.onCompleted();
+      } else {
+        setState(() {
+          _pendingCircleId = result.circleId;
+          _pendingCircleName = result.circleName;
+        });
+      }
     } on FirebaseFunctionsException catch (error) {
       final message = switch (error.code) {
         'not-found' => 'This invitation code is not valid.',
@@ -167,6 +187,17 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
                 style: TextStyle(color: muted),
               ),
               const SizedBox(height: 22),
+              if (widget.profileName.isNotEmpty ||
+                  widget.profilePhone.isNotEmpty) ...[
+                Text(
+                  widget.profileName,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                if (widget.profilePhone.isNotEmpty)
+                  Text(widget.profilePhone, textAlign: TextAlign.center),
+                const SizedBox(height: 18),
+              ],
               Container(
                 height: 48,
                 decoration: BoxDecoration(
@@ -234,7 +265,6 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
 
   Widget _createPanel() => Form(
     key: _createForm,
-    autovalidateMode: AutovalidateMode.onUserInteraction,
     child: Column(
       children: [
         const SizedBox(height: 8),
@@ -255,24 +285,120 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
 
   Widget _joinPanel() => Form(
     key: _joinForm,
-    autovalidateMode: AutovalidateMode.onUserInteraction,
-    child: Column(
-      children: [
-        const SizedBox(height: 8),
-        AppTextFormField(
-          controller: _inviteCode,
-          label: 'Invitation Code',
-          placeholder: 'Enter your 6–12 character code',
-          prefixIcon: Icons.key_rounded,
-          enabled: !_busy,
-          validator: AuthValidators.inviteCode,
-          onFieldSubmitted: (_) => _join(),
-        ),
-        const SizedBox(height: 18),
-        _actionButton('Join Family Circle', _join),
-      ],
-    ),
+    child: _pendingCircleId != null
+        ? _pendingPanel()
+        : Column(
+            children: [
+              const SizedBox(height: 8),
+              AppTextFormField(
+                controller: _inviteCode,
+                label: 'Invitation Code',
+                placeholder: 'Enter your 6–12 character code',
+                prefixIcon: Icons.key_rounded,
+                enabled: !_busy,
+                validator: AuthValidators.inviteCode,
+                onFieldSubmitted: (_) => _join(),
+              ),
+              const SizedBox(height: 18),
+              _actionButton('Join Family Circle', _join),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: _busy ? null : _scanQr,
+                  icon: const Icon(Icons.qr_code_scanner_rounded),
+                  label: const Text('Scan QR Code'),
+                ),
+              ),
+            ],
+          ),
   );
+
+  Future<void> _scanQr() async {
+    final code = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+    );
+    if (code == null || !mounted) return;
+    _inviteCode.text = code;
+    await _join();
+  }
+
+  Widget _pendingPanel() {
+    final service = _joinService;
+    if (service is! CircleJoinService) {
+      return const LightStateView(
+        icon: Icons.hourglass_top_rounded,
+        title: 'Awaiting approval',
+        message: 'A Circle owner or parent must approve your join request.',
+      );
+    }
+    return StreamBuilder<CircleJoinRequest?>(
+      stream: service.watchMyRequest(_pendingCircleId!),
+      builder: (context, snapshot) {
+        final request = snapshot.data;
+        if (request?.status == JoinRequestStatus.approved) {
+          return LightStateView(
+            icon: Icons.verified_rounded,
+            title: 'Request approved',
+            message:
+                'You are now a member of ${_pendingCircleName ?? 'the Family Circle'}.',
+            actionLabel: 'Continue',
+            onAction: widget.onCompleted,
+          );
+        }
+        if (request?.status == JoinRequestStatus.rejected ||
+            request?.status == JoinRequestStatus.cancelled) {
+          return LightStateView(
+            icon: Icons.cancel_outlined,
+            title: 'Request closed',
+            message:
+                'No membership was created. You may use another invitation.',
+            actionLabel: 'Enter Another Code',
+            onAction: () async {
+              await service.clearPendingRequestReference();
+              if (mounted) {
+                setState(() {
+                  _pendingCircleId = null;
+                  _pendingCircleName = null;
+                  _inviteCode.clear();
+                });
+              }
+            },
+          );
+        }
+        return LightStateView(
+          icon: Icons.hourglass_top_rounded,
+          title: 'Awaiting approval',
+          message: 'A Circle owner or parent must approve your join request.',
+          actionLabel: request?.isPending == true && !_busy
+              ? 'Cancel Request'
+              : null,
+          onAction: request?.isPending == true && !_busy
+              ? () async {
+                  setState(() => _busy = true);
+                  try {
+                    await service.cancelRequest(request!);
+                    if (mounted) {
+                      setState(() {
+                        _pendingCircleId = null;
+                        _pendingCircleName = null;
+                      });
+                    }
+                  } catch (error) {
+                    _showError(
+                      'The request could not be cancelled. Please retry.',
+                    );
+                  } finally {
+                    if (mounted) setState(() => _busy = false);
+                  }
+                }
+              : null,
+        );
+      },
+    );
+  }
 
   Widget _actionButton(String label, VoidCallback action) => SizedBox(
     width: double.infinity,

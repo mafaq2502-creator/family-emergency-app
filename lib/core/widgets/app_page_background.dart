@@ -23,8 +23,8 @@ class AppPageBackground extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           Positioned(
-              top: -58,
-              right: -54,
+            top: -58,
+            right: -54,
             child: _SoftOrb(
               size: 160,
               color: !isDark && showTopDecoration
@@ -33,8 +33,8 @@ class AppPageBackground extends StatelessWidget {
             ),
           ),
           Positioned(
-              top: 70,
-              left: -60,
+            top: 70,
+            left: -60,
             child: _SoftOrb(
               size: 130,
               color: !isDark && showTopDecoration
@@ -45,9 +45,7 @@ class AppPageBackground extends StatelessWidget {
           Positioned.fill(
             child: IgnorePointer(
               child: CustomPaint(
-                painter: _HillPainter(
-                  visible: !isDark && showBottomDecoration,
-                ),
+                painter: _HillPainter(visible: !isDark && showBottomDecoration),
               ),
             ),
           ),

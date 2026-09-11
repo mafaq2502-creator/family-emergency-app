@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "groups",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "memberIds", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "progressDaily",
       "queryScope": "COLLECTION",
       "fields": [

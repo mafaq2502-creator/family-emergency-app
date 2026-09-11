@@ -20,9 +20,12 @@ import '../../../services/group_service.dart';
 import '../../../services/emergency_service.dart';
 import '../../../services/app_notification_service.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/device_heartbeat_controller.dart';
+import '../../devices/presentation/device_screens.dart';
 import '../../members/presentation/member_profile_screen.dart';
 import '../../groups/presentation/group_settings_screen.dart';
 import '../../groups/presentation/group_members_screen.dart';
+import '../../groups/presentation/join_circle_screen.dart';
 import '../../notifications/presentation/notification_settings_screen.dart';
 import '../../notifications/presentation/notification_banner.dart';
 import '../../profile/presentation/profile_settings_screen.dart';
@@ -80,8 +83,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String _initialProfileName = '';
   String? _initialProfileRole;
   String _profileEmail = '';
-  String _profilePhone = '';
-  String _profileCountry = '';
+  String? _profilePhotoUrl;
+  Map<String, String> _profileAddress = {};
+  String? _pendingJoinCircleId;
   bool _isProfileLoading = true;
   bool _isSavingProfile = false;
   bool _isProfileDirty = false;
@@ -95,6 +99,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final EmergencyService _emergencyService = EmergencyService();
   final AppNotificationService _appNotificationService =
       AppNotificationService();
+  final DeviceHeartbeatController _deviceHeartbeat =
+      DeviceHeartbeatController();
   List<FamilyGroup> _groups = const [];
   FamilyGroup? _selectedGroup;
   StreamSubscription<List<FamilyGroup>>? _groupsSubscription;
@@ -126,6 +132,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadProfile();
     _watchMembers();
     _prepareGroups();
+    unawaited(
+      _deviceHeartbeat.start(
+        onCurrentDeviceRevoked: () => AuthService().signOut(),
+      ),
+    );
   }
 
   Future<void> _prepareGroups() async {
@@ -189,6 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
           content: Form(
             key: formKey,
             child: TextFormField(
+              autovalidateMode: AutovalidateMode.onUnfocus,
               controller: controller,
               autofocus: true,
               maxLength: CircleNamePolicy.maxLength,
@@ -344,6 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     try {
+      await _profileService.syncCanonicalIdentity(user);
       final profile = await _profileService.load(user);
       if (!mounted) return;
       setState(() {
@@ -352,11 +365,9 @@ class _HomeScreenState extends State<HomeScreen> {
         _initialProfileRole = _profileRole;
         _profileNameController.text = _initialProfileName;
         _profileEmail = profile.email;
-        _profilePhone = profile.phone;
-        _profileCountry = [
-          profile.phoneCountryIso,
-          profile.phoneCountryCode,
-        ].whereType<String>().where((value) => value.isNotEmpty).join('  ');
+        _profilePhotoUrl = profile.photoUrl;
+        _profileAddress = profile.address;
+        _pendingJoinCircleId = profile.pendingJoinCircleId;
         _lastDailyCheckIn = profile.lastDailyCheckIn;
         _notificationSettings = profile.notificationSettings.toMap();
         _isProfileLoading = false;
@@ -416,6 +427,14 @@ class _HomeScreenState extends State<HomeScreen> {
     } finally {
       if (mounted) setState(() => _isSavingProfile = false);
     }
+  }
+
+  Future<bool> _saveAccountAddress(Map<String, String> address) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    await _profileService.saveAddress(user, address);
+    if (mounted) setState(() => _profileAddress = Map.of(address));
+    return true;
   }
 
   Future<bool> _saveAccountSettings(String name, String? relationship) async {
@@ -564,6 +583,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _membersSubscription?.cancel();
     _timer?.cancel();
     _groupRetryTimer?.cancel();
+    unawaited(_deviceHeartbeat.dispose());
     _profileNameController.dispose();
     super.dispose();
   }
@@ -1030,7 +1050,6 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 7),
             _profileRow(icon: Icons.mail_rounded, iconColor: const Color(0xFF778BA0), label: 'Email', value: _profileEmail.isEmpty ? 'Not available' : _profileEmail, isDark: isDark, locked: true),
             const SizedBox(height: 7),
-            _profileRow(icon: Icons.phone_rounded, iconColor: const Color(0xFF778BA0), label: 'Phone Number', value: _profilePhone.isEmpty ? 'Not available' : _profilePhone, isDark: isDark, locked: true),
             const SizedBox(height: 7),
             _profileRow(
               icon: Icons.favorite_rounded,

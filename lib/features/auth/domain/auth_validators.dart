@@ -1,4 +1,5 @@
 import '../../../core/domain/circle_policies.dart';
+import '../../../core/domain/invite_code_policy.dart';
 
 class AuthValidators {
   const AuthValidators._();
@@ -121,17 +122,7 @@ class AuthValidators {
   }
 
   static String normalizeInviteCode(String value) =>
-      value.trim().replaceAll(RegExp(r'[\s-]+'), '').toUpperCase();
+      InviteCodePolicy.normalize(value);
 
-  static String? inviteCode(String? value) {
-    final normalized = normalizeInviteCode(value ?? '');
-    if (normalized.isEmpty) return 'Please enter an invitation code.';
-    if (normalized.length < 6 || normalized.length > 12) {
-      return 'Invitation code must contain 6 to 12 characters.';
-    }
-    if (!RegExp(r'^[A-Z0-9]+$').hasMatch(normalized)) {
-      return 'Please enter a valid invitation code.';
-    }
-    return null;
-  }
+  static String? inviteCode(String? value) => InviteCodePolicy.validate(value);
 }

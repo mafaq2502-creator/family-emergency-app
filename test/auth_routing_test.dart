@@ -87,4 +87,24 @@ void main() {
       AuthDestination.home,
     );
   });
+
+  test(
+    'completed onboarding is not repeated after all Circles are removed',
+    () {
+      expect(
+        AuthDestinationResolver.resolve(
+          signedIn: true,
+          profile: profile({
+            'name': 'Afaq',
+            'email': 'user@example.com',
+            'relationship': 'Self',
+            'profileCompleted': true,
+            'onboardingCompleted': true,
+          }),
+          hasActiveCircle: false,
+        ),
+        AuthDestination.home,
+      );
+    },
+  );
 }

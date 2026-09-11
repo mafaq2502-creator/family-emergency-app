@@ -110,13 +110,51 @@ extension _MembersTab on _HomeScreenState {
             ),
           ),
           const SizedBox(height: 10),
-          Text(
-            'Secure registered-user invitations are handled through the existing invite-code flow. Manual compatibility records are no longer shown as active Circle memberships.',
-            style: TextStyle(fontSize: 10, color: mutedColor),
+          SizedBox(
+            height: 46,
+            child: ElevatedButton.icon(
+              onPressed: _joinAnotherCircle,
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+              label: const Text('Join another Circle'),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _joinAnotherCircle() async {
+    final circleId = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => JoinCircleScreen(pendingCircleId: _pendingJoinCircleId),
+      ),
+    );
+    if (!mounted) return;
+    await _loadProfile();
+    if (!mounted || circleId == null) return;
+
+    final cached = _groups.where((group) => group.id == circleId).firstOrNull;
+    if (cached != null) {
+      _openGroupHome(cached);
+      return;
+    }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final group = await _groupService
+          .watchGroupForUser(circleId, user.uid)
+          .firstWhere((value) => value != null)
+          .timeout(const Duration(seconds: 5));
+      if (mounted && group != null) _openGroupHome(group);
+    } on TimeoutException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Membership approved. Your Circle is syncing now.'),
+        ),
+      );
+    }
   }
 
   Widget _circleScopeButton(String label, bool owned, bool isDark) {

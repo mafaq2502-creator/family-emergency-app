@@ -1,3 +1,5 @@
+import '../../../core/widgets/country_name_field.dart';
+
 import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -94,13 +96,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
-  Future<void> _socialSignUp({required bool apple}) async {
+  Future<void> _googleSignUp() async {
     if (_loading) return;
     setState(() => _loading = true);
     try {
-      await (apple
-          ? _authService.signInWithApple()
-          : _authService.signInWithGoogle());
+      await _authService.signInWithGoogle();
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (error) {
       if (mounted && !AuthErrorMapper.isCancellation(error)) {
@@ -109,8 +109,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             content: Text(
               AuthErrorMapper.message(
                 error,
-                fallback:
-                    '${apple ? 'Apple' : 'Google'} sign-up could not be completed.',
+                fallback: 'Google sign-up could not be completed.',
               ),
             ),
             backgroundColor: kEmergency,
@@ -145,7 +144,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 18),
               child: Form(
                 key: _formKey,
-                autovalidateMode: AutovalidateMode.onUserInteraction,
                 child: Column(
                   children: [
                     const SizedBox(height: 37),
@@ -170,7 +168,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       Icons.person_outline_rounded,
                       validator: AuthValidators.name,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 18),
                     _field(
                       _email,
                       'Email',
@@ -178,10 +176,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       type: TextInputType.emailAddress,
                       validator: AuthValidators.email,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 18),
+                    CountryNameField(
+                      countryIso: _selectedCountry.countryCode,
+                      enabled: !_loading,
+                      onChanged: (country) =>
+                          setState(() => _selectedCountry = country),
+                    ),
+                    const SizedBox(height: 18),
                     _phoneField(),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 18),
                     DropdownButtonFormField<String>(
+                      autovalidateMode: AutovalidateMode.onUnfocus,
                       initialValue: _relationship,
                       isExpanded: true,
                       decoration: const InputDecoration(
@@ -202,7 +208,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           : (value) => setState(() => _relationship = value),
                       validator: AuthValidators.relationship,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 18),
                     _field(
                       _password,
                       'Password',
@@ -214,7 +220,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         () => setState(() => _hidePassword = !_hidePassword),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 18),
                     _field(
                       _confirmPassword,
                       'Confirm Password',
@@ -304,7 +310,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 18),
                     Row(
                       children: [
                         const Expanded(child: Divider()),
@@ -312,20 +318,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Text(
                             'OR',
-                            style: TextStyle(fontSize: 12, color: context.appMuted),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.appMuted,
+                            ),
                           ),
                         ),
                         const Expanded(child: Divider()),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 18),
                     SizedBox(
                       width: double.infinity,
                       height: 45,
                       child: OutlinedButton.icon(
-                        onPressed: _loading
-                            ? null
-                            : () => _socialSignUp(apple: false),
+                        onPressed: _loading ? null : _googleSignUp,
                         icon: const Text(
                           'G',
                           style: TextStyle(
@@ -335,23 +342,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           ),
                         ),
                         label: const Text('Sign up with Google'),
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 45,
-                      child: OutlinedButton.icon(
-                        onPressed: _loading
-                            ? null
-                            : () => _socialSignUp(apple: true),
-                        icon: const Icon(Icons.apple_rounded),
-                        label: const Text('Sign up with Apple'),
                         style: OutlinedButton.styleFrom(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -430,6 +420,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? kDarkMuted : kLightMuted;
     return TextFormField(
+      autovalidateMode: AutovalidateMode.onUnfocus,
       controller: _phone,
       enabled: !_loading,
       keyboardType: TextInputType.phone,
@@ -444,47 +435,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         hintText: 'Enter your phone number',
         floatingLabelBehavior: FloatingLabelBehavior.auto,
         hintStyle: TextStyle(color: muted, fontSize: 12),
-        prefixIconConstraints: const BoxConstraints(minWidth: 102),
-        prefixIcon: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: _loading
-              ? null
-              : () => showCountryPicker(
-                  context: context,
-                  showPhoneCode: true,
-                  favorite: const ['PK', 'AE', 'SA', 'GB', 'US'],
-                  countryListTheme: CountryListThemeData(
-                    backgroundColor: isDark ? kDarkCard : Colors.white,
-                    textStyle: TextStyle(
-                      color: isDark ? Colors.white : kLightNavy,
-                    ),
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
-                  onSelect: (country) =>
-                      setState(() => _selectedCountry = country),
-                ),
-          child: Padding(
-            padding: const EdgeInsets.only(left: 12, right: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_selectedCountry.flagEmoji),
-                const SizedBox(width: 4),
-                Text(
-                  '+${_selectedCountry.phoneCode}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: muted,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const Icon(Icons.keyboard_arrow_down_rounded, size: 16),
-              ],
-            ),
-          ),
-        ),
+        prefixText: '+${_selectedCountry.phoneCode} ',
         filled: true,
         fillColor: isDark ? kDarkCard : Colors.white,
         contentPadding: const EdgeInsets.symmetric(vertical: 13),

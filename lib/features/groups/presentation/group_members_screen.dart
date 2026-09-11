@@ -7,9 +7,11 @@ import '../../../core/widgets/light_ui.dart';
 import '../../../models/circle_membership.dart';
 import '../../../models/family_group.dart';
 import '../../../services/group_service.dart';
+import '../../../services/device_service.dart';
 import '../../members/presentation/circle_member_detail_screen.dart';
 import 'emergency_events_screen.dart';
 import 'group_settings_screen.dart';
+import 'join_requests_screen.dart';
 import 'share_circle_screen.dart';
 
 class GroupMembersScreen extends StatefulWidget {
@@ -18,10 +20,12 @@ class GroupMembersScreen extends StatefulWidget {
     required this.group,
     this.groupService,
     this.viewerId,
+    this.deviceService,
   });
   final FamilyGroup group;
   final GroupService? groupService;
   final String? viewerId;
+  final DeviceActions? deviceService;
 
   @override
   State<GroupMembersScreen> createState() => _GroupMembersScreenState();
@@ -198,6 +202,23 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                           ),
                         ],
                       ),
+                      if (group.canManage) ...[
+                        const SizedBox(height: 9),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    JoinRequestsScreen(group: group),
+                              ),
+                            ),
+                            icon: const Icon(Icons.how_to_reg_rounded),
+                            label: const Text('Review Join Requests'),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -233,6 +254,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                             initialMember: member,
                             viewerId: viewerId,
                             groupService: _service,
+                            deviceService: widget.deviceService,
                           ),
                         ),
                       ),

@@ -51,22 +51,17 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _socialLogin(bool apple) async {
+  Future<void> _googleLogin() async {
     if (_loading) return;
     setState(() => _loading = true);
     try {
-      if (apple) {
-        await _authService.signInWithApple();
-      } else {
-        await _authService.signInWithGoogle();
-      }
+      await _authService.signInWithGoogle();
     } catch (error) {
       if (!AuthErrorMapper.isCancellation(error)) {
-        final provider = apple ? 'Apple' : 'Google';
         _showError(
           AuthErrorMapper.message(
             error,
-            fallback: '$provider sign-in could not be completed.',
+            fallback: 'Google sign-in could not be completed.',
           ),
         );
       }
@@ -97,7 +92,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 constraints: const BoxConstraints(maxWidth: 430),
                 child: Form(
                   key: _formKey,
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
                   child: Column(
                     children: [
                       const AppBrandMark(size: 70),
@@ -127,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         enabled: !_loading,
                         validator: AuthValidators.email,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 18),
                       AppTextFormField(
                         controller: _password,
                         label: 'Password',
@@ -199,7 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         isLoading: _loading,
                         onPressed: _loading ? null : _login,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 18),
                       Row(
                         children: [
                           const Expanded(child: Divider()),
@@ -210,7 +204,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const Expanded(child: Divider()),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 18),
                       _providerButton(
                         label: 'Continue with Google',
                         icon: const Text(
@@ -221,15 +215,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        onPressed: () => _socialLogin(false),
+                        onPressed: _googleLogin,
                       ),
-                      const SizedBox(height: 8),
-                      _providerButton(
-                        label: 'Continue with Apple',
-                        icon: const Icon(Icons.apple_rounded),
-                        onPressed: () => _socialLogin(true),
-                      ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 18),
                       Wrap(
                         alignment: WrapAlignment.center,
                         crossAxisAlignment: WrapCrossAlignment.center,

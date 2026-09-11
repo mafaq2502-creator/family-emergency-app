@@ -55,6 +55,8 @@ class AuthErrorMapper {
           return 'An account already exists with this email using another sign-in method.';
         case 'requires-recent-login':
           return 'For security, please sign in again and retry.';
+        case 'no-current-user':
+          return 'Your session has expired. Please sign in again.';
       }
     }
     if (error is FirebaseException) {

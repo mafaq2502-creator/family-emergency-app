@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/light_ui.dart';
+import '../../../core/widgets/country_name_field.dart';
+import '../../auth/domain/auth_validators.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
   const AccountSettingsScreen({
     super.key,
     required this.initialName,
     required this.email,
-    required this.phone,
-    required this.country,
+    this.initialAddress = const {},
+    required this.onSaveAddress,
     required this.relationship,
     required this.relationships,
     required this.onSave,
@@ -18,8 +21,8 @@ class AccountSettingsScreen extends StatefulWidget {
 
   final String initialName;
   final String email;
-  final String phone;
-  final String country;
+  final Map<String, String> initialAddress;
+  final Future<bool> Function(Map<String, String> address) onSaveAddress;
   final String? relationship;
   final List<String> relationships;
   final Future<bool> Function(String name, String? relationship) onSave;
@@ -37,9 +40,27 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   late String? _savedRelationship;
   bool _saving = false;
   String? _saveError;
+  static const _addressLabels = {
+    'line1': 'Street Address',
+    'line2': 'Apartment / Address Line 2',
+    'city': 'City',
+    'region': 'State / Province',
+    'postalCode': 'Postal Code',
+  };
+  late final Map<String, TextEditingController> _address;
+  late Map<String, String> _savedAddress;
+  String? _countryIso;
+  int _tab = 0;
+
+  Map<String, String> get _currentAddress => {
+    for (final entry in _address.entries) entry.key: entry.value.text.trim(),
+    'countryIso': _countryIso ?? '',
+  };
 
   bool get _dirty =>
-      _name.text.trim() != _savedName || _relationship != _savedRelationship;
+      _name.text.trim() != _savedName ||
+      _relationship != _savedRelationship ||
+      !mapEquals(_currentAddress, _savedAddress);
 
   @override
   void initState() {
@@ -49,6 +70,13 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     _relationship = widget.relationship;
     _savedName = widget.initialName.trim();
     _savedRelationship = widget.relationship;
+    _address = {
+      for (final key in _addressLabels.keys)
+        key: TextEditingController(text: widget.initialAddress[key] ?? '')
+          ..addListener(_refresh),
+    };
+    _countryIso = widget.initialAddress['countryIso'];
+    _savedAddress = _currentAddress;
   }
 
   void _refresh() {
@@ -59,6 +87,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   void dispose() {
     _name.removeListener(_refresh);
     _name.dispose();
+    for (final controller in _address.values) {
+      controller.removeListener(_refresh);
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -102,7 +134,25 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       _saving = true;
       _saveError = null;
     });
-    final saved = await widget.onSave(_name.text.trim(), _relationship);
+    bool saved = false;
+    try {
+      final personalDirty =
+          _name.text.trim() != _savedName ||
+          _relationship != _savedRelationship;
+      saved =
+          !personalDirty ||
+          await widget.onSave(_name.text.trim(), _relationship);
+      if (saved) {
+        _savedName = _name.text.trim();
+        _savedRelationship = _relationship;
+        if (!mapEquals(_currentAddress, _savedAddress)) {
+          saved = await widget.onSaveAddress(_currentAddress);
+          if (saved) _savedAddress = _currentAddress;
+        }
+      }
+    } catch (_) {
+      saved = false;
+    }
     if (!mounted) return saved;
     setState(() {
       _saving = false;
@@ -121,100 +171,174 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   Widget build(BuildContext context) => PopScope<Object?>(
     canPop: !_dirty,
     onPopInvokedWithResult: (didPop, _) async {
-      if (didPop) return;
+      if (didPop || _saving) return;
       if (await _confirmExit() && context.mounted) Navigator.pop(context);
     },
     child: LightPage(
       title: 'Account Settings',
       subtitle: 'Keep your personal details up to date',
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const LightSectionTitle('Personal information'),
-            TextFormField(
-              controller: _name,
-              textInputAction: TextInputAction.done,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              validator: (value) => value == null || value.trim().length < 2
-                  ? 'Enter your full name'
-                  : null,
-              decoration: const InputDecoration(
-                labelText: 'Full Name',
-                hintText: 'Enter your full name',
-                prefixIcon: Icon(Icons.person_outline_rounded),
-              ),
-            ),
-            const SizedBox(height: 11),
-            _lockedField('Email', widget.email, Icons.mail_outline_rounded),
-            const SizedBox(height: 11),
-            _lockedField('Phone Number', widget.phone, Icons.phone_outlined),
-            const SizedBox(height: 11),
-            _lockedField('Country', widget.country, Icons.flag_outlined),
-            const SizedBox(height: 11),
-            DropdownButtonFormField<String>(
-              initialValue: _relationship,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Relationship',
-                hintText: 'Select your relationship',
-                prefixIcon: Icon(Icons.favorite_outline_rounded),
-              ),
-              items: widget.relationships
-                  .map(
-                    (value) => DropdownMenuItem(
-                      value: value,
-                      child: Text(value, overflow: TextOverflow.ellipsis),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() {
-                _relationship = value;
-                _saveError = null;
-              }),
-              validator: (value) =>
-                  value == null ? 'Select a relationship' : null,
-            ),
-            const SizedBox(height: 12),
-            LightSettingRow(
-              icon: Icons.lock_reset_rounded,
-              title: 'Update Password',
-              subtitle: 'Open password security settings',
-              onTap: widget.onUpdatePassword,
-            ),
-            if (_saveError != null) ...[
-              const SizedBox(height: 12),
-              Text(_saveError!, style: const TextStyle(color: kEmergency)),
-            ],
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: _dirty && !_saving ? _save : null,
-                icon: _saving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
+      child: AbsorbPointer(
+        absorbing: _saving,
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => setState(() => _tab = 0),
+                      child: Text(
+                        'Personal',
+                        style: TextStyle(
+                          fontWeight: _tab == 0
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
-                      )
-                    : const Icon(Icons.save_rounded),
-                label: Text(_saving ? 'Saving…' : 'Save Changes'),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => setState(() => _tab = 1),
+                      child: Text(
+                        'Address',
+                        style: TextStyle(
+                          fontWeight: _tab == 1
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: Text(
-                'Email, phone and country come from your verified account.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: context.appMuted, fontSize: 10),
+              const SizedBox(height: 18),
+              Offstage(
+                offstage: _tab != 0,
+                child: Column(
+                  children: [
+                    const LightSectionTitle('Personal information'),
+                    TextFormField(
+                      autovalidateMode: AutovalidateMode.onUnfocus,
+                      controller: _name,
+                      textInputAction: TextInputAction.done,
+                      maxLength: 80,
+                      validator: AuthValidators.name,
+                      decoration: const InputDecoration(
+                        labelText: 'Full Name',
+                        hintText: 'Enter your full name',
+                        prefixIcon: Icon(Icons.person_outline_rounded),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _lockedField(
+                      'Email',
+                      widget.email,
+                      Icons.mail_outline_rounded,
+                    ),
+                    const SizedBox(height: 18),
+                    DropdownButtonFormField<String>(
+                      autovalidateMode: AutovalidateMode.onUnfocus,
+                      initialValue: _relationship,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Relationship',
+                        hintText: 'Select your relationship',
+                        prefixIcon: Icon(Icons.favorite_outline_rounded),
+                      ),
+                      items: widget.relationships
+                          .map(
+                            (value) => DropdownMenuItem(
+                              value: value,
+                              child: Text(
+                                value,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) => setState(() {
+                        _relationship = value;
+                        _saveError = null;
+                      }),
+                      validator: AuthValidators.relationship,
+                    ),
+                    const SizedBox(height: 18),
+                    LightSettingRow(
+                      icon: Icons.security_rounded,
+                      title: 'Security Settings',
+                      subtitle: 'Password, email verification and session',
+                      onTap: widget.onUpdatePassword,
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              Offstage(
+                offstage: _tab != 1,
+                child: Column(
+                  children: [
+                    const LightSectionTitle('Address'),
+                    const Text('Add your address details (optional).'),
+                    const SizedBox(height: 18),
+                    for (final entry in _addressLabels.entries) ...[
+                      TextFormField(
+                        autovalidateMode: AutovalidateMode.onUnfocus,
+                        controller: _address[entry.key],
+                        textCapitalization: TextCapitalization.words,
+                        keyboardType: TextInputType.streetAddress,
+                        maxLength: 200,
+                        decoration: InputDecoration(
+                          labelText: entry.value,
+                          counterText: '',
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+                    CountryNameField(
+                      countryIso: _countryIso,
+                      onChanged: (country) => setState(() {
+                        _countryIso = country.countryCode;
+                        _saveError = null;
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+              if (_saveError != null) ...[
+                const SizedBox(height: 18),
+                Text(_saveError!, style: const TextStyle(color: kEmergency)),
+              ],
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _dirty && !_saving ? _save : null,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.save_rounded),
+                  label: Text(_saving ? 'Saving…' : 'Save Changes'),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Center(
+                child: Text(
+                  'Your email is linked to your account.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: context.appMuted, fontSize: 10),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     ),
@@ -222,6 +346,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
   Widget _lockedField(String label, String value, IconData icon) =>
       TextFormField(
+        autovalidateMode: AutovalidateMode.onUnfocus,
         initialValue: value.isEmpty ? 'Not available' : value,
         readOnly: true,
         decoration: InputDecoration(

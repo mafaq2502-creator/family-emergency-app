@@ -2,119 +2,249 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/app_surface_card.dart';
 import '../../../core/widgets/app_primary_button.dart';
+import '../../../core/widgets/app_surface_card.dart';
+import '../../../features/auth/domain/auth_error_mapper.dart';
+import '../../../features/auth/domain/auth_validators.dart';
+import '../../../services/account_security_service.dart';
 
-const _emerald = kEmerald;
-const _navy = kLightNavy;
-const _danger = kEmergency;
-const _darkBackground = kDarkBackground;
-const _darkCard = kDarkCard;
-const _darkMuted = kDarkMuted;
+class ProfileSettingsScreen extends StatefulWidget {
+  const ProfileSettingsScreen({super.key, this.securityService});
+  final AccountSecurityActions? securityService;
 
-class ProfileSettingsScreen extends StatelessWidget {
-  const ProfileSettingsScreen({super.key});
+  @override
+  State<ProfileSettingsScreen> createState() => _ProfileSettingsScreenState();
+}
+
+class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
+  late final AccountSecurityActions _security =
+      widget.securityService ?? AccountSecurityService();
+  late Future<SecurityOverview> _overview = _security.loadOverview();
+
+  void _reload() => setState(() => _overview = _security.loadOverview());
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Security')),
+    body: FutureBuilder<SecurityOverview>(
+      future: _overview,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError || snapshot.data == null) {
+          return _SecurityError(
+            message: AuthErrorMapper.message(
+              snapshot.error ?? StateError('Missing security state'),
+              fallback: 'We could not load your security settings.',
+            ),
+            onRetry: _reload,
+          );
+        }
+        return _SecurityContent(
+          overview: snapshot.data!,
+          security: _security,
+          onRefresh: _reload,
+        );
+      },
+    ),
+  );
+}
+
+class _SecurityContent extends StatefulWidget {
+  const _SecurityContent({
+    required this.overview,
+    required this.security,
+    required this.onRefresh,
+  });
+  final SecurityOverview overview;
+  final AccountSecurityActions security;
+  final VoidCallback onRefresh;
+
+  @override
+  State<_SecurityContent> createState() => _SecurityContentState();
+}
+
+class _SecurityContentState extends State<_SecurityContent> {
+  bool _sendingVerification = false;
+
+  void _notice(String text, {bool success = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        backgroundColor: success ? kEmerald : kEmergency,
+      ),
+    );
+  }
+
+  Future<void> _sendVerification() async {
+    if (_sendingVerification) return;
+    setState(() => _sendingVerification = true);
+    try {
+      await widget.security.sendEmailVerification();
+      if (mounted) _notice('Verification email sent.', success: true);
+    } catch (error) {
+      if (mounted) _notice(AuthErrorMapper.message(error));
+    } finally {
+      if (mounted) setState(() => _sendingVerification = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : _navy;
-    final muted = isDark ? _darkMuted : kLightMuted;
-    return Scaffold(
-      backgroundColor: isDark ? _darkBackground : kLightBackground,
-      appBar: AppBar(
-        backgroundColor: isDark ? _darkBackground : kLightBackground,
-        foregroundColor: titleColor,
-        elevation: 0,
-        title: const Text(
-          'Profile Settings',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+    final overview = widget.overview;
+    return RefreshIndicator(
+      onRefresh: () async => widget.onRefresh(),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         children: [
-          Text(
-            'Account security',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: titleColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          _settingsCard(isDark, [
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Color(0x1A10B981),
-                child: Icon(Icons.lock_reset_rounded, color: _emerald),
-              ),
-              title: const Text(
-                'Update Password',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-              ),
-              subtitle: const Text(
-                'Use a new password to protect your account.',
-                style: TextStyle(fontSize: 11),
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const UpdatePasswordScreen()),
-              ),
-            ),
-          ]),
-          const SizedBox(height: 20),
-          const Text(
-            'Danger zone',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: _danger,
-            ),
-          ),
-          const SizedBox(height: 8),
-          _settingsCard(isDark, [
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Color(0x1AEF4444),
-                child: Icon(Icons.delete_forever_rounded, color: _danger),
-              ),
-              title: const Text(
-                'Delete Account',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: _danger,
+          const _SectionTitle('Account protection'),
+          const SizedBox(height: 12),
+          AppSurfaceCard(
+            child: Column(
+              children: [
+                _SecurityRow(
+                  icon: overview.emailVerified
+                      ? Icons.verified_user_rounded
+                      : Icons.mark_email_unread_rounded,
+                  title: 'Email verification',
+                  subtitle: overview.emailVerified
+                      ? '${overview.email}\nVerified'
+                      : '${overview.email}\nVerification required',
+                  trailing: overview.emailVerified
+                      ? const Icon(Icons.check_circle_rounded, color: kEmerald)
+                      : TextButton(
+                          onPressed: _sendingVerification
+                              ? null
+                              : _sendVerification,
+                          child: Text(
+                            _sendingVerification ? 'Sending…' : 'Send',
+                          ),
+                        ),
                 ),
-              ),
-              subtitle: const Text(
-                'Verify your email before account deletion.',
-                style: TextStyle(fontSize: 11),
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded, color: _danger),
-              onTap: () => showDialog(
-                context: context,
-                builder: (_) => const _DeleteAccountFlow(),
-              ),
+                if (overview.supportsPassword) ...[
+                  const Divider(height: 1),
+                  _SecurityRow(
+                    icon: Icons.lock_reset_rounded,
+                    title: 'Change password',
+                    subtitle: 'Verify your current password first',
+                    onTap: () async {
+                      final changed = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => UpdatePasswordScreen(
+                            securityService: widget.security,
+                          ),
+                        ),
+                      );
+                      if (changed == true && context.mounted) {
+                        _notice('Password updated securely.', success: true);
+                      }
+                    },
+                  ),
+                  const Divider(height: 1),
+                  _SecurityRow(
+                    icon: Icons.alternate_email_rounded,
+                    title: 'Change email',
+                    subtitle: 'The new address must be verified',
+                    onTap: () async {
+                      final requested = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChangeEmailScreen(
+                            securityService: widget.security,
+                            currentEmail: overview.email,
+                          ),
+                        ),
+                      );
+                      if (requested == true && context.mounted) {
+                        widget.onRefresh();
+                      }
+                    },
+                  ),
+                ],
+              ],
             ),
-          ]),
-          const SizedBox(height: 18),
-          Text(
-            'Demo flow only: password update, email delivery, password history, and account deletion will be connected to Firebase/backend later.',
-            style: TextStyle(fontSize: 11, height: 1.4, color: muted),
+          ),
+          if (!overview.supportsPassword) ...[
+            const SizedBox(height: 10),
+            const Text(
+              'Password changes are managed by your sign-in provider.',
+              style: TextStyle(fontSize: 12, color: kLightMuted),
+            ),
+          ],
+          const SizedBox(height: 24),
+          const _SectionTitle('Current session'),
+          const SizedBox(height: 12),
+          AppSurfaceCard(
+            child: _SecurityRow(
+              icon: Icons.smartphone_rounded,
+              title: 'This device',
+              subtitle:
+                  'Signed in ${_date(overview.lastSignInAt)}\nProviders: ${_providers(overview.providerIds)}',
+              trailing: const Chip(label: Text('Current')),
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Firebase does not provide this app with a list of other active sessions. Selective device logout is unavailable.',
+            style: TextStyle(fontSize: 12, height: 1.4, color: kLightMuted),
+          ),
+          const SizedBox(height: 24),
+          const _SectionTitle('Account'),
+          const SizedBox(height: 12),
+          AppSurfaceCard(
+            child: Column(
+              children: [
+                _SecurityRow(
+                  icon: Icons.calendar_month_rounded,
+                  title: 'Account created',
+                  subtitle: _date(overview.createdAt),
+                ),
+                const Divider(height: 1),
+                _SecurityRow(
+                  icon: Icons.delete_outline_rounded,
+                  iconColor: kEmergency,
+                  title: 'Delete account',
+                  subtitle: 'Review dependencies and availability',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AccountDeletionPreparationScreen(
+                        securityService: widget.security,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _settingsCard(bool isDark, List<Widget> children) =>
-      AppSurfaceCard(child: Column(children: children));
+  static String _date(DateTime? value) {
+    if (value == null) return 'Unavailable';
+    final local = value.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+  }
+
+  static String _providers(List<String> values) => values
+      .map(
+        (value) => switch (value) {
+          'password' => 'Email',
+          'google.com' => 'Google',
+          'apple.com' => 'Apple',
+          _ => value,
+        },
+      )
+      .join(', ');
 }
 
 class UpdatePasswordScreen extends StatefulWidget {
-  const UpdatePasswordScreen({super.key});
+  const UpdatePasswordScreen({super.key, this.securityService});
+  final AccountSecurityActions? securityService;
 
   @override
   State<UpdatePasswordScreen> createState() => _UpdatePasswordScreenState();
@@ -125,9 +255,11 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
   final _current = TextEditingController();
   final _newPassword = TextEditingController();
   final _confirm = TextEditingController();
-  bool _hideCurrent = true;
-  bool _hideNew = true;
-  bool _hideConfirm = true;
+  late final AccountSecurityActions _security =
+      widget.securityService ?? AccountSecurityService();
+  final _hidden = <bool>[true, true, true];
+  bool _busy = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -137,314 +269,422 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
     super.dispose();
   }
 
-  void _continueDemo() {
-    if (!_formKey.currentState!.validate()) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Password update flow verified. Firebase update will be connected later.',
-        ),
-        backgroundColor: _emerald,
-      ),
-    );
+  Future<void> _save() async {
+    if (_busy || !_formKey.currentState!.validate()) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await _security.changePassword(
+        currentPassword: _current.text,
+        newPassword: _newPassword.text,
+      );
+      _clearPasswords();
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      _clearPasswords(keepNew: true);
+      if (mounted) setState(() => _error = _friendlyError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _clearPasswords({bool keepNew = false}) {
+    _current.clear();
+    if (!keepNew) {
+      _newPassword.clear();
+      _confirm.clear();
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : _navy;
-    final muted = isDark ? _darkMuted : kLightMuted;
-    return Scaffold(
-      backgroundColor: isDark ? _darkBackground : kLightBackground,
-      appBar: AppBar(
-        backgroundColor: isDark ? _darkBackground : kLightBackground,
-        foregroundColor: titleColor,
-        elevation: 0,
-        title: const Text(
-          'Update Password',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-        ),
-      ),
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              Text(
-                'Create a strong new password',
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  color: titleColor,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Your new password must be different from the current password and contain at least 8 characters.',
-                style: TextStyle(fontSize: 12, height: 1.35, color: muted),
-              ),
-              const SizedBox(height: 24),
-              _passwordField(
-                'Current Password',
-                _current,
-                _hideCurrent,
-                () => setState(() => _hideCurrent = !_hideCurrent),
-                null,
-              ),
-              const SizedBox(height: 12),
-              _passwordField(
-                'New Password',
-                _newPassword,
-                _hideNew,
-                () => setState(() => _hideNew = !_hideNew),
-                (value) {
-                  if (value == null || value.length < 8) {
-                    return 'Use at least 8 characters';
-                  }
-                  if (value == _current.text) {
-                    return 'New password must be different';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              _passwordField(
-                'Confirm New Password',
-                _confirm,
-                _hideConfirm,
-                () => setState(() => _hideConfirm = !_hideConfirm),
-                (value) => value != _newPassword.text
-                    ? 'Passwords do not match'
-                    : null,
-              ),
-              const SizedBox(height: 24),
-              AppPrimaryButton(
-                label: 'Update Password',
-                onPressed: _continueDemo,
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Password history enforcement will be added when the secure backend is connected.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, color: muted),
-              ),
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Change Password')),
+    body: SafeArea(
+      child: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            const Text(
+              'Verify your current password before choosing a new one.',
+              style: TextStyle(height: 1.4),
+            ),
+            const SizedBox(height: 24),
+            _passwordField(
+              'Current Password',
+              _current,
+              0,
+              (value) => value == null || value.isEmpty
+                  ? 'Enter your current password'
+                  : null,
+            ),
+            const SizedBox(height: 18),
+            _passwordField('New Password', _newPassword, 1, (value) {
+              final validation = AuthValidators.password(value);
+              if (validation != null) return validation;
+              return value == _current.text
+                  ? 'New password must be different'
+                  : null;
+            }),
+            const SizedBox(height: 18),
+            _passwordField(
+              'Confirm New Password',
+              _confirm,
+              2,
+              (value) =>
+                  AuthValidators.confirmPassword(value, _newPassword.text),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 16),
+              Text(_error!, style: const TextStyle(color: kEmergency)),
             ],
-          ),
+            const SizedBox(height: 24),
+            AppPrimaryButton(
+              label: _busy ? 'Updating…' : 'Update Password',
+              onPressed: _busy ? null : _save,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Your current Firebase session remains signed in after a successful password update.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: kLightMuted),
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
 
   Widget _passwordField(
     String label,
     TextEditingController controller,
-    bool hidden,
-    VoidCallback toggle,
-    String? Function(String?)? validator,
-  ) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final muted = isDark ? _darkMuted : kLightMuted;
-    return TextFormField(
-      controller: controller,
-      obscureText: hidden,
-      validator:
-          validator ??
-          (value) => value == null || value.isEmpty
-              ? 'Enter your current password'
-              : null,
-      style: TextStyle(color: isDark ? Colors.white : _navy),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: muted),
-        prefixIcon: Icon(Icons.lock_outline_rounded, color: muted),
-        suffixIcon: IconButton(
-          onPressed: toggle,
-          icon: Icon(
-            hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-            color: muted,
-          ),
-        ),
-        filled: true,
-        fillColor: isDark ? _darkCard : Colors.white,
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: isDark ? const Color(0xFF233846) : const Color(0xFFE7EDF0),
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: _emerald),
+    int index,
+    String? Function(String?) validator,
+  ) => TextFormField(
+    controller: controller,
+    obscureText: _hidden[index],
+    enabled: !_busy,
+    autocorrect: false,
+    enableSuggestions: false,
+    autovalidateMode: AutovalidateMode.onUnfocus,
+    validator: validator,
+    decoration: InputDecoration(
+      labelText: label,
+      prefixIcon: const Icon(Icons.lock_outline_rounded),
+      suffixIcon: IconButton(
+        onPressed: _busy
+            ? null
+            : () => setState(() => _hidden[index] = !_hidden[index]),
+        icon: Icon(
+          _hidden[index]
+              ? Icons.visibility_outlined
+              : Icons.visibility_off_outlined,
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
-class _DeleteAccountFlow extends StatefulWidget {
-  const _DeleteAccountFlow();
+class ChangeEmailScreen extends StatefulWidget {
+  const ChangeEmailScreen({
+    super.key,
+    required this.securityService,
+    required this.currentEmail,
+  });
+  final AccountSecurityActions securityService;
+  final String currentEmail;
 
   @override
-  State<_DeleteAccountFlow> createState() => _DeleteAccountFlowState();
+  State<ChangeEmailScreen> createState() => _ChangeEmailScreenState();
 }
 
-class _DeleteAccountFlowState extends State<_DeleteAccountFlow> {
-  int _step = 0;
-  final _code = TextEditingController();
-  final _email =
-      FirebaseAuth.instance.currentUser?.email ?? 'your email address';
+class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  bool _hidePassword = true;
+  bool _busy = false;
+  String? _error;
 
   @override
   void dispose() {
-    _code.dispose();
+    _email.dispose();
+    _password.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_step == 0) return _confirmEmailStep();
-    if (_step == 1) return _codeStep();
-    return _finalDeleteStep();
+  Future<void> _submit() async {
+    if (_busy || !_formKey.currentState!.validate()) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.securityService.requestEmailChange(
+        currentPassword: _password.text,
+        newEmail: _email.text,
+      );
+      _password.clear();
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: const Icon(Icons.mark_email_read_rounded, color: kEmerald),
+          title: const Text('Check your new email'),
+          content: const Text(
+            'Firebase sent a verification link. Your current email stays active until the new address is verified.',
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      _password.clear();
+      if (mounted) setState(() => _error = _friendlyError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
-  AlertDialog _dialog({
-    required String title,
-    required Widget content,
-    required List<Widget> actions,
-  }) => AlertDialog(
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-    title: Text(
-      title,
-      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-    ),
-    content: content,
-    actions: actions,
-  );
-
-  Widget _confirmEmailStep() => _dialog(
-    title: 'Verify your email',
-    content: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'To continue deleting your account, verify this email address:',
-        ),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            _email,
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'A verification code will be sent after you press Verify.',
-          style: TextStyle(fontSize: 12),
-        ),
-      ],
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
-      ),
-      ElevatedButton(
-        onPressed: () => setState(() => _step = 1),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _emerald,
-          foregroundColor: Colors.white,
-        ),
-        child: const Text('Verify'),
-      ),
-    ],
-  );
-
-  Widget _codeStep() => _dialog(
-    title: 'Enter verification code',
-    content: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Enter the code sent to $_email.'),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _code,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          decoration: const InputDecoration(
-            labelText: '6-digit code',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const Text(
-          'Demo-only test code: 123456',
-          style: TextStyle(fontSize: 11, color: _danger),
-        ),
-      ],
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => setState(() => _step = 0),
-        child: const Text('Back'),
-      ),
-      ElevatedButton(
-        onPressed: () {
-          if (_code.text.trim() == '123456') {
-            setState(() => _step = 2);
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Invalid verification code'),
-                backgroundColor: _danger,
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Change Email')),
+    body: SafeArea(
+      child: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            Text('Current email\n${widget.currentEmail}'),
+            const SizedBox(height: 24),
+            TextFormField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.newUsername],
+              autovalidateMode: AutovalidateMode.onUnfocus,
+              validator: AuthValidators.email,
+              decoration: const InputDecoration(
+                labelText: 'New Email',
+                prefixIcon: Icon(Icons.alternate_email_rounded),
               ),
-            );
-          }
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _emerald,
-          foregroundColor: Colors.white,
-        ),
-        child: const Text('Verify'),
-      ),
-    ],
-  );
-
-  Widget _finalDeleteStep() => _dialog(
-    title: 'Delete account?',
-    content: const Text(
-      'Your email is verified. This action will permanently delete your account and cannot be undone.',
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
-      ),
-      ElevatedButton(
-        onPressed: () {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Deletion flow verified. Account deletion will be connected later.',
+            ),
+            const SizedBox(height: 18),
+            TextFormField(
+              controller: _password,
+              obscureText: _hidePassword,
+              enabled: !_busy,
+              autocorrect: false,
+              enableSuggestions: false,
+              autovalidateMode: AutovalidateMode.onUnfocus,
+              validator: (value) => value == null || value.isEmpty
+                  ? 'Enter your current password'
+                  : null,
+              decoration: InputDecoration(
+                labelText: 'Current Password',
+                prefixIcon: const Icon(Icons.lock_outline_rounded),
+                suffixIcon: IconButton(
+                  onPressed: _busy
+                      ? null
+                      : () => setState(() => _hidePassword = !_hidePassword),
+                  icon: Icon(
+                    _hidePassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                ),
               ),
-              backgroundColor: _danger,
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 16),
+              Text(_error!, style: const TextStyle(color: kEmergency)),
+            ],
+            const SizedBox(height: 24),
+            AppPrimaryButton(
+              label: _busy ? 'Sending…' : 'Send Verification Link',
+              onPressed: _busy ? null : _submit,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class AccountDeletionPreparationScreen extends StatefulWidget {
+  const AccountDeletionPreparationScreen({
+    super.key,
+    required this.securityService,
+  });
+  final AccountSecurityActions securityService;
+
+  @override
+  State<AccountDeletionPreparationScreen> createState() =>
+      _AccountDeletionPreparationScreenState();
+}
+
+class _AccountDeletionPreparationScreenState
+    extends State<AccountDeletionPreparationScreen> {
+  late Future<AccountDeletionReadiness> _readiness = widget.securityService
+      .inspectDeletionReadiness();
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Delete Account')),
+    body: FutureBuilder<AccountDeletionReadiness>(
+      future: _readiness,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError || snapshot.data == null) {
+          return _SecurityError(
+            message: AuthErrorMapper.message(
+              snapshot.error ?? StateError('Missing deletion state'),
+              fallback: 'Could not check account dependencies.',
+            ),
+            onRetry: () => setState(
+              () => _readiness = widget.securityService
+                  .inspectDeletionReadiness(),
             ),
           );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _danger,
-          foregroundColor: Colors.white,
-        ),
-        child: const Text('Delete Account'),
+        }
+        final readiness = snapshot.data!;
+        return ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            Icon(
+              readiness.canRequestDeletion
+                  ? Icons.admin_panel_settings_outlined
+                  : Icons.warning_amber_rounded,
+              size: 54,
+              color: readiness.canRequestDeletion ? kEmerald : kEmergency,
+            ),
+            const SizedBox(height: 18),
+            Text(
+              readiness.canRequestDeletion
+                  ? 'Secure deletion is being prepared'
+                  : 'Resolve Circle ownership first',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 14),
+            if (!readiness.canRequestDeletion) ...[
+              const Text(
+                'Deleting an owner could orphan family data. Delete or transfer these Circles first:',
+              ),
+              const SizedBox(height: 12),
+              for (final name in readiness.ownedCircleNames)
+                ListTile(
+                  leading: const Icon(Icons.groups_rounded),
+                  title: Text(name),
+                ),
+            ] else
+              const Text(
+                'Hard deletion is disabled until a backend-owned cleanup transaction can remove memberships, pending requests, notifications, device/location records and the Firebase Auth identity together. No data has been deleted.',
+                textAlign: TextAlign.center,
+                style: TextStyle(height: 1.45),
+              ),
+            const SizedBox(height: 18),
+            const Text(
+              'This protection prevents partial deletion and damage to other family members’ records.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: kLightMuted),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+class _SecurityRow extends StatelessWidget {
+  const _SecurityRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.iconColor = kEmerald,
+    this.trailing,
+    this.onTap,
+  });
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+    leading: CircleAvatar(
+      backgroundColor: iconColor.withValues(alpha: .12),
+      child: Icon(icon, color: iconColor),
+    ),
+    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+    subtitle: Text(subtitle, maxLines: 3, overflow: TextOverflow.ellipsis),
+    trailing:
+        trailing ??
+        (onTap == null ? null : const Icon(Icons.chevron_right_rounded)),
+    onTap: onTap,
+  );
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+  );
+}
+
+class _SecurityError extends StatelessWidget {
+  const _SecurityError({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.security_rounded, size: 48, color: kEmergency),
+          const SizedBox(height: 16),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 18),
+          ElevatedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Retry'),
+          ),
+        ],
       ),
-    ],
+    ),
+  );
+}
+
+String _friendlyError(Object error) {
+  if (error is ArgumentError) {
+    return error.message?.toString() ?? 'Check the entered details.';
+  }
+  if (error is FirebaseAuthException &&
+      (error.code == 'wrong-password' || error.code == 'invalid-credential')) {
+    return 'The current password is incorrect.';
+  }
+  if (error is FirebaseAuthException && error.code == 'email-already-in-use') {
+    return 'This email change could not be completed.';
+  }
+  return AuthErrorMapper.message(
+    error,
+    fallback: 'The security change could not be completed. Please retry.',
   );
 }

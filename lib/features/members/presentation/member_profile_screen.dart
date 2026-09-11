@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../models/family_member.dart';
-import '../../devices/presentation/device_screens.dart';
 import '../../progress/presentation/progress_detail_screens.dart';
 import 'member_notification_settings_screen.dart';
 
@@ -89,37 +88,14 @@ class MemberProfileScreen extends StatelessWidget {
             'Battery status access',
             member.batteryAccess ? 'Allowed' : 'Not allowed',
           ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => DeviceDetailScreen(memberName: member.name),
-                ),
-              ),
-              icon: const Icon(Icons.smartphone_rounded),
-              label: const Text('Device details'),
-            ),
+          const SizedBox(height: 18),
+          _detail(
+            context,
+            Icons.smartphone_rounded,
+            'Devices',
+            'Device pairing is available for registered accounts from Circle Member Detail.',
           ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => DevicePairingScreen(member: member),
-                ),
-              ),
-              icon: const Icon(Icons.qr_code_scanner_rounded),
-              label: const Text('Pair a device'),
-            ),
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -146,7 +122,7 @@ class MemberProfileScreen extends StatelessWidget {
                 label: const Text('Edit member details'),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 18),
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -191,7 +167,6 @@ class MemberProfileScreen extends StatelessWidget {
   Future<void> _editDetails(BuildContext context) async {
     final name = TextEditingController(text: member.name);
     final email = TextEditingController(text: member.email);
-    final phone = TextEditingController(text: member.phone);
     var relation = member.relation ?? 'Other';
     const relations = [
       'Father',
@@ -228,20 +203,15 @@ class MemberProfileScreen extends StatelessWidget {
                 controller: name,
                 decoration: const InputDecoration(labelText: 'Name'),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 18),
               TextField(
                 controller: email,
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(labelText: 'Email'),
               ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: phone,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Phone number'),
-              ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 18),
               DropdownButtonFormField<String>(
+                autovalidateMode: AutovalidateMode.onUnfocus,
                 initialValue: relation,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Relationship'),
@@ -270,9 +240,7 @@ class MemberProfileScreen extends StatelessWidget {
                         email: email.text.trim().isEmpty
                             ? null
                             : email.text.trim(),
-                        phone: phone.text.trim().isEmpty
-                            ? null
-                            : phone.text.trim(),
+                        phone: member.phone,
                         relation: relation,
                         locationAccess: member.locationAccess,
                         batteryAccess: member.batteryAccess,
@@ -291,7 +259,6 @@ class MemberProfileScreen extends StatelessWidget {
     );
     name.dispose();
     email.dispose();
-    phone.dispose();
     if (saved == true && context.mounted) Navigator.pop(context);
   }
 

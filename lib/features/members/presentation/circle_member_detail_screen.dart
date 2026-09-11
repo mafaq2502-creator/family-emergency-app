@@ -7,6 +7,8 @@ import '../../../core/widgets/light_ui.dart';
 import '../../../models/circle_membership.dart';
 import '../../../models/family_group.dart';
 import '../../../services/group_service.dart';
+import '../../../services/device_service.dart';
+import '../../devices/presentation/device_screens.dart';
 
 class CircleMemberDetailScreen extends StatefulWidget {
   const CircleMemberDetailScreen({
@@ -15,11 +17,13 @@ class CircleMemberDetailScreen extends StatefulWidget {
     required this.initialMember,
     required this.viewerId,
     this.groupService,
+    this.deviceService,
   });
   final FamilyGroup group;
   final CircleMembership initialMember;
   final String viewerId;
   final GroupService? groupService;
+  final DeviceActions? deviceService;
 
   @override
   State<CircleMemberDetailScreen> createState() =>
@@ -168,10 +172,12 @@ class _CircleMemberDetailScreenState extends State<CircleMemberDetailScreen> {
             subtitle: member.email ?? 'Not shared',
           ),
           const SizedBox(height: 9),
-          const LightSettingRow(
-            icon: Icons.smartphone_rounded,
-            title: 'Device',
-            subtitle: 'Device data becomes available after secure pairing',
+          MemberDeviceSection(
+            group: group,
+            memberUserId: member.userId,
+            memberName: member.displayName,
+            viewerId: widget.viewerId,
+            deviceService: widget.deviceService,
           ),
           const SizedBox(height: 9),
           const LightSettingRow(
