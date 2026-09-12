@@ -4,7 +4,6 @@ import '../../../core/domain/circle_error_mapper.dart';
 import '../../../core/domain/invite_code_policy.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/light_ui.dart';
-import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/circle_invite.dart';
 import '../../../models/circle_join_request.dart';
 import '../../../services/circle_join_service.dart';
@@ -123,7 +122,6 @@ class _JoinCircleScreenState extends State<JoinCircleScreen> {
     return LightPage(
       title: 'Join Family Circle',
       subtitle: _submission?.circleName,
-      actions: const [NotificationBellButton()],
       child: pendingCircleId == null
           ? (_preview == null ? _codeEntry() : _previewCard(_preview!))
           : _pendingRequest(pendingCircleId),

@@ -19,6 +19,14 @@ class CircleErrorMapper {
         'You do not have permission to perform this action.',
       'not-found' => 'This family Circle is no longer available.',
       'already-exists' => 'This action was already completed.',
+      'resource-exhausted' => switch (error) {
+        FirebaseFunctionsException value
+            when value.message?.isNotEmpty == true =>
+          value.message!,
+        FirebaseException value when value.message?.isNotEmpty == true =>
+          value.message!,
+        _ => 'Your current plan limit has been reached.',
+      },
       'failed-precondition' => switch (error) {
         FirebaseFunctionsException value
             when value.message?.isNotEmpty == true =>

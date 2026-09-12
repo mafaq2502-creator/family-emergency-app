@@ -26,6 +26,8 @@ class UserProfile {
     this.circleIds = const [],
     this.pendingJoinCircleId,
     this.pendingJoinInviteId,
+    this.planTier = 'free',
+    this.subscriptionStatus,
   });
 
   final Map<String, String> address;
@@ -49,6 +51,11 @@ class UserProfile {
   final List<String> circleIds;
   final String? pendingJoinCircleId;
   final String? pendingJoinInviteId;
+  final String planTier;
+  final String? subscriptionStatus;
+
+  bool get isPremium =>
+      planTier == 'premium' && subscriptionStatus == 'active';
 
   bool get needsProfileCompletion => !profileCompleted;
 
@@ -120,6 +127,8 @@ class UserProfile {
       circleIds: _stringList(source['circleIds']),
       pendingJoinCircleId: _string(source['pendingJoinCircleId']),
       pendingJoinInviteId: _string(source['pendingJoinInviteId']),
+      planTier: _string(source['planTier']) ?? 'free',
+      subscriptionStatus: _string(source['subscriptionStatus']),
     );
   }
 

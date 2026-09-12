@@ -44,10 +44,9 @@ class FamilyEmergencyApp extends StatelessWidget {
         theme: ThemeData(
           pageTransitionsTheme: const PageTransitionsTheme(
             builders: {
-              TargetPlatform.android:
-                  AppPageTransitionsBuilder(
-                    fallbackColor: kLightBackground,
-                  ),
+              TargetPlatform.android: AppPageTransitionsBuilder(
+                fallbackColor: kLightBackground,
+              ),
             },
           ),
           brightness: Brightness.light,
@@ -72,6 +71,8 @@ class FamilyEmergencyApp extends StatelessWidget {
             foregroundColor: kLightNavy,
             elevation: 0,
             scrolledUnderElevation: 0,
+            toolbarHeight: 64,
+            titleSpacing: 16,
             centerTitle: false,
             titleTextStyle: GoogleFonts.manrope(
               color: kLightNavy,
@@ -218,7 +219,8 @@ class FamilyEmergencyApp extends StatelessWidget {
             labelStyle: const TextStyle(
               color: kLightMuted,
               fontSize: AppTypography.fieldLabel,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
             ),
             hintStyle: const TextStyle(
               color: kLightMuted,
@@ -233,7 +235,9 @@ class FamilyEmergencyApp extends StatelessWidget {
             suffixIconColor: kLightMuted,
             floatingLabelStyle: const TextStyle(
               color: kLightPrimary,
-              fontWeight: FontWeight.w700,
+              fontSize: AppTypography.fieldLabel,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
@@ -260,10 +264,9 @@ class FamilyEmergencyApp extends StatelessWidget {
         darkTheme: ThemeData(
           pageTransitionsTheme: const PageTransitionsTheme(
             builders: {
-              TargetPlatform.android:
-                  AppPageTransitionsBuilder(
-                    fallbackColor: kDarkBackground,
-                  ),
+              TargetPlatform.android: AppPageTransitionsBuilder(
+                fallbackColor: kDarkBackground,
+              ),
             },
           ),
           brightness: Brightness.dark,
@@ -294,6 +297,8 @@ class FamilyEmergencyApp extends StatelessWidget {
             foregroundColor: Colors.white,
             elevation: 0,
             scrolledUnderElevation: 0,
+            toolbarHeight: 64,
+            titleSpacing: 16,
             centerTitle: false,
             titleTextStyle: GoogleFonts.manrope(
               fontSize: AppTypography.screenTitle,
@@ -429,7 +434,8 @@ class FamilyEmergencyApp extends StatelessWidget {
             labelStyle: const TextStyle(
               color: kDarkMuted,
               fontSize: AppTypography.fieldLabel,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
             ),
             errorStyle: const TextStyle(
               fontSize: AppTypography.error,
@@ -441,7 +447,9 @@ class FamilyEmergencyApp extends StatelessWidget {
             ),
             floatingLabelStyle: const TextStyle(
               color: kEmerald,
-              fontWeight: FontWeight.w700,
+              fontSize: AppTypography.fieldLabel,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),

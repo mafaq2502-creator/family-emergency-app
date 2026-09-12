@@ -5,7 +5,6 @@ import '../../../core/domain/circle_error_mapper.dart';
 import '../../../core/domain/circle_policies.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/light_ui.dart';
-import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/circle_membership.dart';
 import '../../../models/family_group.dart';
 import '../../../services/group_service.dart';
@@ -47,7 +46,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     final name = await showDialog<String>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => AppAlertDialog(
           icon: const Icon(Icons.edit_rounded, color: kEmerald),
           title: const Text('Rename Circle'),
           content: TextField(
@@ -115,9 +114,12 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   }
 
   Future<void> _saveRecipients(FamilyGroup group) async {
-    if (_recipients.isEmpty) return;
+    final activeRecipients = _recipients
+        .where(group.memberIds.contains)
+        .toList();
+    if (activeRecipients.isEmpty) return;
     await _run(
-      () => _service.setEmergencyRecipients(group, _recipients.toList()),
+      () => _service.setEmergencyRecipients(group, activeRecipients),
       fallback: 'Emergency recipients could not be saved. Please try again.',
       success: 'Emergency recipients updated.',
     );
@@ -160,7 +162,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   }) async =>
       await showDialog<bool>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
+        builder: (dialogContext) => AppAlertDialog(
           icon: const Icon(Icons.warning_amber_rounded, color: kEmergency),
           title: Text(title),
           content: Text(message),
@@ -216,7 +218,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   Widget _settings(FamilyGroup group, String viewerId) => LightPage(
     title: 'Circle Settings',
     subtitle: group.name,
-    actions: const [NotificationBellButton()],
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -266,8 +267,12 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           LightSettingRow(
             icon: Icons.ios_share_rounded,
             title: 'Invite registered member',
-            subtitle: 'Create a secure share link or QR code',
-            onTap: _busy
+            subtitle: group.isFull
+                ? (group.isPremiumOwned
+                      ? 'Circle member limit reached.'
+                      : 'Free Plan member limit reached.')
+                : 'Create a single-use share link or QR code',
+            onTap: _busy || group.isFull
                 ? null
                 : () => Navigator.push(
                     context,
@@ -334,7 +339,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   Widget _unavailable(String message) => Scaffold(
     appBar: AppBar(
       title: const Text('Circle Settings'),
-      actions: const [NotificationBellButton()],
     ),
     body: LightStateView(
       icon: Icons.lock_outline_rounded,

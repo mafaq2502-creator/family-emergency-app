@@ -2,7 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'circle_role.dart';
 
-enum CircleInviteStatus { active, expired, revoked, exhausted, unavailable }
+enum CircleInviteStatus {
+  active,
+  consumed,
+  expired,
+  revoked,
+  exhausted,
+  unavailable,
+}
 
 class CircleInvite {
   const CircleInvite({

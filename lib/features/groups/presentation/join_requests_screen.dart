@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../core/domain/circle_error_mapper.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/light_ui.dart';
-import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/circle_join_request.dart';
 import '../../../models/family_group.dart';
 import '../../../services/circle_join_service.dart';
@@ -28,7 +27,7 @@ class _JoinRequestsScreenState extends State<JoinRequestsScreen> {
     final verb = approve ? 'Approve' : 'Reject';
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => AppAlertDialog(
         title: Text('$verb join request?'),
         content: Text(
           approve
@@ -84,7 +83,6 @@ class _JoinRequestsScreenState extends State<JoinRequestsScreen> {
   Widget build(BuildContext context) => LightPage(
     title: 'Join Requests',
     subtitle: widget.group.name,
-    actions: const [NotificationBellButton()],
     child: !widget.group.canManage
         ? const LightStateView(
             icon: Icons.lock_outline_rounded,

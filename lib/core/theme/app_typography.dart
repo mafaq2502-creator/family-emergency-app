@@ -15,7 +15,7 @@ class AppTypography {
   static const double supporting = 13;
   static const double caption = 12;
   static const double fieldText = 16;
-  static const double fieldLabel = 14;
+  static const double fieldLabel = 15;
   static const double fieldHint = 15;
   static const double button = 16;
   static const double tabLabel = 15;

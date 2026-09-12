@@ -7,7 +7,6 @@ import '../../../models/family_group.dart';
 import '../../../services/app_notification_service.dart';
 import '../../../core/widgets/light_ui.dart';
 import '../../../core/widgets/bounded_dropdown_form_field.dart';
-import 'notification_bell_button.dart';
 import '../../../app/notification_navigation.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
@@ -54,7 +53,6 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       appBar: AppBar(
         title: const Text('Notifications'),
         actions: [
-          NotificationBellButton(groups: widget.groups),
           TextButton(
             onPressed: () => _markAllRead(user),
             child: const Text('Mark all read'),

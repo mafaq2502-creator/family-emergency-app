@@ -21,34 +21,64 @@ class LightPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Colors.transparent,
-    appBar: AppBar(
-      titleSpacing: 4,
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    appBar: AppBar(title: Text(title), actions: actions),
+    body: SafeArea(
+      top: false,
+      child: ListView(
+        padding: padding,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 21,
-              fontWeight: FontWeight.w600,
-              color: context.appHeading,
-            ),
-          ),
-          if (subtitle != null)
+          if (subtitle != null) ...[
             Text(
               subtitle!,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 14, color: context.appMuted),
             ),
+            const SizedBox(height: 12),
+          ],
+          child,
         ],
       ),
-      actions: actions,
     ),
-    body: SafeArea(
-      top: false,
-      child: ListView(padding: padding, children: [child]),
+  );
+}
+
+/// Shared dialog chrome. Closing returns no value, so temporary field edits
+/// remain local to the dismissed popup and are never submitted.
+class AppAlertDialog extends StatelessWidget {
+  const AppAlertDialog({
+    super.key,
+    this.icon,
+    required this.title,
+    this.content,
+    this.actions,
+    this.actionsAlignment,
+  });
+
+  final Widget? icon;
+  final Widget title;
+  final Widget? content;
+  final List<Widget>? actions;
+  final MainAxisAlignment? actionsAlignment;
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    icon: icon,
+    title: Row(
+      children: [
+        Expanded(child: title),
+        const SizedBox(width: 8),
+        IconButton(
+          key: const Key('dialog-close'),
+          tooltip: 'Close',
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.close_rounded),
+        ),
+      ],
     ),
+    content: content,
+    actions: actions,
+    actionsAlignment: actionsAlignment,
   );
 }
 

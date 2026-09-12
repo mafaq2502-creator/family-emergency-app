@@ -4,7 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/light_ui.dart';
-import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/screen_time.dart';
 import '../../../services/screen_time_service.dart';
 
@@ -279,7 +278,7 @@ class _ScreenTimeDetailScreenState extends State<ScreenTimeDetailScreen>
   Future<void> _requestAccess() async {
     final accepted = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => AppAlertDialog(
         title: const Text('Share screen time?'),
         content: const Text(
           'SafeCircle will read Android app-usage totals and share them with members of your paired Circles. You can turn Usage access off at any time in Android Settings.',
@@ -324,7 +323,6 @@ class _ScreenTimeDetailScreenState extends State<ScreenTimeDetailScreen>
   Widget build(BuildContext context) => LightPage(
     title: 'Screen Time',
     subtitle: widget.memberName,
-    actions: const [NotificationBellButton()],
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -484,7 +482,6 @@ class _CheckInHistoryScreenState extends State<CheckInHistoryScreen> {
     return LightPage(
       title: 'Check-In History',
       subtitle: widget.memberName,
-      actions: const [NotificationBellButton()],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -560,7 +557,6 @@ class ProgressDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) => LightPage(
     title: 'Progress Details',
     subtitle: memberName,
-    actions: const [NotificationBellButton()],
     child: Column(
       children: [
         LightSettingRow(

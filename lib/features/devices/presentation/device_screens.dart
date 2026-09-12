@@ -7,7 +7,6 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/domain/device_policies.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/light_ui.dart';
-import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/device_pairing_request.dart';
 import '../../../models/family_group.dart';
 import '../../../models/family_member.dart';
@@ -34,7 +33,6 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('My Devices'),
-      actions: const [NotificationBellButton()],
     ),
     body: FutureBuilder<PairedDevice>(
       future: _registration,
@@ -170,7 +168,6 @@ class _DevicePairingCodeScreenState extends State<DevicePairingCodeScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Pair This Device'),
-      actions: const [NotificationBellButton()],
     ),
     body: FutureBuilder<DevicePairingRequest>(
       future: _request,
@@ -350,7 +347,7 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
       if (!mounted) return;
       await showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (context) => AppAlertDialog(
           icon: const Icon(Icons.verified_rounded, color: kEmerald),
           title: const Text('Device paired'),
           content: Text('${device.name} is now paired to $_name.'),
@@ -374,7 +371,6 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
   Widget build(BuildContext context) => LightPage(
     title: 'Pair Device',
     subtitle: 'Short-lived code and member approval',
-    actions: const [NotificationBellButton()],
     child: Form(
       key: _formKey,
       child: Column(
@@ -532,7 +528,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     final form = GlobalKey<FormState>();
     final name = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => AppAlertDialog(
         title: const Text('Rename Device'),
         content: Form(
           key: form,
@@ -578,7 +574,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     final unpair = !widget.accountDevice;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => AppAlertDialog(
         icon: const Icon(Icons.phonelink_erase_rounded, color: kEmergency),
         title: Text(unpair ? 'Unpair device?' : 'Revoke device?'),
         content: Text(
@@ -642,7 +638,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     return LightPage(
       title: 'Device Detail',
       subtitle: 'Assigned to ${widget.memberName}',
-      actions: const [NotificationBellButton()],
       child: AbsorbPointer(
         absorbing: _busy,
         child: Column(
@@ -940,7 +935,6 @@ class _DeviceQrScannerScreenState extends State<DeviceQrScannerScreen> {
       title: const Text('Scan Device Pairing QR'),
       backgroundColor: Colors.black,
       foregroundColor: Colors.white,
-      actions: const [NotificationBellButton()],
     ),
     body: SafeArea(
       child: Stack(

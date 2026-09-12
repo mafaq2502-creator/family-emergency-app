@@ -83,8 +83,8 @@ void main() {
               ),
             );
             final positions = [
-              'Progress',
               'Family',
+              'Progress',
               'Home',
               'Plan',
               'Profile',
@@ -104,9 +104,15 @@ void main() {
                 )
                 .toList();
             expect(
-              iconY.every((value) => (value - iconY.first).abs() < .01),
+              [
+                iconY[0],
+                iconY[1],
+                iconY[3],
+                iconY[4],
+              ].every((value) => (value - iconY.first).abs() < .01),
               isTrue,
             );
+            expect(iconY[2], lessThan(iconY.first));
             expect(
               tester.getBottomRight(find.text('Home')).dy,
               lessThanOrEqualTo(568 - inset),

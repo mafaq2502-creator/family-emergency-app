@@ -2,7 +2,7 @@
   "name": "alivecircle-firestore-rules-tests",
   "private": true,
   "scripts": {
-    "test": "firebase emulators:exec --config ../firebase.json --project demo-alivecircle --only firestore \"node --test --test-concurrency=1 firestore.rules.test.cjs invite.rules.test.cjs device.rules.test.cjs\"",
+    "test": "firebase emulators:exec --config ../firebase.json --project demo-alivecircle --only firestore \"node --test --test-concurrency=1 firestore.rules.test.cjs trusted-boundary.rules.test.cjs device.rules.test.cjs\"",
     "test:lifecycle": "firebase emulators:exec --config ../firebase.json --project demo-alivecircle --only auth,firestore,functions \"node --test circle-lifecycle.integration.test.cjs\""
   },
   "devDependencies": {

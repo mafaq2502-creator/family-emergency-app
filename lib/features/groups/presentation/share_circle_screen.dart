@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -9,10 +10,10 @@ import '../../../core/domain/circle_error_mapper.dart';
 import '../../../core/domain/invite_code_policy.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/light_ui.dart';
-import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/circle_invite.dart';
 import '../../../models/family_group.dart';
 import '../../../services/circle_join_service.dart';
+import '../../../services/group_service.dart';
 
 class ShareCircleScreen extends StatefulWidget {
   const ShareCircleScreen({super.key, required this.group, this.joinService});
@@ -27,6 +28,7 @@ class ShareCircleScreen extends StatefulWidget {
 class _ShareCircleScreenState extends State<ShareCircleScreen> {
   late final CircleJoinService _service =
       widget.joinService ?? CircleJoinService();
+  final GroupService _groupService = GroupService();
   CircleInvite? _invite;
   Timer? _expiryTimer;
   bool _busy = false;
@@ -70,7 +72,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
     if (_busy) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => AppAlertDialog(
         title: const Text('Revoke invitation?'),
         content: const Text(
           'This code and QR will stop accepting new join requests.',
@@ -132,28 +134,87 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final invite = _invite;
+    String? viewerId;
+    try {
+      viewerId = FirebaseAuth.instance.currentUser?.uid;
+    } catch (_) {
+      viewerId = widget.joinService == null ? null : widget.group.ownerId;
+    }
     return LightPage(
       title: 'Invite Member',
       subtitle: widget.group.name,
-      actions: const [NotificationBellButton()],
-      child: invite == null
-          ? StreamBuilder<List<CircleInvite>>(
-              stream: _service.watchInvites(widget.group.id),
-              builder: (context, snapshot) =>
-                  _emptyState(snapshot.data ?? const []),
+      child: viewerId == null
+          ? const LightStateView(
+              icon: Icons.lock_outline_rounded,
+              title: 'Sign in required',
+              message: 'Please sign in again to manage invitations.',
             )
-          : StreamBuilder<CircleInvite?>(
-              stream: _service.watchInvite(invite.id),
-              initialData: invite,
-              builder: (context, snapshot) =>
-                  _inviteContent(snapshot.data ?? invite),
+          : StreamBuilder<FamilyGroup?>(
+              stream: widget.joinService != null
+                  ? Stream.value(widget.group)
+                  : _groupService.watchGroupForUser(
+                      widget.group.id,
+                      viewerId,
+                    ),
+              initialData: widget.group,
+              builder: (context, groupSnapshot) {
+                final group = groupSnapshot.data;
+                if (group == null) {
+                  return const LightStateView(
+                    icon: Icons.group_off_rounded,
+                    title: 'Circle unavailable',
+                    message: 'This Circle is no longer active.',
+                  );
+                }
+                return StreamBuilder<List<CircleInvite>>(
+                  stream: _service.watchInvites(group.id),
+                  builder: (context, inviteSnapshot) {
+                    final invites = inviteSnapshot.data ?? const [];
+                    final selected = invites
+                            .where((item) => item.id == _invite?.id)
+                            .firstOrNull ??
+                        _invite;
+                    final capacityInvites = selected != null &&
+                            !invites.any((item) => item.id == selected.id)
+                        ? [...invites, selected]
+                        : invites;
+                    return selected == null
+                        ? _emptyState(group, invites)
+                        : _inviteContent(group, selected, capacityInvites);
+                  },
+                );
+              },
             ),
     );
   }
 
-  Widget _emptyState(List<CircleInvite> invites) => Column(
+  bool _hasCapacity(FamilyGroup group, List<CircleInvite> invites) {
+    final activeReservations = invites
+        .where((invite) => invite.isUsable)
+        .length;
+    return group.memberCount + activeReservations < group.memberLimit;
+  }
+
+  Widget _capacity(FamilyGroup group, List<CircleInvite> invites) {
+    final hasCapacity = _hasCapacity(group, invites);
+    return Column(
+      children: [
+        Text('${group.memberCount} of ${group.memberLimit} members'),
+        if (!hasCapacity)
+          Text(
+            group.isPremiumOwned
+                ? 'Circle member limit reached.'
+                : 'Free Plan member limit reached.',
+            style: const TextStyle(color: kEmergency),
+          ),
+      ],
+    );
+  }
+
+  Widget _emptyState(FamilyGroup group, List<CircleInvite> invites) => Column(
     children: [
+      _capacity(group, invites),
+      const SizedBox(height: 14),
       const LightStateView(
         icon: Icons.person_add_alt_1_rounded,
         title: 'Create a secure invitation',
@@ -164,7 +225,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
         width: double.infinity,
         height: 50,
         child: ElevatedButton.icon(
-          onPressed: _busy ? null : _generate,
+          onPressed: _busy || !_hasCapacity(group, invites) ? null : _generate,
           icon: _busy
               ? const SizedBox.square(
                   dimension: 18,
@@ -193,7 +254,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
               ),
               subtitle: Text(
                 invite.isUsable
-                    ? '${invite.useCount}/${invite.maxUses} approved'
+                    ? 'Single-use invitation'
                     : invite.status.name,
               ),
               trailing: const Icon(Icons.chevron_right_rounded),
@@ -205,17 +266,25 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
     ],
   );
 
-  Widget _inviteContent(CircleInvite invite) {
+  Widget _inviteContent(
+    FamilyGroup group,
+    CircleInvite invite,
+    List<CircleInvite> invites,
+  ) {
     final usable = invite.isUsable;
     final status = usable
         ? 'Active'
         : invite.status == CircleInviteStatus.revoked
         ? 'Revoked'
+        : invite.status == CircleInviteStatus.consumed
+        ? 'Consumed'
         : invite.status == CircleInviteStatus.exhausted
-        ? 'Exhausted'
+        ? 'Consumed'
         : 'Expired';
     return Column(
       children: [
+        _capacity(group, invites),
+        const SizedBox(height: 14),
         Row(
           children: [
             Expanded(
@@ -241,7 +310,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
         const SizedBox(height: 12),
         Text(
           'Expires ${MaterialLocalizations.of(context).formatMediumDate(invite.expiresAt.toLocal())} • '
-          '${invite.useCount}/${invite.maxUses} approved',
+          '${invite.useCount == 1 ? 'Used once' : 'Single-use invitation'}',
           textAlign: TextAlign.center,
           style: TextStyle(color: context.appMuted, fontSize: 13),
         ),
@@ -267,7 +336,9 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
               label: const Text('Revoke'),
             ),
             OutlinedButton.icon(
-              onPressed: _busy ? null : () => _generate(replace: usable),
+            onPressed: _busy || (!usable && !_hasCapacity(group, invites))
+                ? null
+                : () => _generate(replace: usable),
               icon: _busy
                   ? const SizedBox.square(
                       dimension: 16,

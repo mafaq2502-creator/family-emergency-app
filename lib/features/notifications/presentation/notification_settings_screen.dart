@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_surface_card.dart';
+import '../../../core/widgets/light_ui.dart';
 import '../../../models/notification_settings.dart';
 import '../../../services/notification_settings_service.dart';
 import '../../../services/push_notification_service.dart';
-import 'notification_bell_button.dart';
 
 const _emerald = kEmerald;
 const _navy = kLightNavy;
@@ -72,7 +72,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   Future<void> _enablePush() async {
     final accepted = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AppAlertDialog(
         title: const Text('Allow safety notifications?'),
         content: const Text(
           'Android notifications let this device show emergency SOS, family activity, and device safety alerts. Your in-app notification history remains available if you decline.',
@@ -146,7 +146,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
         ),
         actions: [
-          const NotificationBellButton(),
           TextButton(
             onPressed: _saving ? null : _save,
             child: _saving

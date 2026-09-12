@@ -86,10 +86,11 @@ extension _LocationTab on _HomeScreenState {
                         .map((member) => member.userId ?? member.id)
                         .firstOrNull,
               periodLabel: _progressPeriod,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ScreenTimeDetailScreen(
+              onTap: () => _openPremiumFeature(
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ScreenTimeDetailScreen(
                     memberName: _progressMemberId == null
                         ? 'All members'
                         : familyMembers
@@ -104,6 +105,7 @@ extension _LocationTab on _HomeScreenState {
                               .where((member) => member.id == _progressMemberId)
                               .map((member) => member.userId ?? member.id)
                               .firstOrNull,
+                    ),
                   ),
                 ),
               ),
@@ -158,10 +160,11 @@ extension _LocationTab on _HomeScreenState {
             SizedBox(
               height: 48,
               child: ElevatedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ProgressDetailsScreen(
+                onPressed: () => _openPremiumFeature(
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProgressDetailsScreen(
                       memberName: _progressMemberId == null
                           ? 'All members'
                           : familyMembers
@@ -181,6 +184,7 @@ extension _LocationTab on _HomeScreenState {
                                 )
                                 .map((member) => member.userId ?? member.id)
                                 .firstOrNull,
+                      ),
                     ),
                   ),
                 ),

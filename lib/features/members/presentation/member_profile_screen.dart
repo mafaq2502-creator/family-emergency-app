@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/bounded_dropdown_form_field.dart';
-import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/family_member.dart';
 import '../../progress/presentation/progress_detail_screens.dart';
 import 'member_notification_settings_screen.dart';
@@ -28,7 +27,6 @@ class MemberProfileScreen extends StatelessWidget {
       backgroundColor: isDark ? kDarkBackground : kLightBackground,
       appBar: AppBar(
         title: const Text('Member Profile'),
-        actions: const [NotificationBellButton()],
       ),
       body: ListView(
         padding: const EdgeInsets.all(24),
@@ -199,9 +197,24 @@ class MemberProfileScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Edit member details',
-                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Edit member details',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    key: const Key('sheet-close'),
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               TextField(

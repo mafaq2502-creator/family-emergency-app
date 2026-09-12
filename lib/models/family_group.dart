@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../core/domain/circle_policies.dart';
+import '../core/domain/entitlement_policy.dart';
 import 'circle_role.dart';
 
 class FamilyGroup {
@@ -12,6 +13,7 @@ class FamilyGroup {
     this.emergencyRecipientIds = const [],
     this.memberIds = const [],
     this.status = CircleLifecycleStatus.active,
+    this.ownerPlanTier = 'free',
     this.createdAt,
     this.updatedAt,
   });
@@ -22,12 +24,18 @@ class FamilyGroup {
   final List<String> emergencyRecipientIds;
   final List<String> memberIds;
   final CircleLifecycleStatus status;
+  final String ownerPlanTier;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   bool get canManage => role.canManageCircle;
   bool get isOwner => role == CircleRole.owner;
   bool get isActive => status == CircleLifecycleStatus.active;
   int get memberCount => memberIds.length;
+  bool get isPremiumOwned => ownerPlanTier == 'premium';
+  int get memberLimit => CircleEntitlementPolicy.memberLimit(
+    premium: isPremiumOwned,
+  );
+  bool get isFull => memberCount >= memberLimit;
 
   factory FamilyGroup.fromMap(String id, Map<String, dynamic> map) =>
       FamilyGroup(
@@ -38,6 +46,7 @@ class FamilyGroup {
         emergencyRecipientIds: _stringList(map['emergencyRecipientIds']),
         memberIds: _stringList(map['memberIds']),
         status: _status(map['status']),
+        ownerPlanTier: _string(map['ownerPlanTier']) ?? 'free',
         createdAt: _date(map['createdAt']),
         updatedAt: _date(map['updatedAt']),
       );

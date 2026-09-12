@@ -4,7 +4,6 @@ import '../../../core/domain/circle_error_mapper.dart';
 import '../../../core/domain/circle_policies.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/light_ui.dart';
-import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/circle_membership.dart';
 import '../../../models/family_group.dart';
 import '../../../services/group_service.dart';
@@ -39,7 +38,7 @@ class _CircleMemberDetailScreenState extends State<CircleMemberDetailScreen> {
     if (_removing) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AppAlertDialog(
         icon: const Icon(Icons.person_remove_rounded, color: kEmergency),
         title: const Text('Remove member?'),
         content: Text(
@@ -137,7 +136,6 @@ class _CircleMemberDetailScreenState extends State<CircleMemberDetailScreen> {
     return LightPage(
       title: 'Member Detail',
       subtitle: group.name,
-      actions: const [NotificationBellButton()],
       child: Column(
         children: [
           LightAvatar(name: member.displayName, radius: 42),
@@ -223,7 +221,6 @@ class _CircleMemberDetailScreenState extends State<CircleMemberDetailScreen> {
   Widget _state(String title, String message) => Scaffold(
     appBar: AppBar(
       title: const Text('Member Detail'),
-      actions: const [NotificationBellButton()],
     ),
     body: LightStateView(
       icon: Icons.person_off_rounded,

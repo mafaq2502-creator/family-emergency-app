@@ -1,28 +1,38 @@
-# Firebase Firestore rules — manual deployment
+# Firebase backend deployment
 
-Use the Firebase project `familyemergencyapp`.
+Use Firebase project `familyemergencyapp`.
 
-1. Open Firebase Console.
-2. Select **familyemergencyapp**.
-3. Open **Firestore Database → Rules**.
-4. Replace the complete editor contents with the complete contents of the
-   repository-root `firestore.rules` file. Do not paste only the newly added
-   functions: the lifecycle checks depend on helper functions elsewhere in that
-   file.
-5. Click **Publish**.
-6. Wait for the successful publication message before testing Circle deletion.
+The current Circle lifecycle requires all three repository backend artifacts:
 
-No Firestore index change is required for this task. The new notification
-cleanup query uses Firestore's automatic single-field `groupId` index.
+- `functions/src/index.ts`
+- `firestore.rules`
+- `firestore.indexes.json`
 
-After publishing, test with a disposable Circle:
+Deploy them together after reviewing the local changes. Deploying only the rules
+will leave Circle create/delete/invite/join actions unavailable because clients
+are intentionally blocked from bypassing the callable transactions.
 
-- confirm a non-owner cannot delete it;
-- cancel once and confirm nothing changes;
-- confirm deletion once as owner;
-- confirm the Circle disappears immediately and the app returns to Family;
-- confirm its pending invite/request is inactive;
-- confirm unrelated global device records and other-Circle notifications remain.
+```powershell
+Set-Location -LiteralPath 'D:\My Projects\family_emergency_app\functions'
+npm run build
+Set-Location -LiteralPath 'D:\My Projects\family_emergency_app'
+firebase deploy --project familyemergencyapp --only functions,firestore:rules,firestore:indexes
+```
 
-Publishing these rules enables the Spark-compatible client deletion path. It
-does not deploy Cloud Functions or enable automatic FCM event delivery.
+The user has instructed Codex not to run any build command until they request it
+in a separate prompt. These commands are documentation only and were not run in
+the current task.
+
+After deployment, use disposable accounts and Circles to verify:
+
+1. A non-owner cannot delete a Circle; its owner can delete it once without the
+   Circle reappearing or showing a permission error.
+2. A Free account cannot own more than one active Circle, and can create another
+   after deleting the first.
+3. A Free account cannot join more than one additional Circle.
+4. A Free Circle stops at owner plus two people, including active invitation
+   reservations. Revoke, cancel, reject, and expiry release capacity.
+5. One link and its QR code resolve the same token. Approval consumes it and a
+   second use is rejected.
+6. SOS reaches only the selected current members, appears in notification
+   history, and opens the emergency detail destination when tapped.

@@ -9,7 +9,6 @@ import '../../../core/widgets/country_name_field.dart';
 import '../../../core/widgets/bounded_dropdown_form_field.dart';
 import '../../../core/widgets/profile_image.dart';
 import '../../auth/domain/auth_validators.dart';
-import '../../notifications/presentation/notification_bell_button.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
   const AccountSettingsScreen({
@@ -150,7 +149,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     if (!_dirty) return true;
     return await showDialog<bool>(
           context: context,
-          builder: (dialogContext) => AlertDialog(
+          builder: (dialogContext) => AppAlertDialog(
             icon: const Icon(Icons.edit_note_rounded, color: kEmerald),
             title: const Text('Save changes?'),
             content: const Text('Your account details have unsaved changes.'),
@@ -233,7 +232,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     child: LightPage(
       title: 'Account Settings',
       subtitle: 'Keep your personal details up to date',
-      actions: const [NotificationBellButton()],
       child: AbsorbPointer(
         absorbing: _saving,
         child: Form(

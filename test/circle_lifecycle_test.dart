@@ -237,7 +237,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('2 members'), findsOneWidget);
+      expect(find.text('2 of 3 members'), findsOneWidget);
       expect(find.text(adult.displayName), findsOneWidget);
       await tester.tap(find.text(adult.displayName));
       await tester.pumpAndSettle();

@@ -148,6 +148,12 @@ extension _MembersTab on _HomeScreenState {
   }
 
   Future<void> _joinAnotherCircle() async {
+    if (!_isPremium && _groups.any((group) => !group.isOwner)) {
+      _showPlanLimit(
+        'Your Free Plan allows you to join 1 additional Circle. Upgrade to Premium to join more.',
+      );
+      return;
+    }
     final circleId = await Navigator.push<String>(
       context,
       MaterialPageRoute(

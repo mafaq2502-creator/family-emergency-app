@@ -23,7 +23,10 @@ class GroupService {
       .collection('groups')
       .where('memberIds', arrayContains: user.uid)
       .where('status', isEqualTo: 'active')
-      .snapshots()
+      .snapshots(includeMetadataChanges: true)
+      // A local batch can still be rejected by rules. Keep the last confirmed
+      // list until the server acknowledges it (including metadata-only acks).
+      .where((snapshot) => !snapshot.metadata.hasPendingWrites)
       .map(
         (snapshot) => snapshot.docs
             .map((doc) {
@@ -104,44 +107,11 @@ class GroupService {
     final trimmedName = CircleNamePolicy.normalize(name);
     final validation = CircleNamePolicy.validate(trimmedName);
     if (validation != null) throw ArgumentError(validation);
-    final doc = _client.collection('groups').doc();
-    final profile = await _client.collection('users').doc(owner.uid).get();
-    final profileData = profile.data() ?? const <String, dynamic>{};
-    final groupData = {
-      'name': trimmedName,
-      'ownerId': owner.uid,
-      'memberIds': [owner.uid],
-      'roles': {owner.uid: CircleRole.owner.value},
-      'emergencyRecipientIds': [owner.uid],
-      'status': CircleLifecycleStatus.active.name,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-    final batch = _client.batch();
-    batch.set(doc, groupData);
-    batch.set(doc.collection('memberships').doc(owner.uid), {
-      'userId': owner.uid,
-      'displayName': profileData['name'] as String? ?? owner.displayName ?? '',
-      'email': owner.email,
-      'relationship':
-          profileData['relationship'] as String? ??
-          profileData['role'] as String? ??
-          'Self',
-      'circleRole': CircleRole.owner.value,
-      'status': 'active',
-      'joinedAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-    batch.set(_client.collection('users').doc(owner.uid), {
-      'onboardingCompleted': true,
-      'activeCircleId': doc.id,
-      'circleIds': FieldValue.arrayUnion([doc.id]),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-    // Keep group, owner membership, and onboarding state atomic. A failure
-    // must not leave a group that the owner cannot see or resume.
-    await batch.commit();
-    return doc.id;
+    final response = await _functionClient
+        .httpsCallable('createCircle')
+        .call({'name': trimmedName});
+    final data = Map<String, dynamic>.from(response.data as Map);
+    return data['circleId'] as String;
   }
 
   Future<String> ensureDefaultGroup(User owner) async {
@@ -178,30 +148,11 @@ class GroupService {
   /// records remain as an auditable tombstone instead of being partially
   /// removed by several client batches.
   Future<void> deleteGroup(FamilyGroup group) async {
-    // The deployed product currently uses Spark. Do not call an undeployed
-    // endpoint on every deletion. Keep the server implementation for an
-    // explicitly configured future deployment.
-    if (!const bool.fromEnvironment('USE_CIRCLE_LIFECYCLE_FUNCTIONS')) {
-      return _deleteGroupWithClientBatch(group);
-    }
-    try {
-      await _callLifecycle('deleteCircle', {'circleId': group.id});
-      return;
-    } on FirebaseFunctionsException catch (error) {
-      // Spark projects cannot execute callable Functions. Keep the trusted
-      // server path as the default, and use the rules-validated atomic path
-      // only when that endpoint is unavailable.
-      if (!const {
-        'not-found',
-        'unavailable',
-        'internal',
-      }.contains(error.code)) {
-        rethrow;
-      }
-    }
-    await _deleteGroupWithClientBatch(group);
+    await _callLifecycle('deleteCircle', {'circleId': group.id});
   }
 
+  // Retained as a migration utility for projects moving existing tombstones.
+  // ignore: unused_element
   Future<void> _deleteGroupWithClientBatch(FamilyGroup group) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {

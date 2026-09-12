@@ -9,7 +9,6 @@ import '../../../models/family_group.dart';
 import '../../../services/group_service.dart';
 import '../../../services/device_service.dart';
 import '../../members/presentation/circle_member_detail_screen.dart';
-import '../../notifications/presentation/notification_bell_button.dart';
 import 'emergency_events_screen.dart';
 import 'group_settings_screen.dart';
 import 'join_requests_screen.dart';
@@ -45,7 +44,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     if (_deleting || !group.isOwner) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AppAlertDialog(
         icon: const Icon(Icons.delete_forever_rounded, color: kEmergency),
         title: const Text('Delete Circle?'),
         content: const Text(
@@ -102,6 +101,18 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       key: ValueKey(_retryKey),
       stream: _service.watchGroupForUser(widget.group.id, viewerId),
       builder: (context, groupSnapshot) {
+        // Deletion revokes this listener's access, and local writes may emit a
+        // tombstone before commit finishes. The operation owns its outcome.
+        if (_deleting) {
+          return const Scaffold(
+            body: LightStateView(
+              icon: Icons.sync_rounded,
+              title: 'Deleting Circle',
+              message: 'Waiting for confirmation…',
+              busy: true,
+            ),
+          );
+        }
         if (groupSnapshot.hasError) {
           return _UnavailableCircle(
             title: 'Circle could not be loaded',
@@ -139,7 +150,6 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
         appBar: AppBar(
           title: Text(group.name),
           actions: [
-            const NotificationBellButton(),
             if (group.isOwner)
               IconButton(
                 icon: _deleting
@@ -219,7 +229,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                                   children: [
                                     LightStatusChip(label: group.role.value),
                                     LightStatusChip(
-                                      label: '${members.length} members',
+                                      label: '${members.length} of ${group.memberLimit} members',
                                       color: const Color(0xFF2563EB),
                                     ),
                                   ],
@@ -235,7 +245,9 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                           if (group.canManage)
                             Expanded(
                               child: OutlinedButton.icon(
-                                onPressed: () => Navigator.push(
+                                onPressed: members.length >= group.memberLimit
+                                    ? null
+                                    : () => Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) =>
@@ -274,6 +286,16 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                         ],
                       ),
                       if (group.canManage) ...[
+                        if (members.length >= group.memberLimit) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            group.isPremiumOwned
+                                ? 'Circle member limit reached.'
+                                : 'Free Plan member limit reached.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: kEmergency),
+                          ),
+                        ],
                         const SizedBox(height: 9),
                         SizedBox(
                           width: double.infinity,
@@ -356,7 +378,6 @@ class _UnavailableCircle extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Family Circle'),
-      actions: const [NotificationBellButton()],
     ),
     body: LightStateView(
       icon: Icons.group_off_rounded,

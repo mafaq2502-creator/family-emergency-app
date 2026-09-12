@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_primary_button.dart';
 import '../../../core/widgets/app_surface_card.dart';
-import '../../notifications/presentation/notification_bell_button.dart';
+import '../../../core/widgets/light_ui.dart';
 import '../../../features/auth/domain/auth_error_mapper.dart';
 import '../../../features/auth/domain/auth_validators.dart';
 import '../../../services/account_security_service.dart';
@@ -28,7 +28,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Security'),
-      actions: const [NotificationBellButton()],
     ),
     body: FutureBuilder<SecurityOverview>(
       future: _overview,
@@ -306,7 +305,6 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Change Password'),
-      actions: const [NotificationBellButton()],
     ),
     body: SafeArea(
       child: Form(
@@ -437,7 +435,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
       if (!mounted) return;
       await showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (context) => AppAlertDialog(
           icon: const Icon(Icons.mark_email_read_rounded, color: kEmerald),
           title: const Text('Check your new email'),
           content: const Text(
@@ -464,7 +462,6 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Change Email'),
-      actions: const [NotificationBellButton()],
     ),
     body: SafeArea(
       child: Form(
@@ -548,7 +545,6 @@ class _AccountDeletionPreparationScreenState
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Delete Account'),
-      actions: const [NotificationBellButton()],
     ),
     body: FutureBuilder<AccountDeletionReadiness>(
       future: _readiness,

@@ -112,6 +112,27 @@ async function read(path) {
   return snapshot;
 }
 
+async function seedProfile(uid, overrides = {}) {
+  await environment.withSecurityRulesDisabled(async context => {
+    await context.firestore().collection('users').doc(uid).set({
+      uid,
+      name: 'Test User',
+      email: `${uid}@example.test`,
+      relationship: 'Self',
+      planTier: 'free',
+      subscriptionStatus: 'inactive',
+      circleIds: [],
+      ownedCircleIds: [],
+      joinedCircleIds: [],
+      profileCompleted: true,
+      onboardingCompleted: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...overrides,
+    });
+  });
+}
+
 async function rejectsWithCode(promise, code) {
   await assert.rejects(promise, error => {
     assert.equal(error.code, code);
@@ -255,3 +276,86 @@ test('concurrent removal attempts produce one success and consistent state', asy
   assert.deepEqual(group.memberIds, [owner.uid]);
   assert.equal(membership.status, 'removed');
 });
+
+test('Free owner can create one Circle and reuse the slot after deletion', async () => {
+  const owner = await user('free-owner');
+  await seedProfile(owner.uid);
+  const create = httpsCallable(owner.functions, 'createCircle');
+
+  const first = await create({name: 'First Circle'});
+  const firstId = first.data.circleId;
+  assert.ok(firstId);
+  await rejectsWithCode(create({name: 'Second Circle'}), 'functions/resource-exhausted');
+
+  await httpsCallable(owner.functions, 'deleteCircle')({circleId: firstId});
+  const replacement = await create({name: 'Replacement Circle'});
+  assert.ok(replacement.data.circleId);
+  assert.notEqual(replacement.data.circleId, firstId);
+});
+
+test('Free Circle invite slots are reserved, released on revoke, and single-use', async () => {
+  const owner = await user('invite-owner');
+  const member = await user('invite-member');
+  const replay = await user('invite-replay');
+  await seedProfile(owner.uid);
+  await seedProfile(member.uid);
+  await seedProfile(replay.uid);
+
+  const circle = await httpsCallable(owner.functions, 'createCircle')({name: 'Invite Circle'});
+  const circleId = circle.data.circleId;
+  const createInvite = httpsCallable(owner.functions, 'createCircleInvite');
+  const first = await createInvite({circleId, circleRole: 'adult'});
+  const second = await createInvite({circleId, circleRole: 'adult'});
+  await rejectsWithCode(createInvite({circleId}), 'functions/resource-exhausted');
+
+  await httpsCallable(owner.functions, 'revokeCircleInvite')({code: second.data.id});
+  await createInvite({circleId, circleRole: 'child'});
+
+  await httpsCallable(member.functions, 'submitCircleJoinRequest')({code: first.data.id});
+  await httpsCallable(owner.functions, 'reviewCircleJoinRequest')({
+    circleId, userId: member.uid, approve: true,
+  });
+  await rejectsWithCode(
+    httpsCallable(replay.functions, 'submitCircleJoinRequest')({code: first.data.id}),
+    'functions/already-exists',
+  );
+
+  const group = (await read(`groups/${circleId}`)).data();
+  const invite = (await read(`circleInvites/${first.data.id}`)).data();
+  assert.equal(group.memberIds.includes(member.uid), true);
+  assert.equal(invite.status, 'consumed');
+  assert.equal(invite.useCount, 1);
+});
+
+for (const outcome of ['cancelled', 'rejected']) {
+  test(`${outcome} pending invitation releases its Free Circle slot`, async () => {
+    const owner = await user(`${outcome}-owner`);
+    const member = await user(`${outcome}-member`);
+    await seedProfile(owner.uid);
+    await seedProfile(member.uid);
+    const circle = await httpsCallable(owner.functions, 'createCircle')({
+      name: `${outcome} Circle`,
+    });
+    const circleId = circle.data.circleId;
+    const createInvite = httpsCallable(owner.functions, 'createCircleInvite');
+    const reserved = await createInvite({circleId});
+    await createInvite({circleId});
+    await httpsCallable(member.functions, 'submitCircleJoinRequest')({
+      code: reserved.data.id,
+    });
+
+    if (outcome === 'cancelled') {
+      await httpsCallable(member.functions, 'cancelCircleJoinRequest')({circleId});
+    } else {
+      await httpsCallable(owner.functions, 'reviewCircleJoinRequest')({
+        circleId, userId: member.uid, approve: false,
+      });
+    }
+
+    const replacement = await createInvite({circleId});
+    assert.ok(replacement.data.id);
+    const invite = (await read(`circleInvites/${reserved.data.id}`)).data();
+    assert.equal(invite.status, 'revoked');
+    assert.equal(invite.reservedBy, undefined);
+  });
+}

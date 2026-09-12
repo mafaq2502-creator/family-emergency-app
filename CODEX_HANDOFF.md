@@ -1,5 +1,102 @@
 # Family Emergency App — Codex Handoff
 
+## SOS, Free Plan limits, single-use invitations, and deletion authority (2026-09-13)
+
+Status: **SOURCE COMPLETE AND LOCAL TESTS PASS. PRODUCTION DEPLOYMENT PENDING.**
+This section supersedes the older Spark/client-deletion notes below.
+
+- Circle create, invite, join approval/rejection/cancellation, member removal,
+  leaving, and owner deletion now use trusted callable transactions. Direct
+  client entitlement and lifecycle mutations are denied by Firestore rules.
+- Owner deletion is authorized from the group document, then atomically
+  tombstones the Circle and cleans memberships, profile references, invites,
+  pending requests, Circle device links, and Circle notifications. The UI waits
+  for the callable result, so an optimistic removal cannot reappear one second
+  later with a permission error.
+- Free accounts may own one active Circle and join one additional Circle. A Free
+  Circle holds three active people total (owner plus two); active unexpired
+  single-use invitations reserve the remaining slots. Approval rechecks both
+  user entitlement and Circle capacity in the transaction.
+- Invitation links and QR codes share one 24-character token. States are active,
+  consumed, expired, and revoked. Approval consumes a token; revocation,
+  cancellation, and rejection release its slot. Replay is rejected.
+- SOS now uses a cancellable 5-to-1 countdown and validates stored recipients
+  against current active Circle members. The sender is excluded. FCM and
+  notification history use that exact recipient list.
+- Root title/bell placement, the five-item curved navigation bar, Home/SOS
+  placement, Plan copy and pricing, premium feature gates, capacity UI, and
+  close-without-save controls on dialogs/sheets are implemented.
+- Verification: 299/299 Flutter tests passed; `flutter analyze --no-pub` reports
+  no issues; 34/34 Firestore/device/trusted-boundary rule tests pass; 10/10
+  callable integration tests pass; Functions TypeScript passes `tsc --noEmit`;
+  and `git diff --check` has no whitespace errors (only line-ending warnings).
+- Per the user's standing instruction, no APK, release bundle, or app build was
+  produced in this task. Do not build until the user explicitly requests it in
+  a separate prompt.
+- To activate this behavior for production users, deploy `functions`,
+  `firestore.rules`, and `firestore.indexes.json` together. The repository has
+  not been deployed in this task.
+
+## Global UI consistency follow-up (2026-09-13)
+
+Status: **IMPLEMENTED, VISUALLY INSPECTED, AND AUTOMATED TESTS PASS.**
+
+- Standardized every Material field label through the shared theme at 15sp,
+  semibold, 1.2 line height. Light, dark, and System themes inherit the same
+  hierarchy while hints, values, helpers, and errors retain their distinct sizes.
+- Standardized AppBar screen-title placement through the shared theme: 64dp
+  toolbar height, 16dp title spacing, left alignment. `LightPage` subtitles now
+  sit below the AppBar so page titles share the same vertical placement. Home
+  now uses `Home` as its AppBar title and keeps its personalized greeting in the
+  page content.
+- Rebuilt bottom navigation from the supplied reference: Family, Progress,
+  raised circular Home, Plan, Profile; curved accent edge, theme-aware surface,
+  glow, consistent label baseline, and preserved destination indices/tap logic.
+- Replaced all 18 app AlertDialogs with a shared closeable dialog. The cross
+  returns no result, so unsaved field edits are discarded. The member-edit
+  bottom sheet and existing notification popup also expose the same close action.
+- Added regression checks for field-label typography in both themes, common
+  AppBar geometry, unsaved-dialog cancellation, navigation order/raised Home,
+  320px layout, 1.5 text scale, and 0/24/48dp system insets.
+- Verification: all 294 Flutter tests pass; responsive/theme matrix passes;
+  `flutter analyze --no-pub` reports no issues. Light/dark form renders and the
+  bottom-navigation render were visually inspected.
+- Rebuilt testing APK with `AUTO_VERIFY_EMAIL_FOR_TESTING=true`:
+  `build/app/outputs/flutter-apk/app-release.apk`, 76,574,822 bytes (73.03 MiB),
+  SHA-256 `874B1BDBBB05A4081B5559A293C2F321EA1FE94CAA0927FF872EC7FC218FFABC`.
+  APK Signature Scheme v2 verification passed with one Android debug signer.
+
+## Circle deletion rollback follow-up (2026-09-13)
+
+Status: **FIXED LOCALLY AND VERIFIED. Production requires the updated complete
+`firestore.rules` plus the rebuilt app.**
+
+- Reproduced the reported sequence: Firestore's optimistic local batch removed
+  the Circle from the query, then a rules rejection rolled the batch back and
+  made the Circle reappear with a permission error.
+- The owner profile cleanup was being checked by the general profile validator.
+  A valid older profile containing legacy fields could therefore reject the
+  complete atomic deletion even though `ownerId` and the Circle role were valid.
+- Added a narrowly scoped profile cleanup rule. It permits only removal of the
+  deleted Circle reference and selected-Circle cleanup, and only in the same
+  atomic write as a valid owner Circle tombstone. It cannot edit unrelated
+  profile fields or remove another Circle reference.
+- Moved Circle-device deletion cleanup ahead of costly alternative rule checks
+  to avoid Firestore's rule-expression limit on that atomic path.
+- Group-list snapshots now ignore local pending writes, and Circle Detail shows
+  a deletion progress state until Firestore confirms the commit. A rejected
+  write no longer looks successful for a second before rolling back.
+- Regression tests cover legacy owner profiles, both selected and non-selected
+  Circles, standalone cleanup denial, unrelated profile-edit denial, wrong
+  Circle removal denial, and the existing non-owner deletion denial.
+- Verification: all 42 Firestore/invite/device rule tests pass, all 291 Flutter
+  tests pass (including 14 focused Circle lifecycle tests), `flutter analyze`
+  reports no issues, and `git diff --check` reports no whitespace errors.
+- Rebuilt testing APK with `AUTO_VERIFY_EMAIL_FOR_TESTING=true`:
+  `build/app/outputs/flutter-apk/app-release.apk`, 76,558,294 bytes (73.01 MiB),
+  SHA-256 `D4D1310CBEE2B49019144ECB765FA5E1E91FC95B35D2B258A8A995587D345123`.
+  APK Signature Scheme v2 verification passed with one Android debug signer.
+
 ## Email verification and Google Sign-In follow-up (2026-09-12)
 
 - Email verification now observes Firebase `userChanges()`, reloads verification

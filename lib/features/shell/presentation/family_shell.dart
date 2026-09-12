@@ -65,9 +65,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 2;
   bool _isCountingDown = false;
-  int _countdown = 3;
-  bool _alertSent = false;
-  Timer? _timer;
   Timer? _groupRetryTimer;
   bool _groupLoadErrorShown = false;
   bool _isCreatingGroup = false;
@@ -111,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isMarkingAlive = false;
   String _deviceTimeZone = 'UTC';
   Map<String, dynamic> _notificationSettings = {};
+  bool _isPremium = false;
   final ProfileService _profileService = ProfileService();
   final FamilyMemberService _memberService = FamilyMemberService();
   final GroupService _groupService = GroupService();
@@ -257,13 +255,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _createGroup() async {
     if (_isCreatingGroup) return;
+    if (!_isPremium && _groups.any((group) => group.isOwner)) {
+      _showPlanLimit(
+        'Your Free Plan allows you to create 1 Circle. Upgrade to Premium to create more.',
+      );
+      return;
+    }
     setState(() => _isCreatingGroup = true);
     final controller = TextEditingController();
     try {
       final formKey = GlobalKey<FormState>();
       final name = await showDialog<String>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
+        builder: (dialogContext) => AppAlertDialog(
           title: const Text('Create Circle'),
           content: Form(
             key: formKey,
@@ -445,6 +449,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _pendingJoinCircleId = profile.pendingJoinCircleId;
         _lastDailyCheckIn = profile.lastDailyCheckIn;
         _notificationSettings = profile.notificationSettings.toMap();
+        _isPremium = profile.isPremium;
         _isProfileLoading = false;
         _isProfileDirty = false;
       });
@@ -532,7 +537,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!_isProfileDirty) return true;
     final result = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AppAlertDialog(
         title: const Text('Save changes?'),
         content: const Text('You have unsaved profile changes.'),
         actions: [
@@ -560,9 +565,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _startSOS() async {
-    if (_isCountingDown || _alertSent) return;
+    if (_isCountingDown) return;
     final group = _selectedGroup;
-    if (group == null || group.emergencyRecipientIds.isEmpty) {
+    final senderId = FirebaseAuth.instance.currentUser?.uid;
+    final recipients = group?.emergencyRecipientIds
+        .where((id) => id != senderId && group.memberIds.contains(id))
+        .toList();
+    if (group == null || recipients == null || recipients.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -574,66 +583,21 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
+    setState(() => _isCountingDown = true);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        icon: Container(
-          width: 58,
-          height: 58,
-          decoration: BoxDecoration(
-            color: kEmergency.withValues(alpha: .11),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.sos_rounded, color: kEmergency, size: 32),
-        ),
-        title: const Text('Send Emergency Alert?'),
-        content: Text(
-          'This will alert the selected recipients in ${group.name}.',
-          textAlign: TextAlign.center,
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(context, true),
-            icon: const Icon(Icons.sos_rounded),
-            label: const Text('Send SOS'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kEmergency,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (context) => EmergencyCountdownDialog(groupName: group.name),
     );
-    if (confirmed != true || !mounted) return;
-
-    setState(() {
-      _isCountingDown = true;
-      _countdown = 3;
-      _alertSent = false;
-    });
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        if (_countdown > 1) {
-          _countdown--;
-        } else {
-          timer.cancel();
-          _isCountingDown = false;
-          _sendEmergency(group);
-        }
-      });
-    });
+    if (!mounted) return;
+    setState(() => _isCountingDown = false);
+    if (confirmed == true) await _sendEmergency(group, recipients);
   }
 
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => AppAlertDialog(
         icon: const Icon(Icons.logout_rounded, color: kEmergency, size: 34),
         title: const Text('Logout Confirmation'),
         content: const Text(
@@ -667,7 +631,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     _groupsSubscription?.cancel();
     _membersSubscription?.cancel();
-    _timer?.cancel();
     _groupRetryTimer?.cancel();
     unawaited(_deviceHeartbeat.dispose());
     _profileNameController.dispose();
@@ -700,7 +663,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _sendEmergency(FamilyGroup group) async {
+  Future<void> _sendEmergency(
+    FamilyGroup group,
+    List<String> recipientIds,
+  ) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     try {
@@ -710,13 +676,12 @@ class _HomeScreenState extends State<HomeScreen> {
         senderName: _profileNameController.text.trim().isEmpty
             ? 'A group member'
             : _profileNameController.text.trim(),
-        recipientIds: group.emergencyRecipientIds,
+        recipientIds: recipientIds,
       );
       if (!mounted) return;
-      setState(() => _alertSent = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('SOS sent to ${group.name} emergency recipients.'),
+        const SnackBar(
+          content: Text('Emergency alert sent successfully.'),
           backgroundColor: kEmergency,
         ),
       );
@@ -755,7 +720,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final member = familyMembers[index];
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => AppAlertDialog(
         icon: const Icon(Icons.person_remove_rounded, color: kEmergency),
         title: const Text('Remove member?'),
         content: Text(
@@ -864,5 +829,102 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildNavigationBar() => AppBottomNavigation(
     selectedIndex: _currentIndex,
     onSelected: (index) => setState(() => _currentIndex = index),
+  );
+
+  Future<void> _openPremiumFeature(VoidCallback action) async {
+    if (_isPremium) {
+      action();
+      return;
+    }
+    final upgrade = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AppAlertDialog(
+        icon: const Icon(Icons.workspace_premium_rounded, color: kEmerald),
+        title: const Text('Premium feature'),
+        content: const Text('This feature is available with Premium.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Not now'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Upgrade to Premium'),
+          ),
+        ],
+      ),
+    );
+    if (upgrade == true && mounted) _openPlansFromProfile();
+  }
+
+  void _showPlanLimit(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        action: SnackBarAction(
+          label: 'Upgrade to Premium',
+          onPressed: () => setState(() => _currentIndex = 3),
+        ),
+      ),
+    );
+  }
+}
+
+class EmergencyCountdownDialog extends StatefulWidget {
+  const EmergencyCountdownDialog({super.key, required this.groupName});
+  final String groupName;
+
+  @override
+  State<EmergencyCountdownDialog> createState() =>
+      _EmergencyCountdownDialogState();
+}
+
+class _EmergencyCountdownDialogState extends State<EmergencyCountdownDialog> {
+  int _seconds = 5;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (_seconds == 1) {
+        _timer?.cancel();
+        Navigator.pop(context, true);
+      } else {
+        setState(() => _seconds--);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AppAlertDialog(
+    icon: Container(
+      width: 58,
+      height: 58,
+      decoration: BoxDecoration(
+        color: kEmergency.withValues(alpha: .11),
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(Icons.sos_rounded, color: kEmergency, size: 32),
+    ),
+    title: const Text('Emergency Alert'),
+    content: Text(
+      'Emergency notification will be sent in $_seconds seconds.\n\nSelected recipients in ${widget.groupName} will be alerted.',
+      textAlign: TextAlign.center,
+    ),
+    actionsAlignment: MainAxisAlignment.center,
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context, false),
+        child: const Text('Cancel'),
+      ),
+    ],
   );
 }

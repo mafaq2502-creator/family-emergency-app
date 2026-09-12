@@ -7,27 +7,7 @@ extension _HomeTab on _HomeScreenState {
     final mutedColor = isDark ? Colors.white70 : kLightMuted;
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Hello, ${_profileNameController.text.isEmpty ? 'Afaq' : _profileNameController.text}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Your family is safe',
-                  style: TextStyle(fontSize: 13, color: mutedColor),
-                ),
-                const SizedBox(width: 5),
-                const Icon(Icons.favorite, size: 14, color: kEmergency),
-              ],
-            ),
-          ],
-        ),
+        title: const Text('Home'),
         actions: [
           _notificationBell(),
           Icon(
@@ -52,6 +32,32 @@ extension _HomeTab on _HomeScreenState {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(
+                        'Hello, ${_profileNameController.text.isEmpty ? 'Afaq' : _profileNameController.text}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: titleColor,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Text(
+                            'Your family is safe',
+                            style: TextStyle(fontSize: 13, color: mutedColor),
+                          ),
+                          const SizedBox(width: 5),
+                          const Icon(
+                            Icons.favorite,
+                            size: 14,
+                            color: kEmergency,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
                       Text(
                         'Your Groups',
                         style: TextStyle(
@@ -109,16 +115,41 @@ extension _HomeTab on _HomeScreenState {
           SizedBox(
             width: double.infinity,
             height: 56,
+            child: ElevatedButton.icon(
+              onPressed: _isCountingDown ? null : _startSOS,
+              icon: const Icon(Icons.warning_amber_rounded, size: 19),
+              label: const Text(
+                'Emergency',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kEmergency,
+                foregroundColor: Colors.white,
+                elevation: 6,
+                shadowColor: kEmergency.withValues(alpha: .45),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(22),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Alerts only your selected emergency recipients',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: mutedColor),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 64,
             child: OutlinedButton.icon(
               onPressed: _isMarkingAlive ? null : _markAlive,
               icon: _isMarkingAlive
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: kEmerald,
-                      ),
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : Icon(
                       _checkedInToday
@@ -143,7 +174,7 @@ extension _HomeTab on _HomeScreenState {
                     ? (isDark ? const Color(0xFF123A31) : kLightSuccessSurface)
                     : Colors.transparent,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(24),
                 ),
               ),
             ),
@@ -151,29 +182,8 @@ extension _HomeTab on _HomeScreenState {
           const SizedBox(height: 4),
           Text(
             _checkedInToday ? 'Checked in today' : 'Tap once each day',
+            textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: mutedColor),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 64,
-            child: ElevatedButton.icon(
-              onPressed: _startSOS,
-              icon: const Icon(Icons.warning_amber_rounded, size: 19),
-              label: const Text(
-                'Emergency',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kEmergency,
-                foregroundColor: Colors.white,
-                elevation: 6,
-                shadowColor: kEmergency.withValues(alpha: .45),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-              ),
-            ),
           ),
         ],
       ),

@@ -6,6 +6,35 @@ const { collection, query, where, limit, getDocs, doc, getDoc, serverTimestamp, 
 
 let testEnvironment;
 
+for (const activeCircleId of ['circle-1', 'another-circle']) {
+  test(`owner deletion tolerates legacy profile fields, active=${activeCircleId}`, async () => {
+    await testEnvironment.withSecurityRulesDisabled(async context => {
+      await updateDoc(doc(context.firestore(), 'users/owner-1'), {
+        role: 'Father', relationship: 'Legacy relationship',
+        circleIds: ['circle-1', 'another-circle'], activeCircleId,
+      });
+    });
+    const owner = testEnvironment.authenticatedContext('owner-1').firestore();
+    const cleanup = {
+      circleIds: ['another-circle'], updatedAt: serverTimestamp(),
+      ...(activeCircleId === 'circle-1' ? {activeCircleId: deleteField()} : {}),
+    };
+    await assertFails(updateDoc(doc(owner, 'users/owner-1'), cleanup));
+    const makeBatch = (extra = {}) => {
+      const batch = writeBatch(owner);
+      batch.update(doc(owner, 'groups/circle-1'), {
+        status: 'deleted', deletedBy: 'owner-1', deletedAt: serverTimestamp(),
+        memberIds: [], roles: {}, emergencyRecipientIds: [], updatedAt: serverTimestamp(),
+      });
+      batch.update(doc(owner, 'users/owner-1'), {...cleanup, ...extra});
+      return batch;
+    };
+    await assertFails(makeBatch({name: 'Unauthorized profile edit'}).commit());
+    await assertFails(makeBatch({circleIds: []}).commit());
+    await assertFails(makeBatch().commit());
+  });
+}
+
 before(async () => {
   testEnvironment = await initializeTestEnvironment({
     projectId: 'demo-alivecircle',
@@ -37,6 +66,7 @@ beforeEach(async () => {
       await setDoc(doc(db, `users/${id}`), {
         uid: id, name, email: `${id}@example.test`, relationship,
         profileCompleted: true, onboardingCompleted: true,
+        planTier: 'premium', subscriptionStatus: 'active',
         circleIds: ['circle-1'], activeCircleId: 'circle-1',
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       });
@@ -155,7 +185,7 @@ test('manager cannot configure an emergency recipient outside the Circle', async
   }));
 });
 
-test('new Circle and owner membership can be created atomically', async () => {
+test('Circle creation is restricted to the trusted entitlement function', async () => {
   const owner = testEnvironment.authenticatedContext('new-owner').firestore();
   const batch = writeBatch(owner);
   batch.set(doc(owner, 'groups/circle-2'), {
@@ -167,7 +197,7 @@ test('new Circle and owner membership can be created atomically', async () => {
     userId: 'new-owner', displayName: 'New Owner', relationship: 'Self', circleRole: 'owner',
     status: 'active', joinedAt: serverTimestamp(), updatedAt: serverTimestamp(),
   });
-  await assertSucceeds(batch.commit());
+  await assertFails(batch.commit());
 });
 
 test('members can write only their own progress record', async () => {
@@ -217,56 +247,17 @@ test('deleted Circle is not readable when a stale member id remains', async () =
   await assertFails(getDoc(doc(owner, 'groups/circle-1')));
 });
 
-test('owner can atomically tombstone a Circle while a non-owner cannot', async () => {
-  await testEnvironment.withSecurityRulesDisabled(async context => {
-    const db = context.firestore();
-    await setDoc(doc(db, 'circleInvites/test-invite'), {circleId: 'circle-1', status: 'exhausted'});
-    await setDoc(doc(db, 'groups/circle-1/joinRequests/requester'), {userUid: 'requester', status: 'pending'});
-    await setDoc(doc(db, 'groups/circle-1/devices/test-device'), {ownerUserId: 'adult-1', pairingStatus: 'paired'});
-    await setDoc(doc(db, 'users/adult-1/devices/global-device'), {ownerUserId: 'adult-1', status: 'active'});
-    await setDoc(doc(db, 'users/owner-1/notifications/circle-notice'), {groupId: 'circle-1', title: 'Circle alert'});
-    await setDoc(doc(db, 'users/owner-1/notifications/other-notice'), {groupId: 'circle-2', title: 'Other alert'});
-  });
+test('Circle deletion is restricted to the trusted lifecycle function', async () => {
   const adult = testEnvironment.authenticatedContext('adult-1').firestore();
   await assertFails(updateDoc(doc(adult, 'groups/circle-1'), {
     status: 'deleted', deletedBy: 'adult-1', deletedAt: serverTimestamp(),
     memberIds: [], roles: {}, emergencyRecipientIds: [], updatedAt: serverTimestamp(),
   }));
-
   const owner = testEnvironment.authenticatedContext('owner-1', {email: 'owner-1@example.test'}).firestore();
-  const batch = writeBatch(owner);
-  batch.update(doc(owner, 'circleInvites/test-invite'), {
-    status: 'revoked', revokedBy: 'owner-1', revokedAt: serverTimestamp(), updatedAt: serverTimestamp(),
-  });
-  batch.update(doc(owner, 'groups/circle-1/joinRequests/requester'), {
-    status: 'rejected', reviewedBy: 'owner-1', reviewedAt: serverTimestamp(), updatedAt: serverTimestamp(),
-  });
-  batch.update(doc(owner, 'groups/circle-1/devices/test-device'), {
-    pairingStatus: 'unpaired', removedBy: 'owner-1', removedAt: serverTimestamp(), updatedAt: serverTimestamp(),
-  });
-  batch.update(doc(owner, 'groups/circle-1'), {
+  await assertFails(updateDoc(doc(owner, 'groups/circle-1'), {
     status: 'deleted', deletedBy: 'owner-1', deletedAt: serverTimestamp(),
     memberIds: [], roles: {}, emergencyRecipientIds: [], updatedAt: serverTimestamp(),
-  });
-  for (const uid of ['owner-1', 'adult-1']) {
-    batch.update(doc(owner, `groups/circle-1/memberships/${uid}`), {
-      status: 'removed', endedBy: 'owner-1', endedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  }
-  batch.update(doc(owner, 'users/owner-1'), {
-    circleIds: [], activeCircleId: deleteField(), updatedAt: serverTimestamp(),
-  });
-  batch.delete(doc(owner, 'users/owner-1/notifications/circle-notice'));
-  await assertSucceeds(batch.commit());
-  await assertFails(getDoc(doc(adult, 'groups/circle-1')));
-  await assertSucceeds(getDoc(doc(adult, 'users/adult-1/devices/global-device')));
-  const requester = testEnvironment.authenticatedContext('requester').firestore();
-  const request = await assertSucceeds(getDoc(doc(requester, 'groups/circle-1/joinRequests/requester')));
-  require('node:assert/strict').equal(request.data().status, 'rejected');
-  const deletedNotice = await assertSucceeds(getDoc(doc(owner, 'users/owner-1/notifications/circle-notice')));
-  require('node:assert/strict').equal(deletedNotice.exists(), false);
-  await assertSucceeds(getDoc(doc(owner, 'users/owner-1/notifications/other-notice')));
+  }));
 });
 
 test('Circle notifications cannot be deleted without the matching owner tombstone', async () => {

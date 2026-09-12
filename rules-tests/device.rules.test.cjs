@@ -48,6 +48,8 @@ beforeEach(async () => {
         relationship: uid === 'owner-1' ? 'Self' : 'Other',
         profileCompleted: true,
         onboardingCompleted: true,
+        planTier: 'premium',
+        subscriptionStatus: 'active',
         circleIds: uid === 'outsider-1' ? [] : ['circle-1'],
         activeCircleId: uid === 'outsider-1' ? null : 'circle-1',
         createdAt: serverTimestamp(),

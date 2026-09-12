@@ -5,7 +5,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../models/emergency_event.dart';
 import '../../../models/family_group.dart';
 import '../../../services/emergency_service.dart';
-import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../core/widgets/light_ui.dart';
 import 'emergency_detail_screen.dart';
 
@@ -60,7 +59,6 @@ class _EmergencyEventsScreenState extends State<EmergencyEventsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.group.name} SOS activity'),
-        actions: const [NotificationBellButton()],
       ),
       body: Column(
         children: [

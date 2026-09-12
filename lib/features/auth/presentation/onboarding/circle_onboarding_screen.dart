@@ -11,7 +11,6 @@ import '../../../../models/circle_join_request.dart';
 import '../../../../services/circle_join_service.dart';
 import '../../../../services/group_service.dart';
 import '../../../groups/presentation/qr_scanner_screen.dart';
-import '../../../notifications/presentation/notification_bell_button.dart';
 import '../../domain/auth_error_mapper.dart';
 import '../../domain/auth_validators.dart';
 
@@ -178,7 +177,6 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
       appBar: AppBar(
         automaticallyImplyLeading: false,
         actions: [
-          const NotificationBellButton(),
           TextButton(
             onPressed: _busy ? null : widget.onSignOut,
             child: const Text('Sign out'),

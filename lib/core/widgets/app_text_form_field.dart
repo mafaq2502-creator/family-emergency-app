@@ -62,12 +62,14 @@ class AppTextFormField extends StatelessWidget {
         labelStyle: TextStyle(
           color: muted,
           fontSize: AppTypography.fieldLabel,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
+          height: 1.2,
         ),
-        floatingLabelStyle: const TextStyle(
-          color: kLightPrimary,
+        floatingLabelStyle: TextStyle(
+          color: Theme.of(context).colorScheme.primary,
           fontSize: AppTypography.fieldLabel,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
+          height: 1.2,
         ),
         hintStyle: TextStyle(
           color: muted.withValues(alpha: .86),

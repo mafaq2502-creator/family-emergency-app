@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../notifications/presentation/notification_bell_button.dart';
 
 class PlansScreen extends StatelessWidget {
   const PlansScreen({super.key});
@@ -10,7 +9,6 @@ class PlansScreen extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Plans'),
-      actions: const [NotificationBellButton()],
     ),
     body: const PlanSelectionContent(showHeader: false),
   );
@@ -81,10 +79,12 @@ class PlanSelectionContent extends StatelessWidget {
                             subtitle: 'Basic features for\nsmall families.',
                             price: '\$0',
                             features: const [
+                              '1 owned Circle',
+                              '1 joined Circle',
                               'Owner + 2 members',
-                              'Manual SOS alerts',
-                              'Daily check-in',
-                              'Emergency contacts',
+                              'Emergency/SOS alerts',
+                              'Emergency recipient selection',
+                              'Basic Circle management',
                             ],
                             selected: true,
                           ),
@@ -95,9 +95,10 @@ class PlanSelectionContent extends StatelessWidget {
                             context: context,
                             title: 'Premium',
                             subtitle: 'Advanced features\nfor complete safety.',
-                            price: '\$4.99',
+                            price: '\$2.99',
                             features: const [
                               'Owner + 10 members',
+                              'Yearly: \$28.70 (20% off)',
                               'Approved device access',
                               'Battery/offline alerts',
                               'Emergency history',

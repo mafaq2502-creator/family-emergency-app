@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
-import {FieldValue} from 'firebase-admin/firestore';
+import {randomBytes} from 'node:crypto';
+import {FieldValue, Timestamp} from 'firebase-admin/firestore';
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
@@ -13,6 +14,42 @@ type GroupData = {
   emergencyRecipientIds?: unknown;
   status?: unknown;
 };
+
+const FREE_MAX_OWNED = 1;
+const FREE_MAX_JOINED = 1;
+const FREE_MAX_MEMBERS = 3;
+const PREMIUM_MAX_MEMBERS = 11;
+
+function isPremium(profile: admin.firestore.DocumentData | undefined): boolean {
+  return profile?.planTier === 'premium' && profile?.subscriptionStatus === 'active';
+}
+
+function maxMembers(profile: admin.firestore.DocumentData | undefined): number {
+  return isPremium(profile) ? PREMIUM_MAX_MEMBERS : FREE_MAX_MEMBERS;
+}
+
+function inviteCode(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = randomBytes(24);
+  return [...bytes].map(value => alphabet[value % alphabet.length]).join('');
+}
+
+function requireName(data: unknown): string {
+  const name = String((data as {name?: unknown} | null)?.name ?? '').trim();
+  if (name.length < 2 || name.length > 60 || /[\u0000-\u001f\u007f]/.test(name)) {
+    throw new HttpsError('invalid-argument', 'Please enter a valid Circle name.');
+  }
+  return name;
+}
+
+async function activeCirclesFor(
+  transaction: admin.firestore.Transaction,
+  userId: string,
+): Promise<admin.firestore.QuerySnapshot> {
+  return transaction.get(db.collection('groups')
+    .where('memberIds', 'array-contains', userId)
+    .where('status', '==', 'active'));
+}
 
 function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.length > 0) : [];
@@ -41,6 +78,8 @@ function ensureActiveGroup(group: admin.firestore.DocumentSnapshot): GroupData {
 function profileCircleCleanup(circleId: string, profileData: admin.firestore.DocumentData | undefined) {
   const update: Record<string, unknown> = {
     circleIds: FieldValue.arrayRemove(circleId),
+    ownedCircleIds: FieldValue.arrayRemove(circleId),
+    joinedCircleIds: FieldValue.arrayRemove(circleId),
     updatedAt: FieldValue.serverTimestamp(),
   };
   if (profileData?.activeCircleId === circleId) {
@@ -97,15 +136,241 @@ async function deliverNotification(userId: string, groupId: string, title: strin
 export const sendEmergencyToRecipients = onDocumentCreated('groups/{groupId}/emergencies/{emergencyId}', async event => {
   const emergency = event.data?.data(); if (!emergency) return;
   const group = await db.collection('groups').doc(event.params.groupId).get();
-  const recipientIds: string[] = group.data()?.emergencyRecipientIds ?? [];
-  const recipients = recipientIds.filter(id => id !== emergency.senderId);
+  const members = new Set(strings(group.data()?.memberIds));
+  const recipients = strings(emergency.recipientIds)
+    .filter(id => members.has(id) && id !== emergency.senderId);
   await Promise.all(recipients.map(async userId => deliverNotification(userId, event.params.groupId, 'Emergency SOS', `${emergency.senderName ?? 'A member'} needs help. Tap to acknowledge.`, 'emergency', event.params.emergencyId)));
+});
+
+export const createCircle = onCall(async request => {
+  const userId = request.auth?.uid;
+  if (!userId) throw new HttpsError('unauthenticated', 'Please sign in again.');
+  const name = requireName(request.data);
+  const groupRef = db.collection('groups').doc();
+  const profileRef = db.collection('users').doc(userId);
+  await db.runTransaction(async transaction => {
+    const [profile, owned] = await Promise.all([
+      transaction.get(profileRef),
+      transaction.get(db.collection('groups').where('ownerId', '==', userId).where('status', '==', 'active')),
+    ]);
+    const profileData = profile.data();
+    if (!isPremium(profileData) && owned.size >= FREE_MAX_OWNED) {
+      throw new HttpsError('resource-exhausted', 'Your Free Plan allows you to create 1 Circle. Upgrade to Premium to create more.');
+    }
+    const now = FieldValue.serverTimestamp();
+    transaction.create(groupRef, {
+      name, ownerId: userId, memberIds: [userId], roles: {[userId]: 'owner'},
+      emergencyRecipientIds: [userId], status: 'active',
+      ownerPlanTier: isPremium(profileData) ? 'premium' : 'free', createdAt: now, updatedAt: now,
+    });
+    transaction.create(groupRef.collection('memberships').doc(userId), {
+      userId, displayName: profileData?.name ?? request.auth?.token.name ?? '',
+      email: request.auth?.token.email ?? '', relationship: profileData?.relationship ?? 'Self',
+      circleRole: 'owner', status: 'active', joinedAt: now, updatedAt: now,
+    });
+    transaction.set(profileRef, {
+      onboardingCompleted: true, activeCircleId: groupRef.id,
+      circleIds: FieldValue.arrayUnion(groupRef.id), ownedCircleIds: FieldValue.arrayUnion(groupRef.id),
+      updatedAt: now,
+    }, {merge: true});
+  });
+  return {circleId: groupRef.id};
+});
+
+export const createCircleInvite = onCall(async request => {
+  const userId = request.auth?.uid;
+  if (!userId) throw new HttpsError('unauthenticated', 'Please sign in again.');
+  const circleId = requireCircleId(request.data);
+  const circleRole = request.data?.circleRole === 'child' ? 'child' : 'adult';
+  const code = inviteCode();
+  const inviteRef = db.collection('circleInvites').doc(code);
+  await db.runTransaction(async transaction => {
+    const groupRef = db.collection('groups').doc(circleId);
+    const groupSnapshot = await transaction.get(groupRef);
+    const groupData = ensureActiveGroup(groupSnapshot);
+    const actorRole = roles(groupData.roles)[userId];
+    if (!strings(groupData.memberIds).includes(userId) || !['owner', 'parent', 'admin'].includes(actorRole)) {
+      throw new HttpsError('permission-denied', 'Only a Circle owner or parent can create invitations.');
+    }
+    const ownerProfile = await transaction.get(db.collection('users').doc(String(groupData.ownerId)));
+    const activeInvites = await transaction.get(db.collection('circleInvites')
+      .where('circleId', '==', circleId).where('status', '==', 'active'));
+    const reserved = activeInvites.docs.filter(doc => {
+      const expiresAt = doc.data().expiresAt;
+      return expiresAt instanceof Timestamp && expiresAt.toMillis() > Date.now();
+    }).length;
+    if (strings(groupData.memberIds).length + reserved >= maxMembers(ownerProfile.data())) {
+      throw new HttpsError('resource-exhausted', isPremium(ownerProfile.data()) ? 'This Circle has reached its member limit.' : 'Free Plan member limit reached.');
+    }
+    const now = FieldValue.serverTimestamp();
+    transaction.create(inviteRef, {
+      circleId, circleName: groupSnapshot.data()?.name, createdBy: userId,
+      createdAt: now, expiresAt: Timestamp.fromMillis(Date.now() + 7 * 86400000),
+      status: 'active', inviteType: 'singleUse', maxUses: 1, useCount: 0,
+      requiresApproval: true, circleRole,
+    });
+  });
+  const group = await db.collection('groups').doc(circleId).get();
+  return {id: code, circleId, circleName: String(group.data()?.name ?? 'Family Circle'),
+    createdBy: userId, expiresAtMillis: Date.now() + 7 * 86400000, status: 'active', maxUses: 1,
+    useCount: 0, requiresApproval: true, circleRole};
+});
+
+export const revokeCircleInvite = onCall(async request => {
+  const userId = request.auth?.uid;
+  if (!userId) throw new HttpsError('unauthenticated', 'Please sign in again.');
+  const code = String(request.data?.code ?? '').trim().toUpperCase();
+  await db.runTransaction(async transaction => {
+    const ref = db.collection('circleInvites').doc(code);
+    const invite = await transaction.get(ref);
+    const data = invite.data();
+    if (!invite.exists || !data) throw new HttpsError('not-found', 'This invitation is no longer available.');
+    const groupData = ensureActiveGroup(await transaction.get(db.collection('groups').doc(String(data.circleId))));
+    if (!['owner', 'parent', 'admin'].includes(roles(groupData.roles)[userId])) throw new HttpsError('permission-denied', 'You cannot revoke this invitation.');
+    if (data.status !== 'active') throw new HttpsError('failed-precondition', 'This invitation is no longer active.');
+    const now = FieldValue.serverTimestamp();
+    transaction.update(ref, {status: 'revoked', revokedBy: userId, revokedAt: now, updatedAt: now});
+  });
+  return {code};
+});
+
+export const cancelCircleJoinRequest = onCall(async request => {
+  const userId = request.auth?.uid;
+  if (!userId) throw new HttpsError('unauthenticated', 'Please sign in again.');
+  const circleId = requireCircleId(request.data);
+  await db.runTransaction(async transaction => {
+    const requestRef = db.collection('groups').doc(circleId).collection('joinRequests').doc(userId);
+    const joinRequest = await transaction.get(requestRef);
+    const data = joinRequest.data();
+    if (!joinRequest.exists || data?.status !== 'pending') return;
+    const inviteRef = db.collection('circleInvites').doc(String(data.inviteId));
+    const invite = await transaction.get(inviteRef);
+    const now = FieldValue.serverTimestamp();
+    transaction.update(requestRef, {status: 'cancelled', updatedAt: now});
+    if (invite.data()?.status === 'active' && invite.data()?.reservedBy === userId) {
+      transaction.update(inviteRef, {
+        status: 'revoked', revokedBy: userId, revokedAt: now,
+        reservedBy: FieldValue.delete(), reservedAt: FieldValue.delete(), updatedAt: now,
+      });
+    }
+    transaction.set(db.collection('users').doc(userId), {pendingJoinCircleId: FieldValue.delete(), pendingJoinInviteId: FieldValue.delete(), updatedAt: now}, {merge: true});
+  });
+  return {circleId};
+});
+
+export const submitCircleJoinRequest = onCall(async request => {
+  const userId = request.auth?.uid;
+  if (!userId) throw new HttpsError('unauthenticated', 'Please sign in again.');
+  const code = String(request.data?.code ?? '').trim().toUpperCase();
+  if (!/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{24}$/.test(code)) throw new HttpsError('invalid-argument', 'This invitation is invalid.');
+  let result: Record<string, unknown> = {};
+  await db.runTransaction(async transaction => {
+    const inviteRef = db.collection('circleInvites').doc(code);
+    const inviteSnapshot = await transaction.get(inviteRef);
+    const inviteData = inviteSnapshot.data();
+    if (!inviteSnapshot.exists || !inviteData) throw new HttpsError('not-found', 'This invitation is invalid.');
+    if (inviteData.status === 'consumed') throw new HttpsError('already-exists', 'This invitation has already been used.');
+    if (inviteData.status === 'revoked') throw new HttpsError('failed-precondition', 'This invitation has been revoked.');
+    if (!(inviteData.expiresAt instanceof Timestamp) || inviteData.expiresAt.toMillis() <= Date.now()) throw new HttpsError('deadline-exceeded', 'This invitation has expired.');
+    if (inviteData.status !== 'active' || (inviteData.reservedBy && inviteData.reservedBy !== userId)) throw new HttpsError('already-exists', 'This invitation has already been used.');
+    const circleId = String(inviteData.circleId);
+    const groupRef = db.collection('groups').doc(circleId);
+    const profileRef = db.collection('users').doc(userId);
+    const [groupSnapshot, profile, memberships] = await Promise.all([
+      transaction.get(groupRef), transaction.get(profileRef), activeCirclesFor(transaction, userId),
+    ]);
+    const groupData = ensureActiveGroup(groupSnapshot);
+    if (strings(groupData.memberIds).includes(userId)) {
+      result = {circleId, circleName: inviteData.circleName, status: 'existingMember'};
+      return;
+    }
+    const joinedCount = memberships.docs.filter(doc => doc.data().ownerId !== userId).length;
+    if (!isPremium(profile.data()) && joinedCount >= FREE_MAX_JOINED) throw new HttpsError('resource-exhausted', 'Your Free Plan allows you to join 1 additional Circle. Upgrade to Premium to join more.');
+    const ownerProfile = await transaction.get(db.collection('users').doc(String(groupData.ownerId)));
+    if (strings(groupData.memberIds).length >= maxMembers(ownerProfile.data())) throw new HttpsError('resource-exhausted', isPremium(ownerProfile.data()) ? 'This Circle is full.' : 'Free Plan member limit reached.');
+    const requestRef = groupRef.collection('joinRequests').doc(userId);
+    const existing = await transaction.get(requestRef);
+    if (existing.data()?.status === 'pending' && inviteData.reservedBy === userId) {
+      result = {circleId, circleName: inviteData.circleName, status: 'alreadyPending'};
+      return;
+    }
+    const now = FieldValue.serverTimestamp();
+    transaction.set(requestRef, {
+      circleId, userUid: userId, inviteId: code, displayName: profile.data()?.name ?? request.auth?.token.name ?? 'Family member',
+      email: profile.data()?.email ?? request.auth?.token.email ?? '', relationship: profile.data()?.relationship ?? 'Family member',
+      circleRole: inviteData.circleRole === 'child' ? 'child' : 'adult', status: 'pending', requestedAt: now, updatedAt: now,
+    });
+    transaction.update(inviteRef, {reservedBy: userId, reservedAt: now, updatedAt: now});
+    transaction.set(profileRef, {pendingJoinCircleId: circleId, pendingJoinInviteId: code, updatedAt: now}, {merge: true});
+    result = {circleId, circleName: inviteData.circleName, status: 'pending'};
+  });
+  return result;
+});
+
+export const reviewCircleJoinRequest = onCall(async request => {
+  const reviewerId = request.auth?.uid;
+  if (!reviewerId) throw new HttpsError('unauthenticated', 'Please sign in again.');
+  const circleId = requireCircleId(request.data);
+  const targetId = String(request.data?.userId ?? '').trim();
+  const approve = request.data?.approve === true;
+  await db.runTransaction(async transaction => {
+    const groupRef = db.collection('groups').doc(circleId);
+    const requestRef = groupRef.collection('joinRequests').doc(targetId);
+    const [groupSnapshot, joinRequest, targetProfile, targetGroups] = await Promise.all([
+      transaction.get(groupRef), transaction.get(requestRef), transaction.get(db.collection('users').doc(targetId)), activeCirclesFor(transaction, targetId),
+    ]);
+    const groupData = ensureActiveGroup(groupSnapshot);
+    const reviewerRole = roles(groupData.roles)[reviewerId];
+    if (!strings(groupData.memberIds).includes(reviewerId) || !['owner', 'parent', 'admin'].includes(reviewerRole)) throw new HttpsError('permission-denied', 'This join request cannot be reviewed.');
+    const requestData = joinRequest.data();
+    if (!joinRequest.exists || requestData?.status !== 'pending') throw new HttpsError('failed-precondition', 'This join request was already reviewed.');
+    const inviteRef = db.collection('circleInvites').doc(String(requestData.inviteId));
+    const invite = await transaction.get(inviteRef);
+    const inviteData = invite.data();
+    const now = FieldValue.serverTimestamp();
+    if (!approve) {
+      transaction.update(requestRef, {status: 'rejected', reviewedBy: reviewerId, reviewedAt: now, updatedAt: now});
+      if (inviteData?.status === 'active' && inviteData.reservedBy === targetId) {
+        transaction.update(inviteRef, {
+          status: 'revoked', revokedBy: reviewerId, revokedAt: now,
+          reservedBy: FieldValue.delete(), reservedAt: FieldValue.delete(), updatedAt: now,
+        });
+      }
+      transaction.set(targetProfile.ref, {pendingJoinCircleId: FieldValue.delete(), pendingJoinInviteId: FieldValue.delete(), updatedAt: now}, {merge: true});
+      return;
+    }
+    if (!invite.exists || !inviteData || inviteData.status !== 'active' || inviteData.reservedBy !== targetId || !(inviteData.expiresAt instanceof Timestamp) || inviteData.expiresAt.toMillis() <= Date.now()) throw new HttpsError('failed-precondition', inviteData?.status === 'consumed' ? 'This invitation has already been used.' : 'This invitation is no longer active.');
+    const ownerProfile = await transaction.get(db.collection('users').doc(String(groupData.ownerId)));
+    if (strings(groupData.memberIds).length >= maxMembers(ownerProfile.data())) throw new HttpsError('resource-exhausted', 'Free Plan member limit reached.');
+    const joinedCount = targetGroups.docs.filter(doc => doc.data().ownerId !== targetId).length;
+    if (!isPremium(targetProfile.data()) && joinedCount >= FREE_MAX_JOINED) throw new HttpsError('resource-exhausted', 'Your Free Plan allows you to join 1 additional Circle. Upgrade to Premium to join more.');
+    const assignedRole = requestData.circleRole === 'child' ? 'child' : 'adult';
+    const nextRoles = roles(groupData.roles); nextRoles[targetId] = assignedRole;
+    transaction.update(groupRef, {memberIds: FieldValue.arrayUnion(targetId), roles: nextRoles, lastApprovedUserId: targetId, updatedAt: now});
+    transaction.set(groupRef.collection('memberships').doc(targetId), {userId: targetId, displayName: requestData.displayName, email: requestData.email, relationship: requestData.relationship, circleRole: assignedRole, status: 'active', joinedAt: now, updatedAt: now});
+    transaction.update(requestRef, {status: 'approved', reviewedBy: reviewerId, reviewedAt: now, updatedAt: now});
+    transaction.update(inviteRef, {status: 'consumed', useCount: 1, consumedBy: targetId, consumedAt: now, updatedAt: now});
+    transaction.set(targetProfile.ref, {onboardingCompleted: true, activeCircleId: circleId, circleIds: FieldValue.arrayUnion(circleId), joinedCircleIds: FieldValue.arrayUnion(circleId), pendingJoinCircleId: FieldValue.delete(), pendingJoinInviteId: FieldValue.delete(), updatedAt: now}, {merge: true});
+  });
+  return {circleId, userId: targetId, approved: approve};
 });
 
 export const notifyEmergencyAcknowledgement = onDocumentUpdated('groups/{groupId}/emergencies/{emergencyId}', async event => {
   const before = event.data?.before.data(); const after = event.data?.after.data();
   if (!before || !after || before.status === after.status || after.status !== 'acknowledged') return;
   await deliverNotification(after.senderId, event.params.groupId, 'SOS acknowledged', `${after.acknowledgedByName ?? 'A group member'} acknowledged your emergency.`, 'emergencyAcknowledged', event.params.emergencyId);
+});
+
+export const syncOwnedCirclePlan = onDocumentUpdated('users/{userId}', async event => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+  if (!after || (before?.planTier === after.planTier && before?.subscriptionStatus === after.subscriptionStatus)) return;
+  const tier = isPremium(after) ? 'premium' : 'free';
+  const groups = await db.collection('groups').where('ownerId', '==', event.params.userId).where('status', '==', 'active').get();
+  if (groups.empty) return;
+  const batch = db.batch();
+  groups.docs.forEach(group => batch.update(group.ref, {ownerPlanTier: tier, updatedAt: FieldValue.serverTimestamp()}));
+  await batch.commit();
 });
 
 export const removeCircleMember = onCall(async request => {
