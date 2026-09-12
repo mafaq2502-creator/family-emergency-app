@@ -118,7 +118,7 @@ void main() {
       ),
       const Size(320, 568),
     );
-    expect(find.text('Save Changes'), findsOneWidget);
+    expect(find.text('Save Settings'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -147,14 +147,14 @@ void main() {
       find.text('Scan to preview this Circle and request approval.'),
       findsOneWidget,
     );
-    await tester.tap(find.text('Invite Code'));
-    await tester.pump();
     expect(find.text(fakeInviteCode), findsNothing);
-    expect(find.text('ABCD-EFGH-JKLM-NPQR-STUV-2345'), findsOneWidget);
-    await tester.tap(find.text('Invite Link'));
+    expect(find.text('ABCD-EFGH-JKLM-NPQR-STUV-2345'), findsNothing);
+    await tester.tap(find.text('Share Link'));
     await tester.pump();
     expect(
-      find.text('familyemergency://join?code=$fakeInviteCode'),
+      find.text(
+        'https://familyemergencyapp.web.app/join?code=$fakeInviteCode',
+      ),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);

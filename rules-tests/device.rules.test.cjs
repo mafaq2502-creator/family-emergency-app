@@ -330,3 +330,74 @@ test('device visibility is limited to owner and Circle managers', async () => {
   await assertSucceeds(getDocs(selfQuery));
   await assertFails(getDocs(collection(outsider, 'groups/circle-1/devices')));
 });
+
+test('screen-time writes are device-bound, idempotent and Circle scoped', async () => {
+  await seedOldInstallation();
+  await testEnvironment.withSecurityRulesDisabled(async context => {
+    const old = Timestamp.fromMillis(Date.now() - 5 * 60 * 1000);
+    await setDoc(doc(context.firestore(), `groups/circle-1/devices/${associationId}`), {
+      ...associationData(), pairedAt: old, lastSeenAt: old,
+      lastHeartbeatAt: old, createdAt: old, updatedAt: old,
+    });
+  });
+  const adult = testEnvironment.authenticatedContext('adult-1').firestore();
+  const owner = testEnvironment.authenticatedContext('owner-1').firestore();
+  const outsider = testEnvironment.authenticatedContext('outsider-1').firestore();
+  const localDate = '2026-09-12';
+  const record = {
+    userId: 'adult-1', installationId, localDate,
+    timeZoneOffsetMinutes: 300, totalTimeMs: 120000,
+    apps: [{packageName: 'com.example.reader', appName: 'Reader', totalTimeMs: 120000}],
+    collectedAt: Timestamp.now(), syncedAt: serverTimestamp(),
+    source: 'android_usage_stats', schemaVersion: 1,
+  };
+  const ownRef = doc(adult, `users/adult-1/devices/${installationId}/screenTimeDaily/${localDate}`);
+  const circleRef = doc(adult, `groups/circle-1/screenTimeDaily/adult-1_${installationId}_${localDate}`);
+  await assertSucceeds(setDoc(ownRef, record));
+  await assertSucceeds(setDoc(circleRef, record));
+  await assertSucceeds(setDoc(circleRef, {...record, totalTimeMs: 180000}));
+  await assertSucceeds(getDoc(doc(owner, circleRef.path)));
+  await assertFails(getDoc(doc(outsider, circleRef.path)));
+  await assertFails(setDoc(doc(outsider, circleRef.path), {...record, userId: 'outsider-1'}));
+  await assertFails(setDoc(doc(adult, `groups/circle-1/screenTimeDaily/spoofed`), record));
+});
+
+test('only a device owner can publish screen-time permission and sync state', async () => {
+  await seedOldInstallation();
+  await testEnvironment.withSecurityRulesDisabled(async context => {
+    const old = Timestamp.fromMillis(Date.now() - 5 * 60 * 1000);
+    await setDoc(doc(context.firestore(), `groups/circle-1/devices/${associationId}`), {
+      ...associationData(), pairedAt: old, lastSeenAt: old,
+      lastHeartbeatAt: old, createdAt: old, updatedAt: old,
+    });
+  });
+  const adult = testEnvironment.authenticatedContext('adult-1').firestore();
+  const outsider = testEnvironment.authenticatedContext('outsider-1').firestore();
+  const ref = doc(adult, `users/adult-1/devices/${installationId}`);
+  const association = doc(adult, `groups/circle-1/devices/${associationId}`);
+  await assertSucceeds(updateDoc(ref, {
+    permissions: {screenTime: false},
+    screenTimePermissionState: 'notGranted',
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(outsider, ref.path), {
+    permissions: {screenTime: true},
+    screenTimePermissionState: 'granted',
+    updatedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(updateDoc(association, {
+    permissions: {screenTime: false},
+    screenTimePermissionState: 'notGranted',
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(outsider, association.path), {
+    permissions: {screenTime: true},
+    screenTimePermissionState: 'granted',
+    updatedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(updateDoc(ref, {
+    permissions: {screenTime: true},
+    lastScreenTimeSyncAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }));
+});

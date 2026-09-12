@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:family_emergency_app/app/family_emergency_app.dart';
 import 'package:family_emergency_app/core/domain/circle_policies.dart';
+import 'package:family_emergency_app/core/theme/app_colors.dart';
 import 'package:family_emergency_app/features/groups/presentation/group_members_screen.dart';
 import 'package:family_emergency_app/features/groups/presentation/group_settings_screen.dart';
 import 'package:family_emergency_app/models/circle_membership.dart';
@@ -41,10 +42,15 @@ FamilyGroup circle(CircleRole role) => FamilyGroup(
 );
 
 class FakeGroupService extends GroupService {
-  FakeGroupService({required this.group, required this.members});
+  FakeGroupService({
+    required this.group,
+    required this.members,
+    this.failDelete = false,
+  });
 
   final FamilyGroup group;
   final List<CircleMembership> members;
+  final bool failDelete;
   final membershipController =
       StreamController<List<CircleMembership>>.broadcast();
   int removeCalls = 0;
@@ -80,7 +86,10 @@ class FakeGroupService extends GroupService {
   Future<void> leaveGroup(FamilyGroup group) async => leaveCalls++;
 
   @override
-  Future<void> deleteGroup(FamilyGroup group) async => deleteCalls++;
+  Future<void> deleteGroup(FamilyGroup group) async {
+    deleteCalls++;
+    if (failDelete) throw StateError('delete failed');
+  }
 
   @override
   Future<void> renameGroup(FamilyGroup group, String name) async =>
@@ -299,6 +308,137 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Remove'));
     await tester.pumpAndSettle();
     expect(service.removeCalls, 1);
+  });
+
+  testWidgets('Circle Detail owns the delete confirmation flow', (
+    tester,
+  ) async {
+    final service = FakeGroupService(
+      group: circle(CircleRole.owner),
+      members: const [owner, adult],
+    );
+    addTearDown(service.dispose);
+    await tester.pumpWidget(
+      FamilyEmergencyApp(
+        home: GroupMembersScreen(
+          group: service.group,
+          viewerId: owner.userId,
+          groupService: service,
+          deviceService: FakeDeviceService(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final deleteButton = find.byTooltip('Delete Circle');
+    expect(deleteButton, findsOneWidget);
+    await tester.tap(deleteButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Delete Circle?'), findsOneWidget);
+    expect(
+      find.text(
+        'Are you sure you want to permanently delete this Circle? This action cannot be undone.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    expect(service.deleteCalls, 0);
+
+    await tester.tap(deleteButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Delete'));
+    await tester.pumpAndSettle();
+    expect(service.deleteCalls, 1);
+  });
+
+  testWidgets('non-owner cannot see Circle delete', (tester) async {
+    final service = FakeGroupService(
+      group: circle(CircleRole.adult),
+      members: const [owner, adult],
+    );
+    addTearDown(service.dispose);
+    await tester.pumpWidget(
+      FamilyEmergencyApp(
+        home: GroupMembersScreen(
+          group: service.group,
+          viewerId: adult.userId,
+          groupService: service,
+          deviceService: FakeDeviceService(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Delete Circle'), findsNothing);
+  });
+
+  testWidgets('failed Circle delete remains on Circle Detail', (tester) async {
+    final service = FakeGroupService(
+      group: circle(CircleRole.owner),
+      members: const [owner, adult],
+      failDelete: true,
+    );
+    addTearDown(service.dispose);
+    await tester.pumpWidget(
+      FamilyEmergencyApp(
+        home: GroupMembersScreen(
+          group: service.group,
+          viewerId: owner.userId,
+          groupService: service,
+          deviceService: FakeDeviceService(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Delete Circle'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(service.deleteCalls, 1);
+    expect(find.text('Khan Family'), findsWidgets);
+    expect(find.byTooltip('Delete Circle'), findsOneWidget);
+    expect(find.textContaining('could not be deleted'), findsOneWidget);
+  });
+
+  testWidgets('Circle lifecycle actions precede invite and Leave is red', (
+    tester,
+  ) async {
+    final service = FakeGroupService(
+      group: circle(CircleRole.owner),
+      members: const [owner, adult],
+    );
+    addTearDown(service.dispose);
+    await tester.pumpWidget(
+      FamilyEmergencyApp(
+        home: GroupSettingsScreen(
+          group: service.group,
+          memberships: service.members,
+          viewerId: owner.userId,
+          groupService: service,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final labels = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((widget) => widget.data)
+        .whereType<String>()
+        .toList();
+    expect(
+      labels.indexOf('Leave Circle'),
+      lessThan(labels.indexOf('Transfer Ownership')),
+    );
+    expect(
+      labels.indexOf('Transfer Ownership'),
+      lessThan(labels.indexOf('Invite registered member')),
+    );
+    expect(find.text('Delete Circle'), findsNothing);
+    expect(
+      tester.widget<Text>(find.text('Leave Circle')).style?.color,
+      kEmergency,
+    );
   });
 
   testWidgets('rename dialog blocks invalid Circle names without a write', (

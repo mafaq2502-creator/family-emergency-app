@@ -108,8 +108,8 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Address'));
       await tester.pumpAndSettle();
       expect(find.text(' Islamabad '), findsOneWidget);
-      await tester.ensureVisible(find.text('Save Changes'));
-      await tester.tap(find.text('Save Changes'));
+      await tester.ensureVisible(find.text('Save Settings'));
+      await tester.tap(find.text('Save Settings'));
       await tester.pumpAndSettle();
       expect(submitted?['city'], 'Islamabad');
       expect(submitted?['countryIso'], 'PK');
@@ -120,4 +120,39 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('profile photo is staged until Save Settings succeeds', (
+    tester,
+  ) async {
+    String? savedPhoto;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AccountSettingsScreen(
+          initialName: 'Test User',
+          email: 'test@example.com',
+          relationship: 'Self',
+          relationships: const ['Self'],
+          onSave: (_, _) async => true,
+          onSaveAddress: (_) async => true,
+          pickProfilePhoto: () async => 'draft-profile-photo',
+          onSavePhoto: (photo) async {
+            savedPhoto = photo;
+            return true;
+          },
+          onUpdatePassword: () {},
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('edit-account-profile-photo')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('edit-account-profile-photo')));
+    await tester.pump();
+    expect(savedPhoto, isNull);
+    final save = find.widgetWithText(ElevatedButton, 'Save Settings');
+    await tester.ensureVisible(save);
+    await tester.pumpAndSettle();
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(savedPhoto, 'draft-profile-photo');
+  });
 }

@@ -8,207 +8,166 @@ extension _ProfileTab on _HomeScreenState {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark ? Colors.white : kLightNavy;
     final mutedColor = isDark ? Colors.white60 : kLightMuted;
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 22, 24, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'My Profile',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w600,
-                          color: titleColor,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Manage your account information.',
-                        style: TextStyle(fontSize: 14, color: mutedColor),
-                      ),
-                    ],
-                  ),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My Profile'),
+        actions: [
+          _notificationBell(),
+          Padding(
+            padding: const EdgeInsets.only(right: 14),
+            child: CircleAvatar(
+              key: const Key('profile-read-only-avatar'),
+              radius: 22,
+              backgroundColor: context.appSuccessSurface,
+              foregroundImage: ProfileImageData.provider(_profilePhotoUrl),
+              child: Text(
+                _profileNameController.text.isEmpty
+                    ? '?'
+                    : _profileNameController.text[0].toUpperCase(),
+                style: TextStyle(
+                  color: context.appPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
-                _notificationBell(),
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: context.appSuccessSurface,
-                      foregroundImage: ProfileImageData.provider(
-                        _profilePhotoUrl,
-                      ),
-                      child: Text(
-                        _profileNameController.text.isEmpty
-                            ? '?'
-                            : _profileNameController.text[0].toUpperCase(),
-                        style: TextStyle(
-                          color: context.appPrimary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 22, 24, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Manage your account information.',
+                style: TextStyle(fontSize: 14, color: mutedColor),
+              ),
+              const SizedBox(height: 15),
+              _profileRow(
+                icon: Icons.verified_user_outlined,
+                iconColor: kEmerald,
+                label: 'Signed-in Account',
+                value: _profileEmail.isEmpty ? 'Authenticated' : _profileEmail,
+                isDark: isDark,
+                showTrailing: false,
+              ),
+              const SizedBox(height: 7),
+              _profileRow(
+                icon: Icons.manage_accounts_rounded,
+                iconColor: kEmerald,
+                label: 'Account Settings',
+                value: 'Personal information and address',
+                isDark: isDark,
+                onTap: () async {
+                  final result = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AccountSettingsScreen(
+                        initialName: _profileNameController.text,
+                        email: _profileEmail,
+                        initialPhotoUrl: _profilePhotoUrl,
+                        initialAddress: _profileAddress,
+                        onSaveAddress: _saveAccountAddress,
+                        relationship: _profileRole,
+                        relationships: _HomeScreenState._roles,
+                        onSave: _saveAccountSettings,
+                        onSavePhoto: _saveAccountPhoto,
+                        onUpdatePassword: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ProfileSettingsScreen(),
+                          ),
                         ),
                       ),
                     ),
-                    Positioned(
-                      right: -12,
-                      bottom: -12,
-                      child: IconButton.filled(
-                        tooltip: _profilePhotoUrl == null
-                            ? 'Add profile image'
-                            : 'Edit profile image',
-                        onPressed: _isSavingProfilePhoto
-                            ? null
-                            : _pickProfilePhoto,
-                        iconSize: 18,
-                        style: IconButton.styleFrom(
-                          minimumSize: const Size(48, 48),
-                          backgroundColor: context.appPrimary,
-                          foregroundColor: Colors.white,
-                        ),
-                        icon: _isSavingProfilePhoto
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.camera_alt_rounded),
+                  );
+                  if (result == true && mounted) _loadProfile();
+                },
+              ),
+              const SizedBox(height: 7),
+              _profileRow(
+                icon: Icons.workspace_premium_rounded,
+                iconColor: const Color(0xFFFF7A47),
+                label: 'Plans',
+                value: 'Free Plan',
+                isDark: isDark,
+                plan: true,
+                onTap: _openPlansFromProfile,
+              ),
+              const SizedBox(height: 7),
+              _profileRow(
+                icon: Icons.notifications_active_rounded,
+                iconColor: const Color(0xFF2563EB),
+                label: 'Notification Settings',
+                value: (_selectedGroup?.isOwner ?? false)
+                    ? 'Personal & family owner controls'
+                    : 'Personal notification preferences',
+                isDark: isDark,
+                onTap: () async {
+                  final saved = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => NotificationSettingsScreen(
+                        initialSettings: _notificationSettings,
+                        isCircleOwner: _selectedGroup?.isOwner ?? false,
                       ),
                     ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 15),
-            _profileRow(
-              icon: Icons.verified_user_outlined,
-              iconColor: kEmerald,
-              label: 'Signed-in Account',
-              value: _profileEmail.isEmpty ? 'Authenticated' : _profileEmail,
-              isDark: isDark,
-              showTrailing: false,
-            ),
-            const SizedBox(height: 7),
-            _profileRow(
-              icon: Icons.manage_accounts_rounded,
-              iconColor: kEmerald,
-              label: 'Account Settings',
-              value: 'Personal information and address',
-              isDark: isDark,
-              onTap: () async {
-                final result = await Navigator.push<bool>(
+                  );
+                  if (saved == true && context.mounted) _loadProfile();
+                },
+              ),
+              const SizedBox(height: 7),
+              _profileRow(
+                icon: Icons.devices_rounded,
+                iconColor: const Color(0xFF2563EB),
+                label: 'My Devices',
+                value: 'Registration, heartbeat and Circle pairing',
+                isDark: isDark,
+                onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => AccountSettingsScreen(
-                      initialName: _profileNameController.text,
-                      email: _profileEmail,
-                      initialAddress: _profileAddress,
-                      onSaveAddress: _saveAccountAddress,
-                      relationship: _profileRole,
-                      relationships: _HomeScreenState._roles,
-                      onSave: _saveAccountSettings,
-                      onUpdatePassword: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ProfileSettingsScreen(),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-                if (result == true && mounted) _loadProfile();
-              },
-            ),
-            const SizedBox(height: 7),
-            _profileRow(
-              icon: Icons.workspace_premium_rounded,
-              iconColor: const Color(0xFFFF7A47),
-              label: 'Current Plan',
-              value: 'Free Plan',
-              isDark: isDark,
-              plan: true,
-              onTap: _openPlanTab,
-            ),
-            const SizedBox(height: 7),
-            _profileRow(
-              icon: Icons.notifications_active_rounded,
-              iconColor: const Color(0xFF2563EB),
-              label: 'Notification Settings',
-              value: (_selectedGroup?.isOwner ?? false)
-                  ? 'Personal & family owner controls'
-                  : 'Personal notification preferences',
-              isDark: isDark,
-              onTap: () async {
-                final saved = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => NotificationSettingsScreen(
-                      initialSettings: _notificationSettings,
-                      isCircleOwner: _selectedGroup?.isOwner ?? false,
-                    ),
-                  ),
-                );
-                if (saved == true && context.mounted) _loadProfile();
-              },
-            ),
-            const SizedBox(height: 7),
-            _profileRow(
-              icon: Icons.devices_rounded,
-              iconColor: const Color(0xFF2563EB),
-              label: 'My Devices',
-              value: 'Registration, heartbeat and Circle pairing',
-              isDark: isDark,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DeviceListScreen()),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              'Theme',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: titleColor,
-              ),
-            ),
-            const SizedBox(height: 8),
-            AppThemeModeSelector(
-              mode: appThemeMode.value,
-              onChanged: (mode) => appThemeMode.value = mode,
-            ),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton.icon(
-                onPressed: _logout,
-                icon: const Icon(Icons.logout_rounded),
-                label: const Text(
-                  'Logout',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  MaterialPageRoute(builder: (_) => const DeviceListScreen()),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kEmergency,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Theme',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: titleColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+              AppThemeModeSelector(
+                mode: appThemeMode.value,
+                onChanged: setAppThemeMode,
+              ),
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton.icon(
+                  onPressed: _logout,
+                  icon: const Icon(Icons.logout_rounded),
+                  label: const Text(
+                    'Logout',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kEmergency,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

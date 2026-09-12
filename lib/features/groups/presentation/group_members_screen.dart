@@ -15,6 +15,8 @@ import 'group_settings_screen.dart';
 import 'join_requests_screen.dart';
 import 'share_circle_screen.dart';
 
+enum CircleDetailExit { deleted, left }
+
 class GroupMembersScreen extends StatefulWidget {
   const GroupMembersScreen({
     super.key,
@@ -35,8 +37,56 @@ class GroupMembersScreen extends StatefulWidget {
 class _GroupMembersScreenState extends State<GroupMembersScreen> {
   late final GroupService _service = widget.groupService ?? GroupService();
   int _retryKey = 0;
+  bool _deleting = false;
   String? get _viewerId =>
       widget.viewerId ?? FirebaseAuth.instance.currentUser?.uid;
+
+  Future<void> _deleteCircle(FamilyGroup group) async {
+    if (_deleting || !group.isOwner) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.delete_forever_rounded, color: kEmergency),
+        title: const Text('Delete Circle?'),
+        content: const Text(
+          'Are you sure you want to permanently delete this Circle? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: kEmergency),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _deleting = true);
+    try {
+      await _service.deleteGroup(group);
+      if (mounted) Navigator.pop(context, CircleDetailExit.deleted);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              CircleErrorMapper.message(
+                error,
+                fallback: 'The Circle could not be deleted. Please try again.',
+              ),
+            ),
+            backgroundColor: kEmergency,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,6 +140,18 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
           title: Text(group.name),
           actions: [
             const NotificationBellButton(),
+            if (group.isOwner)
+              IconButton(
+                icon: _deleting
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.delete_outline_rounded),
+                color: kEmergency,
+                tooltip: 'Delete Circle',
+                onPressed: _deleting ? null : () => _deleteCircle(group),
+              ),
             IconButton(
               icon: const Icon(Icons.warning_amber_rounded),
               tooltip: 'SOS activity',
@@ -187,17 +249,24 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                           if (group.canManage) const SizedBox(width: 9),
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => GroupSettingsScreen(
-                                    group: group,
-                                    memberships: members,
-                                    groupService: _service,
-                                    viewerId: viewerId,
-                                  ),
-                                ),
-                              ),
+                              onPressed: () async {
+                                final result =
+                                    await Navigator.push<GroupSettingsOutcome>(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => GroupSettingsScreen(
+                                          group: group,
+                                          memberships: members,
+                                          groupService: _service,
+                                          viewerId: viewerId,
+                                        ),
+                                      ),
+                                    );
+                                if (!context.mounted) return;
+                                if (result == GroupSettingsOutcome.left) {
+                                  Navigator.pop(context, CircleDetailExit.left);
+                                }
+                              },
                               icon: const Icon(Icons.settings_rounded),
                               label: const Text('Settings'),
                             ),

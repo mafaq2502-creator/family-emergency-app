@@ -3,6 +3,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
+import '../../../../core/domain/invite_code_policy.dart';
 import '../../../../core/widgets/app_text_form_field.dart';
 import '../../../../core/widgets/light_ui.dart';
 import '../../../../models/circle_join_request.dart';
@@ -22,6 +24,8 @@ class CircleOnboardingScreen extends StatefulWidget {
     required this.onCompleted,
     this.joinService,
     this.pendingCircleId,
+    this.initialInviteCode,
+    this.onInviteHandled,
     this.profileName = '',
     this.profilePhone = '',
   });
@@ -31,6 +35,8 @@ class CircleOnboardingScreen extends StatefulWidget {
   final Future<void> Function() onSignOut;
   final CircleJoinActions? joinService;
   final String? pendingCircleId;
+  final String? initialInviteCode;
+  final VoidCallback? onInviteHandled;
   final String profileName;
   final String profilePhone;
   final VoidCallback onCompleted;
@@ -42,9 +48,10 @@ class CircleOnboardingScreen extends StatefulWidget {
 class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
     with SingleTickerProviderStateMixin {
   final _createForm = GlobalKey<FormState>();
-  final _joinForm = GlobalKey<FormState>();
   final _circleName = TextEditingController();
-  final _inviteCode = TextEditingController();
+  late final _inviteCode = TextEditingController(
+    text: widget.initialInviteCode,
+  );
   late final CircleJoinActions _joinService =
       widget.joinService ?? CircleJoinService();
   bool _busy = false;
@@ -57,7 +64,17 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
   void initState() {
     super.initState();
     _pendingCircleId = widget.pendingCircleId;
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialInviteCode == null ? 0 : 1,
+    );
+    if (widget.initialInviteCode != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onInviteHandled?.call();
+        _join();
+      });
+    }
   }
 
   @override
@@ -100,10 +117,11 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
 
   Future<void> _join() async {
     if (_busy) return;
-    final valid = _joinForm.currentState?.validate() ?? false;
-    if (!valid) {
+    final validation = InviteCodePolicy.validate(_inviteCode.text);
+    if (validation != null) {
       setState(() => _tabHasValidationError[1] = true);
       _tabController.animateTo(1);
+      _showError(validation);
       return;
     }
     if (_tabHasValidationError[1]) {
@@ -219,8 +237,12 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
                   labelColor: kEmerald,
                   unselectedLabelColor: muted,
                   labelStyle: const TextStyle(
-                    fontSize: 13,
+                    fontSize: AppTypography.tabLabel,
                     fontWeight: FontWeight.w600,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontSize: AppTypography.tabLabel,
+                    fontWeight: FontWeight.w500,
                   ),
                   tabs: [
                     _onboardingTab('Create Circle', 0),
@@ -285,37 +307,28 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
     ),
   );
 
-  Widget _joinPanel() => Form(
-    key: _joinForm,
-    child: _pendingCircleId != null
-        ? _pendingPanel()
-        : Column(
-            children: [
-              const SizedBox(height: 8),
-              AppTextFormField(
-                controller: _inviteCode,
-                label: 'Invitation Code',
-                placeholder: 'Enter your 6–12 character code',
-                prefixIcon: Icons.key_rounded,
-                enabled: !_busy,
-                validator: AuthValidators.inviteCode,
-                onFieldSubmitted: (_) => _join(),
+  Widget _joinPanel() => _pendingCircleId != null
+      ? _pendingPanel()
+      : Column(
+          children: [
+            const SizedBox(height: 8),
+            const LightStateView(
+              icon: Icons.link_rounded,
+              title: 'Use a secure invitation',
+              message: 'Open the shared invite link or scan its QR code. The Circle owner must still approve your request.',
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: _busy ? null : _scanQr,
+                icon: const Icon(Icons.qr_code_scanner_rounded),
+                label: const Text('Scan Invitation QR'),
               ),
-              const SizedBox(height: 18),
-              _actionButton('Join Family Circle', _join),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: _busy ? null : _scanQr,
-                  icon: const Icon(Icons.qr_code_scanner_rounded),
-                  label: const Text('Scan QR Code'),
-                ),
-              ),
-            ],
-          ),
-  );
+            ),
+          ],
+        );
 
   Future<void> _scanQr() async {
     final code = await Navigator.push<String>(
@@ -357,7 +370,7 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
             title: 'Request closed',
             message:
                 'No membership was created. You may use another invitation.',
-            actionLabel: 'Enter Another Code',
+            actionLabel: 'Scan Another Invitation',
             onAction: () async {
               await service.clearPendingRequestReference();
               if (mounted) {

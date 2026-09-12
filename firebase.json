@@ -6,6 +6,11 @@
   "functions": {
     "source": "functions"
   },
+  "hosting": {
+    "public": "hosting",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "cleanUrls": true
+  },
   "emulators": {
     "auth": { "port": 9099 },
     "functions": { "port": 5001 },

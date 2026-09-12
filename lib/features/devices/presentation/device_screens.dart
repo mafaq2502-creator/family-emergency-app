@@ -702,6 +702,20 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
               'Paired / Registered',
               _date(device.pairedAt ?? device.registeredAt),
             ),
+            _metric(
+              Icons.schedule_rounded,
+              'Screen Time Access',
+              device.platform != 'android'
+                  ? 'Unavailable on this platform'
+                  : device.permissions['screenTime'] == true
+                  ? 'Allowed'
+                  : 'Not allowed',
+            ),
+            _metric(
+              Icons.cloud_sync_outlined,
+              'Screen Time Sync',
+              _date(device.lastScreenTimeSyncAt),
+            ),
             if (widget.accountDevice &&
                 device.pairingStatus != DevicePairingStatus.revoked) ...[
               const SizedBox(height: 14),

@@ -303,6 +303,86 @@ service cloud.firestore {
         ]);
     }
 
+    function validScreenTimePermissionUpdate(userId, deviceId) {
+      return request.auth.uid == userId &&
+        resource.data.ownerUserId == userId &&
+        resource.data.installationId == deviceId &&
+        resource.data.status == 'active' &&
+        request.resource.data.permissions is map &&
+        request.resource.data.permissions.screenTime is bool &&
+        request.resource.data.screenTimePermissionState in [
+          'unknown', 'notGranted', 'granted', 'unavailable'
+        ] &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'permissions', 'screenTimePermissionState', 'updatedAt'
+        ]);
+    }
+
+    function validScreenTimeSyncStatus(userId, deviceId) {
+      return request.auth.uid == userId &&
+        resource.data.ownerUserId == userId &&
+        resource.data.installationId == deviceId &&
+        resource.data.status == 'active' &&
+        request.resource.data.permissions is map &&
+        request.resource.data.permissions.screenTime == true &&
+        request.resource.data.lastScreenTimeSyncAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'permissions', 'lastScreenTimeSyncAt', 'updatedAt'
+        ]);
+    }
+
+    function validScreenTimeRecord(userId, installationId, localDate) {
+      return request.resource.data.keys().hasAll([
+          'userId', 'installationId', 'localDate', 'timeZoneOffsetMinutes',
+          'totalTimeMs', 'apps', 'collectedAt', 'syncedAt', 'source',
+          'schemaVersion'
+        ]) &&
+        request.resource.data.keys().hasOnly([
+          'userId', 'installationId', 'localDate', 'timeZoneOffsetMinutes',
+          'totalTimeMs', 'apps', 'collectedAt', 'syncedAt', 'source',
+          'schemaVersion'
+        ]) &&
+        request.auth.uid == userId &&
+        request.resource.data.userId == userId &&
+        request.resource.data.installationId == installationId &&
+        request.resource.data.localDate == localDate &&
+        localDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        request.resource.data.timeZoneOffsetMinutes is int &&
+        request.resource.data.timeZoneOffsetMinutes >= -840 &&
+        request.resource.data.timeZoneOffsetMinutes <= 840 &&
+        request.resource.data.totalTimeMs is int &&
+        request.resource.data.totalTimeMs >= 0 &&
+        request.resource.data.totalTimeMs <= 172800000 &&
+        request.resource.data.apps is list &&
+        request.resource.data.apps.size() <= 100 &&
+        request.resource.data.collectedAt is timestamp &&
+        request.resource.data.collectedAt <= request.time &&
+        request.resource.data.syncedAt == request.time &&
+        request.resource.data.source == 'android_usage_stats' &&
+        request.resource.data.schemaVersion == 1;
+    }
+
+    function validCircleScreenTimeRecord(groupId, recordId) {
+      let userId = request.resource.data.userId;
+      let installationId = request.resource.data.installationId;
+      let associationId = userId + '_' + installationId;
+      let association = get(deviceAssociationPath(groupId, associationId));
+      return isMember(groupId) &&
+        userId == request.auth.uid &&
+        userId in group(groupId).data.memberIds &&
+        recordId == userId + '_' + installationId + '_' +
+          request.resource.data.localDate &&
+        exists(deviceAssociationPath(groupId, associationId)) &&
+        association.data.ownerUserId == userId &&
+        association.data.installationId == installationId &&
+        association.data.pairingStatus == 'paired' &&
+        validScreenTimeRecord(
+          userId, installationId, request.resource.data.localDate
+        );
+    }
+
     function validPairingCreate(pairingId) {
       let installationId = request.resource.data.installationId;
       let installation = get(installationPath(request.auth.uid, installationId));
@@ -453,6 +533,34 @@ service cloud.firestore {
           ])));
     }
 
+    function validAssociationScreenTimeStatus(groupId) {
+      return isMember(groupId) &&
+        resource.data.ownerUserId == request.auth.uid &&
+        resource.data.pairingStatus == 'paired' &&
+        request.resource.data.permissions is map &&
+        request.resource.data.permissions.screenTime == true &&
+        request.resource.data.lastScreenTimeSyncAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'permissions', 'lastScreenTimeSyncAt', 'updatedAt'
+        ]);
+    }
+
+    function validAssociationScreenTimePermission(groupId) {
+      return isMember(groupId) &&
+        resource.data.ownerUserId == request.auth.uid &&
+        resource.data.pairingStatus == 'paired' &&
+        request.resource.data.permissions is map &&
+        request.resource.data.permissions.screenTime is bool &&
+        request.resource.data.screenTimePermissionState in [
+          'unknown', 'notGranted', 'granted', 'unavailable'
+        ] &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'permissions', 'screenTimePermissionState', 'updatedAt'
+        ]);
+    }
+
     match /users/{userId} {
       allow create: if signedIn() && request.auth.uid == userId &&
         validSelfProfile(userId);
@@ -484,8 +592,19 @@ service cloud.firestore {
         allow update: if signedIn() &&
           (validInstallationHeartbeat(userId, deviceId) ||
            validInstallationRename(userId, deviceId) ||
-           validInstallationRevoke(userId, deviceId));
+           validInstallationRevoke(userId, deviceId) ||
+           validScreenTimePermissionUpdate(userId, deviceId) ||
+           validScreenTimeSyncStatus(userId, deviceId));
         allow delete: if false;
+
+        match /screenTimeDaily/{localDate} {
+          allow read: if signedIn() && request.auth.uid == userId;
+          allow create, update: if signedIn() &&
+            exists(installationPath(userId, deviceId)) &&
+            get(installationPath(userId, deviceId)).data.status == 'active' &&
+            validScreenTimeRecord(userId, deviceId, localDate);
+          allow delete: if false;
+        }
       }
     }
 
@@ -575,7 +694,16 @@ service cloud.firestore {
         allow update: if signedIn() &&
           (validAssociationHeartbeat(groupId) ||
            validAssociationRename(groupId) ||
-           validAssociationRemoval(groupId));
+           validAssociationRemoval(groupId) ||
+           validAssociationScreenTimeStatus(groupId) ||
+           validAssociationScreenTimePermission(groupId));
+        allow delete: if false;
+      }
+
+      match /screenTimeDaily/{recordId} {
+        allow read: if isMember(groupId);
+        allow create, update: if signedIn() &&
+          validCircleScreenTimeRecord(groupId, recordId);
         allow delete: if false;
       }
 

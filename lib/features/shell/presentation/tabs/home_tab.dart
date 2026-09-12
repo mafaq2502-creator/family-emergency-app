@@ -5,136 +5,98 @@ extension _HomeTab on _HomeScreenState {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark ? Colors.white : kLightNavy;
     final mutedColor = isDark ? Colors.white70 : kLightMuted;
-    return SafeArea(
-      child: LayoutBuilder(
-        builder: (context, viewport) {
-          final contentWidth = viewport.maxWidth - 48;
-          final cardWidth = (contentWidth - 10) / 2;
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: viewport.maxHeight - 36),
-              child: IntrinsicHeight(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Hello, ${_profileNameController.text.isEmpty ? 'Afaq' : _profileNameController.text}',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  height: 1.15,
-                                  fontWeight: FontWeight.w600,
-                                  color: titleColor,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Text(
-                                    'Your family is safe',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: mutedColor,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  const Icon(
-                                    Icons.favorite,
-                                    size: 15,
-                                    color: kEmergency,
-                                  ),
-                                ],
-                              ),
-                            ],
+    return Scaffold(
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Hello, ${_profileNameController.text.isEmpty ? 'Afaq' : _profileNameController.text}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Your family is safe',
+                  style: TextStyle(fontSize: 13, color: mutedColor),
+                ),
+                const SizedBox(width: 5),
+                const Icon(Icons.favorite, size: 14, color: kEmergency),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          _notificationBell(),
+          Icon(
+            Icons.groups_rounded,
+            color: isDark ? kEmerald : kLightPrimary,
+            size: 32,
+          ),
+          const SizedBox(width: 12),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: LayoutBuilder(
+          builder: (context, viewport) {
+            final contentWidth = viewport.maxWidth - 48;
+            final cardWidth = (contentWidth - 10) / 2;
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: viewport.maxHeight - 36),
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your Groups',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: titleColor,
+                        ),
+                      ),
+                      if (_groups.isEmpty) ...[
+                        const SizedBox(height: 28),
+                        Center(
+                          child: Text(
+                            'No groups yet. Create one from Members.',
+                            style: TextStyle(fontSize: 14, color: mutedColor),
                           ),
                         ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
+                      ] else ...[
+                        const SizedBox(height: 10),
+                        // A Wrap is deliberately used here instead of a nested GridView.
+                        // This tab lives inside a SingleChildScrollView; a nested viewport
+                        // can receive an unbounded height after authentication and crash.
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
                           children: [
-                            _notificationBell(),
-                            Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Icon(
-                                  Icons.groups_rounded,
-                                  color: isDark ? kEmerald : kLightPrimary,
-                                  size: 37,
-                                ),
-                                Positioned(
-                                  right: -2,
-                                  top: -2,
-                                  child: Container(
-                                    width: 10,
-                                    height: 10,
-                                    decoration: BoxDecoration(
-                                      color: kEmergency,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: isDark
-                                            ? const Color(0xFF101916)
-                                            : kLightBackground,
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                            for (final group in _groups)
+                              SizedBox(
+                                width: cardWidth,
+                                height: cardWidth / 1.25,
+                                child: _groupHomeCard(group, isDark),
+                              ),
                           ],
                         ),
+                        const SizedBox(height: 18),
                       ],
-                    ),
-                    const SizedBox(height: 15),
-                    Text(
-                      'Your Groups',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: titleColor,
-                      ),
-                    ),
-                    if (_groups.isEmpty) ...[
-                      const SizedBox(height: 28),
-                      Center(
-                        child: Text(
-                          'No groups yet. Create one from Members.',
-                          style: TextStyle(fontSize: 14, color: mutedColor),
-                        ),
-                      ),
-                    ] else ...[
-                      const SizedBox(height: 10),
-                      // A Wrap is deliberately used here instead of a nested GridView.
-                      // This tab lives inside a SingleChildScrollView; a nested viewport
-                      // can receive an unbounded height after authentication and crash.
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          for (final group in _groups)
-                            SizedBox(
-                              width: cardWidth,
-                              height: cardWidth / 1.25,
-                              child: _groupHomeCard(group, isDark),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
+                      const Spacer(),
+                      _homeActions(isDark, mutedColor),
+                      const SizedBox(height: 12),
                     ],
-                    const Spacer(),
-                    _homeActions(isDark, mutedColor),
-                    const SizedBox(height: 12),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

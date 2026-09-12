@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../core/domain/circle_error_mapper.dart';
 import '../../../core/domain/invite_code_policy.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/app_text_form_field.dart';
 import '../../../core/widgets/light_ui.dart';
 import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/circle_invite.dart';
@@ -30,7 +29,6 @@ class JoinCircleScreen extends StatefulWidget {
 }
 
 class _JoinCircleScreenState extends State<JoinCircleScreen> {
-  final _formKey = GlobalKey<FormState>();
   late final CircleJoinService _service =
       widget.joinService ?? CircleJoinService();
   late final TextEditingController _code = TextEditingController(
@@ -39,6 +37,14 @@ class _JoinCircleScreenState extends State<JoinCircleScreen> {
   CircleInvite? _preview;
   JoinSubmissionResult? _submission;
   bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialCode != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _validate());
+    }
+  }
 
   @override
   void dispose() {
@@ -58,7 +64,12 @@ class _JoinCircleScreenState extends State<JoinCircleScreen> {
   }
 
   Future<void> _validate() async {
-    if (_busy || !(_formKey.currentState?.validate() ?? false)) return;
+    if (_busy) return;
+    final validation = InviteCodePolicy.validate(_code.text);
+    if (validation != null) {
+      _showError(CircleInviteException('invalid-invite', validation));
+      return;
+    }
     setState(() => _busy = true);
     try {
       final invite = await _service.validateInvite(_code.text);
@@ -119,52 +130,24 @@ class _JoinCircleScreenState extends State<JoinCircleScreen> {
     );
   }
 
-  Widget _codeEntry() => Form(
-    key: _formKey,
-    child: Column(
-      children: [
-        const LightStateView(
-          icon: Icons.mark_email_unread_outlined,
-          title: 'Use a secure invitation',
-          message: 'Enter the invitation code or scan its QR. You will review the Circle before requesting approval.',
+  Widget _codeEntry() => Column(
+    children: [
+      const LightStateView(
+        icon: Icons.mark_email_unread_outlined,
+        title: 'Use a secure invitation',
+        message: 'Open the shared invitation link or scan its QR. You will review the Circle before requesting approval.',
+      ),
+      const SizedBox(height: 18),
+      SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: OutlinedButton.icon(
+          onPressed: _busy ? null : _scan,
+          icon: const Icon(Icons.qr_code_scanner_rounded),
+          label: const Text('Scan Invitation QR'),
         ),
-        const SizedBox(height: 18),
-        AppTextFormField(
-          controller: _code,
-          label: 'Invitation Code',
-          placeholder: 'XXXX-XXXX-XXXX-XXXX-XXXX-XXXX',
-          prefixIcon: Icons.key_rounded,
-          enabled: !_busy,
-          validator: InviteCodePolicy.validate,
-          onFieldSubmitted: (_) => _validate(),
-        ),
-        const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton.icon(
-            onPressed: _busy ? null : _validate,
-            icon: _busy
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.search_rounded),
-            label: Text(_busy ? 'Checking…' : 'Check Invitation'),
-          ),
-        ),
-        const SizedBox(height: 9),
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: OutlinedButton.icon(
-            onPressed: _busy ? null : _scan,
-            icon: const Icon(Icons.qr_code_scanner_rounded),
-            label: const Text('Scan QR Code'),
-          ),
-        ),
-      ],
-    ),
+      ),
+    ],
   );
 
   Widget _previewCard(CircleInvite invite) => Column(
@@ -212,7 +195,7 @@ class _JoinCircleScreenState extends State<JoinCircleScreen> {
       ),
       TextButton(
         onPressed: _busy ? null : () => setState(() => _preview = null),
-        child: const Text('Use a different code'),
+        child: const Text('Scan another invitation'),
       ),
     ],
   );
@@ -268,7 +251,7 @@ class _JoinCircleScreenState extends State<JoinCircleScreen> {
           icon: Icons.cancel_outlined,
           title: 'Request declined',
           message: 'No membership was created. You may use another invitation.',
-          actionLabel: 'Enter Another Code',
+          actionLabel: 'Scan Another Invitation',
           onAction: () async {
             await _service.clearPendingRequestReference();
             if (mounted) {
@@ -283,7 +266,7 @@ class _JoinCircleScreenState extends State<JoinCircleScreen> {
           icon: Icons.info_outline_rounded,
           title: 'Request closed',
           message: 'This request is no longer active.',
-          actionLabel: 'Enter Another Code',
+          actionLabel: 'Scan Another Invitation',
           onAction: () => setState(() {
             _submission = null;
             _preview = null;

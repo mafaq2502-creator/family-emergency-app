@@ -28,6 +28,8 @@ class PairedDevice {
     this.updatedAt,
     this.revokedAt,
     this.removedAt,
+    this.lastScreenTimeSyncAt,
+    this.screenTimePermissionState,
     this.permissions = const {},
   });
 
@@ -51,6 +53,8 @@ class PairedDevice {
   final DateTime? updatedAt;
   final DateTime? revokedAt;
   final DateTime? removedAt;
+  final DateTime? lastScreenTimeSyncAt;
+  final String? screenTimePermissionState;
   final Map<String, bool> permissions;
 
   bool isOnline(DateTime now, {Duration timeout = DevicePolicy.staleAfter}) {
@@ -103,6 +107,9 @@ class PairedDevice {
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
       revokedAt: (map['revokedAt'] as Timestamp?)?.toDate(),
       removedAt: (map['removedAt'] as Timestamp?)?.toDate(),
+      lastScreenTimeSyncAt: (map['lastScreenTimeSyncAt'] as Timestamp?)
+          ?.toDate(),
+      screenTimePermissionState: map['screenTimePermissionState'] as String?,
       permissions: Map<String, bool>.from(
         map['permissions'] as Map? ?? const {},
       ),

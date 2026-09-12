@@ -127,7 +127,7 @@ class FamilyEmergencyApp extends StatelessWidget {
           style: _interactiveButtonStyle(Brightness.light),
         ),
         navigationBarTheme: NavigationBarThemeData(
-          height: 72,
+          height: 80,
           elevation: 0,
           backgroundColor: Colors.white,
           indicatorColor: kLightAccent,
@@ -136,7 +136,7 @@ class FamilyEmergencyApp extends StatelessWidget {
               color: states.contains(WidgetState.selected)
                   ? Colors.white
                   : const Color(0xFF789088),
-              size: states.contains(WidgetState.selected) ? 26 : 24,
+              size: AppTypography.tabIcon,
             ),
           ),
           labelTextStyle: WidgetStateProperty.resolveWith(
@@ -144,7 +144,7 @@ class FamilyEmergencyApp extends StatelessWidget {
               color: states.contains(WidgetState.selected)
                   ? kLightPrimary
                   : kLightMuted,
-              fontSize: states.contains(WidgetState.selected) ? 13 : 12,
+              fontSize: AppTypography.tabLabel,
               fontWeight: states.contains(WidgetState.selected)
                   ? FontWeight.w600
                   : FontWeight.w500,
@@ -155,11 +155,11 @@ class FamilyEmergencyApp extends StatelessWidget {
           labelColor: kLightPrimary,
           unselectedLabelColor: kLightMuted,
           labelStyle: GoogleFonts.manrope(
-            fontSize: 15,
+            fontSize: AppTypography.tabLabel,
             fontWeight: FontWeight.w600,
           ),
           unselectedLabelStyle: GoogleFonts.manrope(
-            fontSize: 14,
+            fontSize: AppTypography.tabLabel,
             fontWeight: FontWeight.w500,
           ),
           indicatorColor: kLightPrimary,
@@ -382,11 +382,11 @@ class FamilyEmergencyApp extends StatelessWidget {
           labelColor: kEmerald,
           unselectedLabelColor: kDarkMuted,
           labelStyle: GoogleFonts.manrope(
-            fontSize: 15,
+            fontSize: AppTypography.tabLabel,
             fontWeight: FontWeight.w600,
           ),
           unselectedLabelStyle: GoogleFonts.manrope(
-            fontSize: 14,
+            fontSize: AppTypography.tabLabel,
             fontWeight: FontWeight.w500,
           ),
           indicatorColor: kEmerald,

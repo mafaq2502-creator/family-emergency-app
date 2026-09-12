@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:image_picker/image_picker.dart';
 
 import 'dart:async';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/domain/circle_error_mapper.dart';
 import '../../../core/domain/circle_policies.dart';
 import '../../../core/theme/theme_mode_controller.dart';
@@ -44,7 +44,16 @@ part 'tabs/profile_tab.dart';
 // ====================== HOME SCREEN ======================
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+    this.initialInviteCode,
+    this.initialInviteError,
+    this.onInviteHandled,
+  });
+
+  final String? initialInviteCode;
+  final String? initialInviteError;
+  final VoidCallback? onInviteHandled;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -75,7 +84,10 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() => _progressMemberId = id);
   void _selectProgressPeriod(String period) =>
       setState(() => _progressPeriod = period);
-  void _openPlanTab() => setState(() => _currentIndex = 3);
+  void _openPlansFromProfile() => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const PlansScreen()),
+  );
 
   void _setCircleScope(bool owned) {
     setState(() => _showOwnedCircles = owned);
@@ -91,7 +103,6 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _pendingJoinCircleId;
   bool _isProfileLoading = true;
   bool _isSavingProfile = false;
-  bool _isSavingProfilePhoto = false;
   bool _isProfileDirty = false;
   DateTime? _lastDailyCheckIn;
   bool _isMarkingAlive = false;
@@ -141,6 +152,38 @@ class _HomeScreenState extends State<HomeScreen> {
         onCurrentDeviceRevoked: () => AuthService().signOut(),
       ),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openInitialInvite());
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialInviteCode != oldWidget.initialInviteCode ||
+        widget.initialInviteError != oldWidget.initialInviteError) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openInitialInvite());
+    }
+  }
+
+  Future<void> _openInitialInvite() async {
+    if (!mounted) return;
+    final error = widget.initialInviteError;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: kEmergency),
+      );
+      widget.onInviteHandled?.call();
+      return;
+    }
+    final code = widget.initialInviteCode;
+    if (code == null) return;
+    widget.onInviteHandled?.call();
+    final circleId = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => JoinCircleScreen(initialCode: code)),
+    );
+    if (!mounted || circleId == null) return;
+    _watchGroups();
+    setState(() => _currentIndex = 0);
   }
 
   Future<void> _prepareGroups() async {
@@ -295,12 +338,19 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openGroupHome(FamilyGroup group) {
+  Future<void> _openGroupHome(FamilyGroup group) async {
     setState(() => _selectedGroup = group);
-    Navigator.push(
+    final result = await Navigator.push<CircleDetailExit>(
       context,
       MaterialPageRoute(builder: (_) => GroupMembersScreen(group: group)),
     );
+    if (!mounted || result == null) return;
+    setState(() {
+      _groups = _groups.where((item) => item.id != group.id).toList();
+      _selectedGroup = _groups.firstOrNull;
+      _currentIndex = 0;
+    });
+    _watchMembers();
   }
 
   Widget _notificationBell() {
@@ -396,55 +446,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _pickProfilePhoto() async {
-    if (_isSavingProfilePhoto) return;
-    try {
-      final picked = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 512,
-        maxHeight: 512,
-        imageQuality: 65,
-      );
-      if (picked == null || !mounted) return;
-      final bytes = await picked.readAsBytes();
-      if (bytes.length > ProfileImageData.maxBytes) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please choose a smaller profile image.'),
-              backgroundColor: kEmergency,
-            ),
-          );
-        }
-        return;
-      }
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-      setState(() => _isSavingProfilePhoto = true);
-      final photo = ProfileImageData.encodeJpeg(bytes);
-      await _profileService.saveProfilePhoto(user, photo);
-      if (!mounted) return;
-      setState(() => _profilePhotoUrl = photo);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile image updated.'),
-          backgroundColor: kEmerald,
-        ),
-      );
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile image could not be updated.'),
-            backgroundColor: kEmergency,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSavingProfilePhoto = false);
-    }
-  }
-
   Future<void> _saveProfile() async {
     if (!_isProfileDirty || _isSavingProfile) return;
     final user = FirebaseAuth.instance.currentUser;
@@ -487,6 +488,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (user == null) return false;
     await _profileService.saveAddress(user, address);
     if (mounted) setState(() => _profileAddress = Map.of(address));
+    return true;
+  }
+
+  Future<bool> _saveAccountPhoto(String photoUrl) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    await _profileService.saveProfilePhoto(user, photoUrl);
+    if (mounted) setState(() => _profilePhotoUrl = photoUrl);
     return true;
   }
 
@@ -839,7 +848,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return SafeArea(
       top: false,
       child: SizedBox(
-        height: 88,
+        height: 96,
         child: Stack(
           clipBehavior: Clip.none,
           alignment: Alignment.topCenter,
@@ -851,7 +860,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 elevation: 10,
                 shadowColor: Colors.black26,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 20),
+                  padding: const EdgeInsets.only(top: 22),
                   child: Row(
                     children: [
                       for (final item in items.take(2))
@@ -875,8 +884,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   children: [
                     Container(
-                      width: 62,
-                      height: 62,
+                      width: 68,
+                      height: 68,
                       decoration: BoxDecoration(
                         gradient: _currentIndex == 2 && !isDark
                             ? const LinearGradient(
@@ -907,7 +916,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: _currentIndex == 2
                             ? Colors.white
                             : (isDark ? kDarkMuted : kLightMuted),
-                        size: 30,
+                        size: 34,
                       ),
                     ),
                     const SizedBox(height: 1),
@@ -917,7 +926,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: _currentIndex == 2
                             ? (isDark ? kEmerald : kLightPrimary)
                             : (isDark ? Colors.grey : kLightMuted),
-                        fontSize: _currentIndex == 2 ? 13 : 12,
+                        fontSize: AppTypography.tabLabel,
                         fontWeight: _currentIndex == 2
                             ? FontWeight.w600
                             : FontWeight.w500,
@@ -948,7 +957,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
                 color: selected
                     ? activeColor.withValues(alpha: .13)
@@ -958,7 +967,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Icon(
                 icon,
                 color: selected ? activeColor : inactiveColor,
-                size: 24,
+                size: AppTypography.tabIcon,
               ),
             ),
             const SizedBox(height: 3),
@@ -966,7 +975,7 @@ class _HomeScreenState extends State<HomeScreen> {
               label,
               style: TextStyle(
                 color: selected ? activeColor : inactiveColor,
-                fontSize: selected ? 13 : 12,
+                fontSize: AppTypography.tabLabel,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
@@ -977,259 +986,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ================= LOCATION TAB =================
-  /* Legacy tab implementations archived during the incremental split.
-  Widget _legacyBuildLocationTab() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : kNavy;
-    final mutedColor = isDark ? Colors.white60 : const Color(0xFF64748B);
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 22, 24, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Live Location', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: titleColor)),
-            const SizedBox(height: 4),
-            Text('View your family members on map.', style: TextStyle(fontSize: 12, color: mutedColor)),
-            const Spacer(),
-            Center(child: _legacyLocationEmptyArtwork(isDark)),
-            const SizedBox(height: 25),
-            Center(child: Text('Location map will be available soon.', style: TextStyle(fontSize: 12, color: mutedColor))),
-            const Spacer(flex: 2),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _legacyLocationEmptyArtwork(bool isDark) => SizedBox(
-        width: 195,
-        height: 150,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned(bottom: 2, child: Transform.rotate(angle: -.18, child: Container(width: 150, height: 72, decoration: BoxDecoration(color: const Color(0xFFBDECEE), borderRadius: BorderRadius.circular(8))))),
-            Positioned(bottom: 21, child: Transform.rotate(angle: -.18, child: Container(width: 156, height: 3, color: Colors.white70))),
-            Positioned(bottom: 40, child: Transform.rotate(angle: -.18, child: Container(width: 156, height: 3, color: Colors.white70))),
-            const Positioned(left: 30, bottom: 38, child: Icon(Icons.park_rounded, color: Color(0xFF69CBBE), size: 32)),
-            const Positioned(right: 25, bottom: 20, child: Icon(Icons.park_rounded, color: Color(0xFF69CBBE), size: 36)),
-            const Positioned(right: 25, top: 43, child: Icon(Icons.cloud_rounded, color: Color(0xFFDCECF8), size: 44)),
-            Container(
-              width: 67,
-              height: 76,
-              decoration: const BoxDecoration(color: kEmerald, shape: BoxShape.circle),
-              child: const Icon(Icons.location_on_rounded, color: Colors.white, size: 43),
-            ),
-          ],
-        ),
-      );
-
-  Widget _legacyBuildPlanTab() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : kNavy;
-    final mutedColor = isDark ? Colors.white60 : const Color(0xFF64748B);
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 22, 24, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Choose Your Plan', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: titleColor)),
-            const SizedBox(height: 4),
-            Text('Get more features to keep your family\nextra safe.', style: TextStyle(fontSize: 12, color: mutedColor)),
-            const SizedBox(height: 12),
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(child: _legacyPlanCard(title: 'Free', subtitle: 'Basic features for\nsmall families.', price: '\$0', features: const ['Up to 5 members', 'Basic alerts', 'Location tracking'], selected: true)),
-                  const SizedBox(width: 9),
-                  Expanded(child: _legacyPlanCard(title: 'Premium', subtitle: 'Advanced features\nfor complete safety.', price: '\$4.99', features: const ['Unlimited members', 'Real-time alerts', 'Location history', 'Priority support'])),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _legacyPlanCard({required String title, required String subtitle, required String price, required List<String> features, bool selected = false}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 11, 10, 10),
-      decoration: BoxDecoration(
-        color: isDark ? kDarkCard : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE9EDF0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(width: 38, height: 38, decoration: BoxDecoration(color: selected ? const Color(0xFFEAF4FF) : const Color(0xFFFFF4D9), shape: BoxShape.circle), child: Icon(selected ? Icons.send_rounded : Icons.workspace_premium_rounded, color: selected ? const Color(0xFF2586F6) : const Color(0xFFFFAE00), size: 23)),
-          const SizedBox(height: 8),
-          Text('$title Plan', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : kNavy)),
-          const SizedBox(height: 4),
-          Text(subtitle, style: TextStyle(fontSize: 13, height: 1.12, color: isDark ? Colors.white60 : const Color(0xFF64748B))),
-          const SizedBox(height: 10),
-          RichText(text: TextSpan(children: [TextSpan(text: price, style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold, color: isDark ? Colors.white : kNavy)), TextSpan(text: ' / month', style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : const Color(0xFF52647B)))])),
-          const SizedBox(height: 10),
-          for (final feature in features) Padding(
-            padding: const EdgeInsets.only(bottom: 5),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [const Icon(Icons.check, size: 15, color: kEmerald), const SizedBox(width: 4), Expanded(child: Text(feature, style: TextStyle(fontSize: 13, height: 1.1, color: isDark ? Colors.white70 : const Color(0xFF314761))))]),
-          ),
-          const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            height: 35,
-            child: ElevatedButton(
-              onPressed: selected ? null : () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Premium upgrade will be available soon.'))),
-              style: ElevatedButton.styleFrom(backgroundColor: selected ? const Color(0xFFF1F3F4) : kEmerald, foregroundColor: selected ? const Color(0xFF64748B) : Colors.white, disabledBackgroundColor: const Color(0xFFF1F3F4), disabledForegroundColor: const Color(0xFF64748B), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9))),
-              child: Text(selected ? 'Current Plan' : 'Upgrade Now', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ================= PROFILE TAB =================
-  Widget _legacyBuildProfileTab() {
-    if (_isProfileLoading) {
-      return const Center(child: CircularProgressIndicator(color: kEmerald));
-    }
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : kNavy;
-    final mutedColor = isDark ? Colors.white60 : const Color(0xFF64748B);
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 22, 24, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('My Profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: titleColor)), const SizedBox(height: 4), Text('Manage your account information.', style: TextStyle(fontSize: 12, color: mutedColor))])),
-                TextButton(
-                  onPressed: _isProfileDirty && !_isSavingProfile ? _saveProfile : null,
-                  child: _isSavingProfile
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: kEmerald, strokeWidth: 2))
-                      : Text('Save', style: TextStyle(fontWeight: FontWeight.bold, color: _isProfileDirty ? kEmerald : mutedColor)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 15),
-            _legacyProfileRow(icon: Icons.person_rounded, iconColor: const Color(0xFF778BA0), label: 'User Name', value: _profileNameController.text, isDark: isDark, editable: TextField(controller: _profileNameController, style: TextStyle(fontSize: 13, color: mutedColor), decoration: const InputDecoration(isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.zero))),
-            const SizedBox(height: 7),
-            _profileRow(icon: Icons.mail_rounded, iconColor: const Color(0xFF778BA0), label: 'Email', value: _profileEmail.isEmpty ? 'Not available' : _profileEmail, isDark: isDark, locked: true),
-            const SizedBox(height: 7),
-            const SizedBox(height: 7),
-            _profileRow(
-              icon: Icons.favorite_rounded,
-              iconColor: const Color(0xFFD95B69),
-              label: 'Relationship',
-              value: _profileRole ?? 'Self',
-              isDark: isDark,
-              height: 66,
-              showTrailing: false,
-              editable: SizedBox(
-                height: 24,
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _profileRole,
-                    isExpanded: true,
-                    isDense: true,
-                    itemHeight: kMinInteractiveDimension,
-                    icon: Icon(Icons.keyboard_arrow_down_rounded, color: mutedColor, size: 18),
-                    dropdownColor: isDark ? kDarkCard : Colors.white,
-                    style: TextStyle(fontSize: 13, color: mutedColor),
-                    items: _roles.map((role) => DropdownMenuItem(value: role, child: Text(role))).toList(),
-                    onChanged: _changeProfileRole,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 7),
-            _profileRow(icon: Icons.workspace_premium_rounded, iconColor: const Color(0xFFFF7A47), label: 'Current Plan', value: 'Free Plan', isDark: isDark, plan: true),
-            const SizedBox(height: 7),
-            _profileRow(
-              icon: Icons.notifications_active_rounded,
-              iconColor: const Color(0xFF2563EB),
-              label: 'Notification Settings',
-              value: (_selectedGroup?.isOwner ?? false) ? 'Personal & family owner controls' : 'Personal notification preferences',
-              isDark: isDark,
-              onTap: () async {
-                final saved = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => NotificationSettingsScreen(initialSettings: _notificationSettings, isCircleOwner: _selectedGroup?.isOwner ?? false)));
-                if (saved == true && mounted) _loadProfile();
-              },
-            ),
-            const SizedBox(height: 7),
-            _profileRow(
-              icon: Icons.manage_accounts_rounded,
-              iconColor: const Color(0xFF7C3AED),
-              label: 'Profile Settings',
-              value: 'Password and account security',
-              isDark: isDark,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileSettingsScreen())),
-            ),
-            const SizedBox(height: 18),
-            Text('Theme', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: titleColor)),
-            const SizedBox(height: 8),
-            _themeSelector(isDark ? kDarkCard : Colors.white, titleColor, mutedColor),
-            const SizedBox(height: 22),
-            SizedBox(width: double.infinity, height: 45, child: ElevatedButton.icon(onPressed: _logout, icon: const Icon(Icons.logout_rounded), label: const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)), style: ElevatedButton.styleFrom(backgroundColor: kEmergency, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _legacyProfileRow({required IconData icon, required Color iconColor, required String label, required String value, required bool isDark, Widget? editable, bool locked = false, bool plan = false, VoidCallback? onTap, double height = 54, bool showTrailing = true}) {
-    final titleColor = isDark ? Colors.white : kNavy;
-    final mutedColor = isDark ? Colors.white60 : const Color(0xFF64748B);
-    final row = Container(
-      height: height,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(color: isDark ? kDarkCard : Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: isDark ? const Color(0xFF233846) : const Color(0xFFE9EDF0)), boxShadow: isDark ? null : const [BoxShadow(color: Color(0x080F172A), blurRadius: 10, offset: Offset(0, 3))]),
-      child: Row(children: [
-        Container(width: 30, height: 30, decoration: BoxDecoration(color: iconColor.withValues(alpha: .16), shape: BoxShape.circle), child: Icon(icon, color: iconColor, size: 18)),
-        const SizedBox(width: 11),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(label, style: TextStyle(fontSize: 13, height: 1, fontWeight: FontWeight.bold, color: titleColor)), const SizedBox(height: 5), editable ?? Row(children: [if (plan) const Icon(Icons.workspace_premium_rounded, size: 12, color: Color(0xFFFFAE00)), if (plan) const SizedBox(width: 3), Text(value, style: TextStyle(fontSize: 13, height: 1, color: mutedColor))])])),
-        if (showTrailing) ...[const SizedBox(width: 7), Icon(locked ? Icons.lock_outline_rounded : Icons.chevron_right_rounded, color: mutedColor, size: 19)],
-      ]),
-    );
-    if (onTap == null) return row;
-    return InkWell(borderRadius: BorderRadius.circular(12), onTap: onTap, child: row);
-  }
-
-  Widget _legacyThemeSelector(Color cardColor, Color enabledText, Color mutedText) {
-    const choices = [(ThemeMode.system, 'System', Icons.brightness_auto_rounded), (ThemeMode.light, 'Light', Icons.light_mode_rounded), (ThemeMode.dark, 'Dark', Icons.dark_mode_rounded)];
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(14)),
-      child: Row(
-        children: choices.map((choice) {
-          final selected = appThemeMode.value == choice.$1;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => appThemeMode.value = choice.$1,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(color: selected ? Colors.green : Colors.transparent, borderRadius: BorderRadius.circular(10)),
-                child: Column(children: [
-                  Icon(choice.$3, size: 19, color: selected ? Colors.white : mutedText),
-                  const SizedBox(height: 3),
-                  Text(choice.$2, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: selected ? Colors.white : enabledText)),
-                ]),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-  */
 }
 
 class _WaveNavigationClipper extends CustomClipper<Path> {

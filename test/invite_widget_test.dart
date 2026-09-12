@@ -45,13 +45,13 @@ class SlowSubmitService extends FakeCircleJoinService {
 }
 
 void main() {
-  testWidgets('invalid invite field blocks network validation', (tester) async {
+  testWidgets('invalid invite link blocks network validation', (tester) async {
     final service = FakeCircleJoinService();
     await tester.pumpWidget(
-      FamilyEmergencyApp(home: JoinCircleScreen(joinService: service)),
+      FamilyEmergencyApp(
+        home: JoinCircleScreen(joinService: service, initialCode: 'ABC'),
+      ),
     );
-    await tester.enterText(find.byType(TextFormField), 'ABC');
-    await tester.tap(find.text('Check Invitation'));
     await tester.pump();
     expect(find.textContaining('24-character'), findsOneWidget);
     expect(service.validateCalls, 0);
@@ -62,10 +62,13 @@ void main() {
   ) async {
     final service = FakeCircleJoinService();
     await tester.pumpWidget(
-      FamilyEmergencyApp(home: JoinCircleScreen(joinService: service)),
+      FamilyEmergencyApp(
+        home: JoinCircleScreen(
+          joinService: service,
+          initialCode: fakeInviteCode,
+        ),
+      ),
     );
-    await tester.enterText(find.byType(TextFormField), fakeInviteCode);
-    await tester.tap(find.text('Check Invitation'));
     await tester.pumpAndSettle();
     expect(find.text('Khan Family'), findsWidgets);
     expect(find.text('Request to Join'), findsOneWidget);
@@ -78,10 +81,13 @@ void main() {
   testWidgets('join submission prevents duplicate rapid taps', (tester) async {
     final service = SlowSubmitService();
     await tester.pumpWidget(
-      FamilyEmergencyApp(home: JoinCircleScreen(joinService: service)),
+      FamilyEmergencyApp(
+        home: JoinCircleScreen(
+          joinService: service,
+          initialCode: fakeInviteCode,
+        ),
+      ),
     );
-    await tester.enterText(find.byType(TextFormField), fakeInviteCode);
-    await tester.tap(find.text('Check Invitation'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Request to Join'));
     await tester.tap(find.text('Request to Join'));
@@ -97,7 +103,7 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('real QR invitation renders and exposes exact code and link', (
+  testWidgets('real QR invitation renders and exposes only the share link', (
     tester,
   ) async {
     final service = FakeCircleJoinService();
@@ -112,13 +118,12 @@ void main() {
       find.text('Scan to preview this Circle and request approval.'),
       findsOneWidget,
     );
-    await tester.tap(find.text('Invite Code'));
-    await tester.pump();
-    expect(find.text('ABCD-EFGH-JKLM-NPQR-STUV-2345'), findsOneWidget);
-    await tester.tap(find.text('Invite Link'));
+    expect(find.text('Invite Code'), findsNothing);
+    expect(find.text('ABCD-EFGH-JKLM-NPQR-STUV-2345'), findsNothing);
+    await tester.tap(find.text('Share Link'));
     await tester.pump();
     expect(
-      find.text('familyemergency://join?code=$fakeInviteCode'),
+      find.text('https://familyemergencyapp.web.app/join?code=$fakeInviteCode'),
       findsOneWidget,
     );
   });

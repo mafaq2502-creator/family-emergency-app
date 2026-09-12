@@ -47,6 +47,8 @@ dependencies:
   share_plus: ^13.3.0
   shared_preferences: ^2.5.5
   image_picker: ^1.2.3
+  app_links: ^7.2.1
+  workmanager: ^0.10.10
 
 dev_dependencies:
   flutter_test:

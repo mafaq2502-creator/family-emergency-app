@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Family Emergency</title>
+    <style>
+      body { margin: 0; font: 16px system-ui, sans-serif; background: #f2fffc; color: #08213f; }
+      main { max-width: 34rem; margin: 12vh auto; padding: 2rem; text-align: center; }
+      a { display: inline-block; margin-top: 1rem; padding: .9rem 1.2rem; border-radius: .8rem; background: #009b7f; color: white; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Family Emergency invitation</h1>
+      <p>Opening the secure invitation in the app…</p>
+      <a id="store" href="https://play.google.com/store/apps/details?id=com.example.family_emergency_app">Get the Android app</a>
+    </main>
+    <script>
+      const code = new URLSearchParams(location.search).get('code') || '';
+      const valid = /^[A-HJ-NP-Z2-9]{24}$/.test(code);
+      if (valid) {
+        location.href = `familyemergency://join?code=${encodeURIComponent(code)}`;
+        setTimeout(() => document.getElementById('store').click(), 1400);
+      } else {
+        document.querySelector('p').textContent = 'This invitation link is invalid.';
+      }
+    </script>
+  </body>
+</html>

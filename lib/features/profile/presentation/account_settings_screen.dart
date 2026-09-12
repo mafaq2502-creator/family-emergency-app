@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/light_ui.dart';
 import '../../../core/widgets/country_name_field.dart';
 import '../../../core/widgets/bounded_dropdown_form_field.dart';
+import '../../../core/widgets/profile_image.dart';
 import '../../auth/domain/auth_validators.dart';
 import '../../notifications/presentation/notification_bell_button.dart';
 
@@ -13,21 +16,27 @@ class AccountSettingsScreen extends StatefulWidget {
     super.key,
     required this.initialName,
     required this.email,
+    this.initialPhotoUrl,
     this.initialAddress = const {},
     required this.onSaveAddress,
     required this.relationship,
     required this.relationships,
     required this.onSave,
+    this.onSavePhoto,
+    this.pickProfilePhoto,
     required this.onUpdatePassword,
   });
 
   final String initialName;
   final String email;
+  final String? initialPhotoUrl;
   final Map<String, String> initialAddress;
   final Future<bool> Function(Map<String, String> address) onSaveAddress;
   final String? relationship;
   final List<String> relationships;
   final Future<bool> Function(String name, String? relationship) onSave;
+  final Future<bool> Function(String photoUrl)? onSavePhoto;
+  final Future<String?> Function()? pickProfilePhoto;
   final VoidCallback onUpdatePassword;
 
   @override
@@ -40,6 +49,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   late String? _relationship;
   late String _savedName;
   late String? _savedRelationship;
+  late String? _savedPhotoUrl;
+  String? _draftPhotoUrl;
   bool _saving = false;
   String? _saveError;
   static const _addressLabels = {
@@ -62,7 +73,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   bool get _dirty =>
       _name.text.trim() != _savedName ||
       _relationship != _savedRelationship ||
-      !mapEquals(_currentAddress, _savedAddress);
+      !mapEquals(_currentAddress, _savedAddress) ||
+      _draftPhotoUrl != _savedPhotoUrl;
 
   @override
   void initState() {
@@ -72,6 +84,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     _relationship = widget.relationship;
     _savedName = widget.initialName.trim();
     _savedRelationship = widget.relationship;
+    _savedPhotoUrl = widget.initialPhotoUrl;
+    _draftPhotoUrl = _savedPhotoUrl;
     _address = {
       for (final key in _addressLabels.keys)
         key: TextEditingController(text: widget.initialAddress[key] ?? '')
@@ -83,6 +97,42 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
   void _refresh() {
     if (mounted) setState(() => _saveError = null);
+  }
+
+  Future<void> _pickPhoto() async {
+    try {
+      String? selected;
+      if (widget.pickProfilePhoto != null) {
+        selected = await widget.pickProfilePhoto!();
+      } else {
+        final picked = await ImagePicker().pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 512,
+          maxHeight: 512,
+          imageQuality: 65,
+        );
+        if (picked == null) return;
+        final bytes = await picked.readAsBytes();
+        if (bytes.length > ProfileImageData.maxBytes) {
+          if (mounted) {
+            setState(
+              () => _saveError = 'Please choose a smaller profile image.',
+            );
+          }
+          return;
+        }
+        selected = ProfileImageData.encodeJpeg(bytes);
+      }
+      if (selected == null || !mounted) return;
+      setState(() {
+        _draftPhotoUrl = selected;
+        _saveError = null;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _saveError = 'Profile image could not be selected.');
+      }
+    }
   }
 
   @override
@@ -141,16 +191,18 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       final personalDirty =
           _name.text.trim() != _savedName ||
           _relationship != _savedRelationship;
+      final addressDirty = !mapEquals(_currentAddress, _savedAddress);
+      final photoDirty = _draftPhotoUrl != _savedPhotoUrl;
       saved =
           !personalDirty ||
           await widget.onSave(_name.text.trim(), _relationship);
-      if (saved) {
-        _savedName = _name.text.trim();
-        _savedRelationship = _relationship;
-        if (!mapEquals(_currentAddress, _savedAddress)) {
-          saved = await widget.onSaveAddress(_currentAddress);
-          if (saved) _savedAddress = _currentAddress;
-        }
+      if (saved && addressDirty) {
+        saved = await widget.onSaveAddress(_currentAddress);
+      }
+      if (saved && photoDirty) {
+        saved =
+            widget.onSavePhoto != null &&
+            await widget.onSavePhoto!(_draftPhotoUrl!);
       }
     } catch (_) {
       saved = false;
@@ -161,6 +213,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       if (saved) {
         _savedName = _name.text.trim();
         _savedRelationship = _relationship;
+        _savedAddress = Map.of(_currentAddress);
+        _savedPhotoUrl = _draftPhotoUrl;
       } else {
         _saveError = 'Changes could not be saved. Please try again.';
       }
@@ -187,6 +241,42 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Center(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      key: const Key('account-profile-avatar'),
+                      radius: 48,
+                      backgroundColor: context.appSuccessSurface,
+                      foregroundImage: ProfileImageData.provider(
+                        _draftPhotoUrl,
+                      ),
+                      child: Text(
+                        _name.text.trim().isEmpty
+                            ? '?'
+                            : _name.text.trim()[0].toUpperCase(),
+                        style: TextStyle(
+                          color: context.appPrimary,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: -8,
+                      bottom: -5,
+                      child: IconButton.filled(
+                        key: const Key('edit-account-profile-photo'),
+                        tooltip: 'Change profile image',
+                        onPressed: _saving ? null : _pickPhoto,
+                        icon: const Icon(Icons.camera_alt_rounded),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
@@ -311,7 +401,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                           ),
                         )
                       : const Icon(Icons.save_rounded),
-                  label: Text(_saving ? 'Saving…' : 'Save Changes'),
+                  label: Text(_saving ? 'Saving…' : 'Save Settings'),
                 ),
               ),
               const SizedBox(height: 18),
@@ -356,7 +446,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           style: TextButton.styleFrom(
             foregroundColor: selected ? Colors.white : context.appText,
             textStyle: TextStyle(
-              fontSize: 15,
+              fontSize: AppTypography.tabLabel,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
             ),
           ),

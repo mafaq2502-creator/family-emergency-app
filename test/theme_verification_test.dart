@@ -302,7 +302,7 @@ void main() {
     },
   );
 
-  testWidgets('Circle field errors are marked on their own child tabs', (
+  testWidgets('Circle create errors stay scoped and Join uses secure links', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(430, 932);
@@ -329,10 +329,9 @@ void main() {
     await tester.tap(find.text('Join Circle'));
     await tester.pumpAndSettle();
     expect(find.text('Please enter a family Circle name.'), findsNothing);
-    await tester.tap(find.text('Join Family Circle'));
-    await tester.pump();
-    expect(find.text('Enter an invitation code.'), findsOneWidget);
-    expect(find.byKey(const ValueKey('circle-tab-error-1')), findsOneWidget);
+    expect(find.text('Scan Invitation QR'), findsOneWidget);
+    expect(find.byType(TextFormField), findsNothing);
+    expect(find.byKey(const ValueKey('circle-tab-error-1')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

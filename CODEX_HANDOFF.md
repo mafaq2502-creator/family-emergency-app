@@ -1,5 +1,162 @@
 # Family Emergency App — Codex Handoff
 
+## Phase 9 — Real Android screen-time collection (2026-09-12)
+
+Status: **IMPLEMENTED, SECURED, TESTED, AND ANDROID-BUILT. Real-device runtime
+validation and production Firestore-rules deployment remain pending.** Per the
+Phase 9 acceptance rule, this section does not label the phase complete until an
+Android phone grants Usage access and confirms a real sync end to end.
+
+- Added a native Android `UsageStatsManager` bridge in `MainActivity.kt` with
+  source-of-truth states `unknown`, `notGranted`, `granted`, and `unavailable`.
+  Android opens the real app-specific Usage Access settings page; the app never
+  fakes permission or usage values and never prompts at startup.
+- Added the protected `PACKAGE_USAGE_STATS` manifest declaration. Collection is
+  excluded on unsupported platforms and the UI shows an unavailable state.
+- Added an in-app consent explanation before opening Android settings. Consent
+  is stored locally, permission is rechecked on app resume and refresh, and a
+  revoked grant stops collection and publishes the revoked state.
+- Collection is tied to the stable Phase 8 installation ID. Daily records use
+  deterministic IDs, so retries update the same user/device/date record instead
+  of creating duplicates.
+- Firestore schema:
+  - private source: `users/{uid}/devices/{installationId}/screenTimeDaily/{yyyy-MM-dd}`
+  - Circle mirror: `groups/{circleId}/screenTimeDaily/{uid}_{installationId}_{yyyy-MM-dd}`
+  Each record stores the owner UID, installation ID, local date/timezone offset,
+  actual Android foreground total, per-app totals, collection/server-sync time,
+  source, and schema version.
+- Circle mirroring occurs only when that exact Phase 8 device association is
+  still paired. Rules bind writes to the authenticated UID, active device,
+  deterministic path, active Circle membership, and paired association. Circle
+  reads require active membership; outsiders and spoofed paths are denied.
+- Added offline durability: a JSON pending payload is saved before Firestore
+  writes and cleared only after a server-source read confirms delivery.
+  Firestore's own offline queue remains active as a second layer.
+- Added WorkManager periodic sync every six hours. It does not display a prompt;
+  it retries pending data and collects Today only when both consent and Android
+  Usage access are already granted. Manual refresh syncs the selected period.
+- Progress now shows selected Circle/member/period screen-time totals and opens
+  a real detail screen with consent/permission/error/no-data states, refresh,
+  device count, last-sync time, and per-app usage. Device Detail shows the stored
+  screen-time permission and last sync.
+- Period definitions are local-calendar based: Today, Yesterday, trailing seven
+  days including Today, and the previous calendar month. For overlapping
+  multiple devices, each day's largest device total is used to avoid obvious
+  double counting; app totals follow the selected daily device.
+- `flutter analyze`: **No issues found**.
+- Complete `flutter test`: **286 passed, 0 failed**.
+- Firestore emulator rules: **36 passed, 0 failed**, including screen-time
+  idempotency, ownership, Circle visibility, spoof prevention, and permission
+  publication cases.
+- Android debug build succeeded:
+  `build/app/outputs/flutter-apk/app-debug.apk`
+  - Size: **216,870,234 bytes (206.82 MiB)**
+  - SHA-256: `5014D4FE30F49DB09DFB9F617EC15BBC4E1889A49B7545D1795A4C85DE26A209`
+- No emulator was used. `adb devices -l` found no connected physical Android
+  device, so real UsageStats grant/data collection could not be exercised in
+  this environment.
+- Production rules deployment was prepared for Firebase project
+  `familyemergencyapp`, but automatic approval review rejected the persistent
+  production access-control change pending explicit confirmation of that exact
+  project and deploy action. No paid Firebase product was enabled.
+
+Remaining acceptance check:
+
+1. Connect/install on a physical Android phone, open Progress > Screen Time,
+   accept sharing, enable SafeCircle in Android Usage Access, return to the app,
+   refresh, and verify non-zero real app usage plus a server-synced timestamp.
+2. Explicitly approve deployment of `firestore.rules` to production project
+   `familyemergencyapp`, then run the rules-only Firebase deploy.
+
+## Tab icon, label, and selected-state sizing refinement (2026-09-12)
+
+Status: **COMPLETE.** This small follow-up standardizes tab presentation to the
+approved Figma direction. No APK was built.
+
+- Added shared tab tokens: **15sp labels** and **28dp icons**.
+- Increased the custom bottom navigation height to 96dp so the larger Progress,
+  Family, Home, Plan, and Profile controls retain safe spacing.
+- Bottom destination icons now use 28dp consistently. The raised Home action is
+  68dp with a 34dp icon. All five labels use the same 15sp size and retain the
+  theme-colored selected surface, active color, and stronger selected weight.
+- Applied the same 15sp label standard and selected/unselected weight treatment
+  to Family Owned/Joined, Create/Join Circle, Account Personal/Address, Progress
+  period, and System/Light/Dark controls.
+- Increased theme selector icons to 24dp and vertical padding to preserve the
+  Figma-style segmented-control proportions.
+- Light/Dark responsive verification passed at 320px and 430px widths, including
+  text scale 1.5: **186 tests passed, 0 failed**.
+- flutter analyze: **No issues found**.
+- APK was intentionally not rebuilt per the user's instruction. The existing APK
+  predates this tab-only refinement.
+
+## Consolidated UI, navigation, Circle, plans, links, and theme pass (2026-09-12)
+
+Status: **COMPLETE in code, automated verification, analyzer, and Android
+artifact.** This section supersedes older notes for the same screens.
+
+- Rebuilt the shared dropdown as a fixed-height, bounded MenuAnchor. Labels
+  always float, selected text cannot overlap the placeholder, long values
+  ellipsize, and every menu is scrollable within the trigger width.
+- Profile now shows a read-only avatar. Photo selection moved to Account
+  Settings and participates in the same dirty state as personal/address edits.
+  The new image remains a preview until **Save Settings** succeeds; cancellation
+  or a failed write keeps the edit on screen.
+- Main Home, Family, Progress, Plans, and Profile headers are fixed above their
+  scrollable content. Their existing notification/action icons remain in the
+  header.
+- Circle deletion moved from Circle Settings to the Circle Detail app bar and is
+  owner-only. It uses the required permanent-delete confirmation, returns to the
+  Family list on success, removes the stale local Circle immediately, and stays
+  on Circle Detail with an error on failure.
+- Circle Settings is ordered as identity/role, lifecycle (red Leave followed by
+  Transfer Ownership), secure invitation, then emergency recipients. Delete was
+  removed from this screen.
+- Invitations now expose only **QR Code** and **Share Link**. Manual invite/share
+  code entry and display were removed. The QR encodes the same HTTPS URL that is
+  shared. AuthGate retains valid app links across sign-in/profile gates and
+  consumes them once; the existing callable validation, approval request, role
+  enforcement, expiry, usage limit, and replay protections remain unchanged.
+- Added Android custom-scheme/HTTPS intent filters, iOS custom URL registration,
+  app_links, and a Firebase Hosting /join fallback page that opens the app or
+  directs an uninstalled Android user to Play Store. Invalid link hosts and
+  malformed codes fail closed.
+- Plans now uses responsive cards that fill taller screens and scroll on compact
+  screens. Profile's row is named **Plans** and pushes the same Plans screen, so
+  Back returns to Profile; the bottom Plans tab remains a root destination.
+- Navigation continues to use normal Material routes and system back. Android
+  predictive-back support is enabled; Circle leave/delete returns unwind to the
+  Family tab without forcing unrelated tabs.
+- System, Light, and Dark selections now persist with SharedPreferences and are
+  restored before the app renders.
+- Removed the obsolete commented legacy tab implementation from
+  family_shell.dart.
+- flutter analyze: **No issues found**.
+- Complete flutter test: **282 passed, 0 failed**.
+- Build:
+  flutter build apk --release --dart-define=AUTO_VERIFY_EMAIL_FOR_TESTING=true.
+- APK: build/app/outputs/flutter-apk/app-release.apk
+- Size: **75,480,926 bytes (71.98 MiB)**.
+- SHA-256:
+  352873D8A10D8C0916221EEDAB68CAEAF4E5CA3FBE24BF716D895949249CCC34.
+- apksigner verification passed with APK Signature Scheme v2 and one signer.
+  The current release configuration still uses the Android debug certificate,
+  so this artifact is for testing.
+- No emulator/device run and no paid Firebase feature was enabled.
+
+External release setup still required:
+
+- Replace the placeholder Android application ID
+  com.example.family_emergency_app with the final Play package and publish the
+  Play listing before the fallback store URL can work for real users.
+- Configure the final owned HTTPS invite domain, deploy the included Firebase
+  Hosting files on the Spark/free project, and host
+  /.well-known/assetlinks.json using the final production signing certificate.
+  Until that deployment, generated HTTPS invite links are implementation-ready
+  but are not live.
+- Configure the equivalent iOS Associated Domains/Apple App Site Association
+  and App Store destination when the iOS release identity is available.
+
 ## App-wide UI sizing, navigation actions, profile photo, and rebuilt APK (2026-09-12)
 
 Status: **COMPLETE in code, automated tests, responsive renders, and Android
@@ -179,11 +336,11 @@ Cloud Function, rules deployment, Android emulator, or APK build was required.
 
 ## Phase 8 — Device Pairing & Heartbeat (2026-09-12)
 
-Status: **COMPLETE within the current Firebase client architecture.** The tested
-Firestore rules and indexes are deployed to production project
-`familyemergencyapp`. Firebase remains on the Spark/free plan; no paid feature,
-Cloud Function, Android emulator, APK build, or Phase 9 work was started. Preserve
-all uncommitted Phase 1–7 work together with these Phase 8 changes.
+Historical Phase 8 close status: **COMPLETE within the current Firebase client
+architecture.** Its tested Firestore rules and indexes were deployed to production
+project `familyemergencyapp`. Firebase remains on the Spark/free plan. Phase 9 has
+since been implemented as documented at the top of this handoff. Preserve all
+uncommitted work across phases.
 
 ### 1. Files modified
 
@@ -429,7 +586,8 @@ rendering passed in light/dark themes at 320×568 and 430×932, text scales 1.0 
 - Platform and app version are registered. OS version/model/manufacturer remain
   “Not reported” until a future vetted metadata package is introduced; no private
   permanent hardware identifier is collected.
-- FCM token storage/delivery, screen-time, and location remain their later phases.
+- FCM token storage/delivery and location remain later phases. Screen-time is now
+  implemented in Phase 9 as documented at the top of this handoff.
 - Physical two-phone camera scanning, process kill/reinstall, real production test
   accounts, offline restoration, and remote revocation timing were not manually
   exercised because the user requested no emulator/APK build and no physical test
@@ -441,8 +599,6 @@ rendering passed in light/dark themes at 320×568 and 430×932, text scales 1.0 
   and inspect server heartbeat timestamps; rename/unpair/revoke from the permitted
   screens; verify a normal member cannot view another member's devices and a
   revoked current device signs out when online.
-
-Do not start Phase 9 automatically.
 
 ## Product plan decision — recorded 2026-09-11
 

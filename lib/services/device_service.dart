@@ -613,6 +613,8 @@ extension PairedDeviceCopy on PairedDevice {
     updatedAt: updatedAt,
     revokedAt: revokedAt,
     removedAt: removedAt,
+    lastScreenTimeSyncAt: lastScreenTimeSyncAt,
+    screenTimePermissionState: screenTimePermissionState,
     permissions: permissions,
   );
 }

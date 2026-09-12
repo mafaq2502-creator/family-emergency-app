@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_typography.dart';
 
 class AppThemeModeSelector extends StatelessWidget {
   const AppThemeModeSelector({
@@ -46,7 +47,7 @@ class AppThemeModeSelector extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                   onTap: () => onChanged(choice.$1),
                   child: Ink(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
                       gradient: selected ? kPrimaryGradient : null,
                       borderRadius: BorderRadius.circular(10),
@@ -56,14 +57,14 @@ class AppThemeModeSelector extends StatelessWidget {
                       children: [
                         Icon(
                           choice.$3,
-                          size: 19,
+                          size: 24,
                           color: selected ? Colors.white : mutedText,
                         ),
                         const SizedBox(height: 3),
                         Text(
                           choice.$2,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: AppTypography.tabLabel,
                             fontWeight: FontWeight.w700,
                             color: selected ? Colors.white : enabledText,
                           ),

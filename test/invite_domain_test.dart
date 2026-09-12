@@ -26,6 +26,16 @@ void main() {
         InviteCodePolicy.normalize(InviteCodePolicy.qrPayload(validCode)),
         validCode,
       );
+      expect(
+        InviteCodePolicy.inviteUrl(validCode),
+        'https://familyemergencyapp.web.app/join?code=$validCode',
+      );
+      expect(
+        InviteCodePolicy.isSupportedInviteUri(
+          Uri.parse('https://familyemergencyapp.web.app/join?code=$validCode'),
+        ),
+        isTrue,
+      );
     });
 
     test('rejects missing, malformed, short, long and ambiguous values', () {
@@ -38,9 +48,16 @@ void main() {
         'ABCDEFGH_JKLMNPQRSTUV2345',
         'ABCDEFGHIKLMNPQRSTUV2345',
         'https://example.com/?code=$validCode',
+        'https://example.com/join?code=$validCode',
       ]) {
         expect(InviteCodePolicy.validate(value), isNotNull, reason: '$value');
       }
+      expect(
+        InviteCodePolicy.isSupportedInviteUri(
+          Uri.parse('https://example.com/join?code=$validCode'),
+        ),
+        isFalse,
+      );
     });
   });
 

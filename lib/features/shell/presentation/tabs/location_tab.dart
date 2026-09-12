@@ -3,142 +3,93 @@ part of '../family_shell.dart';
 extension _LocationTab on _HomeScreenState {
   Widget _buildLocationTab() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : kLightNavy;
-    final mutedColor = isDark ? Colors.white60 : kLightMuted;
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Progress',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
-                    color: titleColor,
-                  ),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Progress'),
+        actions: [
+          _notificationBell(),
+          IconButton(
+            tooltip: 'Progress settings',
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Progress uses the Circle, member and date filters below.',
                 ),
               ),
-              _notificationBell(),
-              IconButton(
-                tooltip: 'Progress settings',
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Progress uses the Circle, member and date filters below.',
-                    ),
-                  ),
-                ),
-                icon: const Icon(Icons.settings_outlined),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          BoundedDropdownFormField<FamilyGroup>(
-            initialValue: _selectedGroup,
-            decoration: const InputDecoration(
-              labelText: 'Family Circle',
-              prefixIcon: Icon(Icons.groups_rounded),
             ),
-            hint: const Text('Select a Circle'),
-            items: _groups
-                .map(
-                  (group) => DropdownMenuItem(
-                    value: group,
-                    child: Text(group.name, overflow: TextOverflow.ellipsis),
-                  ),
-                )
-                .toList(),
-            onChanged: _selectProgressGroup,
+            icon: const Icon(Icons.settings_outlined),
           ),
-          const SizedBox(height: 10),
-          BoundedDropdownFormField<String?>(
-            initialValue: familyMembers.any((m) => m.id == _progressMemberId)
-                ? _progressMemberId
-                : null,
-            decoration: const InputDecoration(
-              labelText: 'Member / Child',
-              prefixIcon: Icon(Icons.person_outline_rounded),
-            ),
-            items: [
-              const DropdownMenuItem<String?>(
-                value: null,
-                child: Text('All members'),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+          children: [
+            BoundedDropdownFormField<FamilyGroup>(
+              initialValue: _selectedGroup,
+              decoration: const InputDecoration(
+                labelText: 'Family Circle',
+                prefixIcon: Icon(Icons.groups_rounded),
               ),
-              ...familyMembers
-                  .where((m) => m.id != null)
+              hint: const Text('Select a Circle'),
+              items: _groups
                   .map(
-                    (member) => DropdownMenuItem<String?>(
-                      value: member.id,
-                      child: Text(member.name, overflow: TextOverflow.ellipsis),
+                    (group) => DropdownMenuItem(
+                      value: group,
+                      child: Text(group.name, overflow: TextOverflow.ellipsis),
                     ),
-                  ),
-            ],
-            onChanged: _selectProgressMember,
-          ),
-          const SizedBox(height: 12),
-          ProgressPeriodSelector(
-            value: _progressPeriod,
-            onChanged: _selectProgressPeriod,
-          ),
-          const SizedBox(height: 15),
-          _unavailableProgressCard(titleColor, mutedColor),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _progressMetric(
-                  icon: Icons.battery_5_bar_rounded,
-                  label: 'Battery',
-                  value: 'Not available',
-                  isDark: isDark,
-                ),
+                  )
+                  .toList(),
+              onChanged: _selectProgressGroup,
+            ),
+            const SizedBox(height: 10),
+            BoundedDropdownFormField<String?>(
+              initialValue: familyMembers.any((m) => m.id == _progressMemberId)
+                  ? _progressMemberId
+                  : null,
+              decoration: const InputDecoration(
+                labelText: 'Member / Child',
+                prefixIcon: Icon(Icons.person_outline_rounded),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _progressMetric(
-                  icon: Icons.storage_rounded,
-                  label: 'Storage',
-                  value: 'Not available',
-                  isDark: isDark,
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('All members'),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _progressMetric(
-                  icon: Icons.sync_rounded,
-                  label: 'Last Sync',
-                  value: 'No device sync',
-                  isDark: isDark,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _progressMetric(
-                  icon: Icons.verified_rounded,
-                  label: 'Check-in',
-                  value: _checkedInToday
-                      ? 'Checked in today'
-                      : 'No check-in today',
-                  isDark: isDark,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 48,
-            child: ElevatedButton(
-              onPressed: () => Navigator.push(
+                ...familyMembers
+                    .where((m) => m.id != null)
+                    .map(
+                      (member) => DropdownMenuItem<String?>(
+                        value: member.id,
+                        child: Text(
+                          member.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+              ],
+              onChanged: _selectProgressMember,
+            ),
+            const SizedBox(height: 12),
+            ProgressPeriodSelector(
+              value: _progressPeriod,
+              onChanged: _selectProgressPeriod,
+            ),
+            const SizedBox(height: 15),
+            ScreenTimeOverviewCard(
+              circleId: _selectedGroup?.id,
+              memberUserId: _progressMemberId == null
+                  ? null
+                  : familyMembers
+                        .where((member) => member.id == _progressMemberId)
+                        .map((member) => member.userId ?? member.id)
+                        .firstOrNull,
+              periodLabel: _progressPeriod,
+              onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ProgressDetailsScreen(
+                  builder: (_) => ScreenTimeDetailScreen(
                     memberName: _progressMemberId == null
                         ? 'All members'
                         : familyMembers
@@ -146,90 +97,98 @@ extension _LocationTab on _HomeScreenState {
                                   .map((m) => m.name)
                                   .firstOrNull ??
                               'Selected member',
-                    latestCheckIn: _progressMemberId == null
-                        ? _lastDailyCheckIn
-                        : null,
+                    circleId: _selectedGroup?.id,
+                    memberUserId: _progressMemberId == null
+                        ? null
+                        : familyMembers
+                              .where((member) => member.id == _progressMemberId)
+                              .map((member) => member.userId ?? member.id)
+                              .firstOrNull,
                   ),
                 ),
               ),
-              child: const Text('View Details'),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _unavailableProgressCard(Color titleColor, Color mutedColor) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? kDarkCard : kLightSurface,
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: isDark ? Colors.white12 : kLightBorder),
-        boxShadow: isDark
-            ? null
-            : const [
-                BoxShadow(
-                  color: Color(0x0D0B715E),
-                  blurRadius: 18,
-                  offset: Offset(0, 7),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _progressMetric(
+                    icon: Icons.battery_5_bar_rounded,
+                    label: 'Battery',
+                    value: 'Not available',
+                    isDark: isDark,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _progressMetric(
+                    icon: Icons.storage_rounded,
+                    label: 'Storage',
+                    value: 'Not available',
+                    isDark: isDark,
+                  ),
                 ),
               ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? kEmerald.withValues(alpha: .15)
-                      : kLightSuccessSurface,
-                  shape: BoxShape.circle,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _progressMetric(
+                    icon: Icons.sync_rounded,
+                    label: 'Last Sync',
+                    value: 'No device sync',
+                    isDark: isDark,
+                  ),
                 ),
-                child: Icon(
-                  Icons.schedule_rounded,
-                  color: isDark ? kEmerald : kLightPrimary,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _progressMetric(
+                    icon: Icons.verified_rounded,
+                    label: 'Check-in',
+                    value: _checkedInToday
+                        ? 'Checked in today'
+                        : 'No check-in today',
+                    isDark: isDark,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Screen Time',
-                      style: TextStyle(
-                        color: mutedColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProgressDetailsScreen(
+                      memberName: _progressMemberId == null
+                          ? 'All members'
+                          : familyMembers
+                                    .where((m) => m.id == _progressMemberId)
+                                    .map((m) => m.name)
+                                    .firstOrNull ??
+                                'Selected member',
+                      latestCheckIn: _progressMemberId == null
+                          ? _lastDailyCheckIn
+                          : null,
+                      circleId: _selectedGroup?.id,
+                      memberUserId: _progressMemberId == null
+                          ? null
+                          : familyMembers
+                                .where(
+                                  (member) => member.id == _progressMemberId,
+                                )
+                                .map((member) => member.userId ?? member.id)
+                                .firstOrNull,
                     ),
-                    Text(
-                      'Not available',
-                      style: TextStyle(
-                        color: titleColor,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
+                child: const Text('View Details'),
               ),
-              Icon(Icons.info_outline_rounded, color: context.appMuted),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'No screen-time telemetry exists for the selected Circle, member and period ($_progressPeriod).',
-            style: TextStyle(color: mutedColor, fontSize: 13),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

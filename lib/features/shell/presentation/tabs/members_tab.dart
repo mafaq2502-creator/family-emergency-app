@@ -8,131 +8,128 @@ extension _MembersTab on _HomeScreenState {
     final visibleGroups = _groups
         .where((group) => _showOwnedCircles ? group.isOwner : !group.isOwner)
         .toList();
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  'Family Circles',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
-                    color: titleColor,
-                  ),
-                ),
-              ),
-              _notificationBell(),
-              IconButton(
-                tooltip: 'Circle Settings',
-                onPressed: _openFamilyCircleSettings,
-                icon: Icon(Icons.settings_outlined, color: context.appPrimary),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Open a Circle to view its active registered members.',
-            style: TextStyle(fontSize: 14, color: mutedColor),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: isDark ? kDarkSurface : kLightSurfaceMuted,
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: Row(
-              children: [
-                _circleScopeButton('Owned', true, isDark),
-                _circleScopeButton('Joined', false, isDark),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (visibleGroups.isEmpty)
-            LightStateView(
-              icon: Icons.diversity_1_rounded,
-              title: _showOwnedCircles
-                  ? 'No owned Circles'
-                  : 'No joined Circles',
-              message: _showOwnedCircles
-                  ? 'Create a family Circle to become its owner.'
-                  : 'Circles joined with your registered account appear here.',
-              actionLabel: _showOwnedCircles ? 'Create Circle' : null,
-              onAction: _showOwnedCircles ? _createGroup : null,
-            )
-          else
-            for (final group in visibleGroups) ...[
-              LightCard(
-                onTap: () => _openGroupHome(group),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: kEmerald.withValues(alpha: .13),
-                      child: const Icon(Icons.groups_rounded, color: kEmerald),
-                    ),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            group.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: titleColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            '${group.isOwner ? 'owner' : group.role.value} • ${group.memberCount} active ${group.memberCount == 1 ? 'member' : 'members'}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 13, color: mutedColor),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right_rounded),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 9),
-            ],
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 52,
-            child: OutlinedButton.icon(
-              onPressed: _isCreatingGroup ? null : _createGroup,
-              icon: _isCreatingGroup
-                  ? const SizedBox(
-                      width: 17,
-                      height: 17,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.group_add_outlined),
-              label: Text(
-                _isCreatingGroup ? 'Creating Circle…' : 'Create another Circle',
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 54,
-            child: ElevatedButton.icon(
-              onPressed: _joinAnotherCircle,
-              icon: const Icon(Icons.qr_code_scanner_rounded),
-              label: const Text('Join another Circle'),
-            ),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Family Circles'),
+        actions: [
+          _notificationBell(),
+          IconButton(
+            tooltip: 'Circle Settings',
+            onPressed: _openFamilyCircleSettings,
+            icon: Icon(Icons.settings_outlined, color: context.appPrimary),
           ),
         ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
+          children: [
+            Text(
+              'Open a Circle to view its active registered members.',
+              style: TextStyle(fontSize: 14, color: mutedColor),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: isDark ? kDarkSurface : kLightSurfaceMuted,
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Row(
+                children: [
+                  _circleScopeButton('Owned', true, isDark),
+                  _circleScopeButton('Joined', false, isDark),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (visibleGroups.isEmpty)
+              LightStateView(
+                icon: Icons.diversity_1_rounded,
+                title: _showOwnedCircles
+                    ? 'No owned Circles'
+                    : 'No joined Circles',
+                message: _showOwnedCircles
+                    ? 'Create a family Circle to become its owner.'
+                    : 'Circles joined with your registered account appear here.',
+                actionLabel: _showOwnedCircles ? 'Create Circle' : null,
+                onAction: _showOwnedCircles ? _createGroup : null,
+              )
+            else
+              for (final group in visibleGroups) ...[
+                LightCard(
+                  onTap: () => _openGroupHome(group),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: kEmerald.withValues(alpha: .13),
+                        child: const Icon(
+                          Icons.groups_rounded,
+                          color: kEmerald,
+                        ),
+                      ),
+                      const SizedBox(width: 11),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              group.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: titleColor,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${group.isOwner ? 'owner' : group.role.value} • ${group.memberCount} active ${group.memberCount == 1 ? 'member' : 'members'}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 13, color: mutedColor),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 9),
+              ],
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: _isCreatingGroup ? null : _createGroup,
+                icon: _isCreatingGroup
+                    ? const SizedBox(
+                        width: 17,
+                        height: 17,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.group_add_outlined),
+                label: Text(
+                  _isCreatingGroup
+                      ? 'Creating Circle…'
+                      : 'Create another Circle',
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 54,
+              child: ElevatedButton.icon(
+                onPressed: _joinAnotherCircle,
+                icon: const Icon(Icons.qr_code_scanner_rounded),
+                label: const Text('Join another Circle'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -213,7 +210,7 @@ extension _MembersTab on _HomeScreenState {
               color: selected
                   ? Colors.white
                   : (isDark ? Colors.white60 : kLightMuted),
-              fontSize: 15,
+              fontSize: AppTypography.tabLabel,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
             ),
           ),

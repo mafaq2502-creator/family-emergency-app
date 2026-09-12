@@ -11,6 +11,8 @@ import '../../../models/family_group.dart';
 import '../../../services/group_service.dart';
 import 'share_circle_screen.dart';
 
+enum GroupSettingsOutcome { left }
+
 class GroupSettingsScreen extends StatefulWidget {
   const GroupSettingsScreen({
     super.key,
@@ -108,25 +110,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       fallback: 'You could not leave this Circle. Please try again.',
     );
     if (succeeded && mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    }
-  }
-
-  Future<void> _delete(FamilyGroup group) async {
-    if (_busy || !group.isOwner) return;
-    final confirmed = await _confirm(
-      title: 'Delete Circle?',
-      message:
-          '${group.name} will be closed for every member. Its records will be retained as a protected lifecycle tombstone.',
-      action: 'Delete Circle',
-    );
-    if (!confirmed || !mounted) return;
-    final succeeded = await _run(
-      () => _service.deleteGroup(group),
-      fallback: 'The Circle could not be deleted. Please try again.',
-    );
-    if (succeeded && mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      Navigator.pop(context, GroupSettingsOutcome.left);
     }
   }
 
@@ -252,12 +236,37 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           title: 'Your Circle role',
           subtitle: group.role.value,
         ),
-        if (group.canManage) ...[
+        const SizedBox(height: 22),
+        const LightSectionTitle('Circle lifecycle'),
+        if (group.isOwner)
+          const LightSettingRow(
+            icon: Icons.logout_rounded,
+            title: 'Leave Circle',
+            subtitle: 'Transfer ownership before leaving this Circle',
+            destructive: true,
+          )
+        else
+          LightSettingRow(
+            icon: Icons.logout_rounded,
+            title: 'Leave Circle',
+            subtitle: 'Remove your active membership from this Circle',
+            destructive: true,
+            onTap: _busy ? null : () => _leave(group),
+          ),
+        if (group.isOwner) ...[
           const SizedBox(height: 9),
+          const LightSettingRow(
+            icon: Icons.swap_horiz_rounded,
+            title: 'Transfer Ownership',
+            subtitle: 'Reserved for a later lifecycle extension',
+          ),
+        ],
+        if (group.canManage) ...[
+          const SizedBox(height: 22),
           LightSettingRow(
             icon: Icons.ios_share_rounded,
             title: 'Invite registered member',
-            subtitle: 'Generate a secure Phase 6 invitation code',
+            subtitle: 'Create a secure share link or QR code',
             onTap: _busy
                 ? null
                 : () => Navigator.push(
@@ -316,38 +325,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                   : () => _saveRecipients(group),
               child: const Text('Save Emergency Recipients'),
             ),
-          ),
-        ],
-        const SizedBox(height: 26),
-        const LightSectionTitle('Circle lifecycle'),
-        if (group.isOwner)
-          const LightSettingRow(
-            icon: Icons.logout_rounded,
-            title: 'Leave Circle',
-            subtitle: 'The owner must transfer ownership or delete the Circle',
-          )
-        else
-          LightSettingRow(
-            icon: Icons.logout_rounded,
-            title: 'Leave Circle',
-            subtitle: 'Remove your active membership from this Circle',
-            destructive: true,
-            onTap: _busy ? null : () => _leave(group),
-          ),
-        if (group.isOwner) ...[
-          const SizedBox(height: 9),
-          const LightSettingRow(
-            icon: Icons.swap_horiz_rounded,
-            title: 'Transfer Ownership',
-            subtitle: 'Reserved for a later lifecycle extension',
-          ),
-          const SizedBox(height: 9),
-          LightSettingRow(
-            icon: Icons.delete_forever_rounded,
-            title: 'Delete Circle',
-            subtitle: 'Close this Circle for every member',
-            destructive: true,
-            onTap: _busy ? null : () => _delete(group),
           ),
         ],
       ],

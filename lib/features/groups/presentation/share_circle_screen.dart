@@ -107,13 +107,12 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
   }
 
   Future<void> _share(CircleInvite invite) async {
-    final code = InviteCodePolicy.display(invite.code);
     await SharePlus.instance.share(
       ShareParams(
         subject: 'Join ${widget.group.name}',
         text:
             'Join ${widget.group.name} in Family Emergency.\n'
-            'Invite code: $code\n${InviteCodePolicy.qrPayload(invite.code)}',
+            '${InviteCodePolicy.inviteUrl(invite.code)}',
       ),
     );
   }
@@ -188,7 +187,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
                 color: invite.isUsable ? kEmerald : kEmergency,
               ),
               title: Text(
-                InviteCodePolicy.display(invite.code),
+                invite.circleName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -290,7 +289,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
       borderRadius: BorderRadius.circular(13),
     ),
     child: Row(
-      children: ['QR Code', 'Invite Code', 'Invite Link'].indexed.map((entry) {
+      children: ['QR Code', 'Share Link'].indexed.map((entry) {
         final selected = _tab == entry.$1;
         return Expanded(
           child: InkWell(
@@ -354,7 +353,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
         ),
       );
     }
-    if (_tab == 2) {
+    if (_tab == 1) {
       return LightCard(
         child: Column(
           children: [
@@ -373,28 +372,6 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
         ),
       );
     }
-    final displayCode = InviteCodePolicy.display(invite.code);
-    return LightCard(
-      child: Column(
-        children: [
-          SelectableText(
-            displayCode,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: context.appHeading,
-              fontSize: 18,
-              letterSpacing: 1.4,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextButton.icon(
-            onPressed: usable ? () => _copy(invite.code, 'Code') : null,
-            icon: const Icon(Icons.copy_rounded),
-            label: const Text('Copy Code'),
-          ),
-        ],
-      ),
-    );
+    return const SizedBox.shrink();
   }
 }

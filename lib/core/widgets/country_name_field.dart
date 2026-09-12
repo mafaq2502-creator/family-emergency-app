@@ -28,6 +28,7 @@ class CountryNameField extends StatelessWidget {
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: 'Country',
+          floatingLabelBehavior: FloatingLabelBehavior.always,
           enabled: enabled,
           prefixIcon: const Icon(Icons.public_rounded),
           suffixIcon: const Icon(Icons.arrow_drop_down_rounded),

@@ -18,6 +18,8 @@ class AppTypography {
   static const double fieldLabel = 14;
   static const double fieldHint = 15;
   static const double button = 16;
+  static const double tabLabel = 15;
+  static const double tabIcon = 28;
   static const double error = 13;
 
   static TextTheme textTheme(Brightness brightness) {

@@ -1,21 +1,36 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../notifications/presentation/notification_bell_button.dart';
+
+class PlansScreen extends StatelessWidget {
+  const PlansScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Plans'),
+      actions: const [NotificationBellButton()],
+    ),
+    body: const PlanSelectionContent(showHeader: false),
+  );
+}
 
 class PlanSelectionContent extends StatelessWidget {
-  const PlanSelectionContent({super.key, this.action});
+  const PlanSelectionContent({super.key, this.action, this.showHeader = true});
 
   final Widget? action;
+  final bool showHeader;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark ? Colors.white : kLightNavy;
     final mutedColor = isDark ? Colors.white60 : kLightMuted;
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
-        children: [
+    final header = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showHeader)
           Row(
             children: [
               Expanded(
@@ -31,46 +46,69 @@ class PlanSelectionContent extends StatelessWidget {
               ?action,
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Get more features to keep your family\nextra safe.',
-            style: TextStyle(fontSize: 14, color: mutedColor),
+        if (showHeader) const SizedBox(height: 4),
+        Text(
+          'Get more features to keep your family\nextra safe.',
+          style: TextStyle(fontSize: 14, color: mutedColor),
+        ),
+      ],
+    );
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 18, 24, 10),
+            child: header,
           ),
-          const SizedBox(height: 12),
-          IntrinsicHeight(
-            child: Row(
-              children: [
-                Expanded(
-                  child: _planCard(
-                    context: context,
-                    title: 'Free',
-                    subtitle: 'Basic features for\nsmall families.',
-                    price: '\$0',
-                    features: const [
-                      'Owner + 2 members',
-                      'Manual SOS alerts',
-                      'Daily check-in',
-                      'Emergency contacts',
-                    ],
-                    selected: true,
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, viewport) => SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 2, 24, 20),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: viewport.maxHeight > 28
+                        ? viewport.maxHeight - 28
+                        : 0,
+                  ),
+                  child: IntrinsicHeight(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _planCard(
+                            context: context,
+                            title: 'Free',
+                            subtitle: 'Basic features for\nsmall families.',
+                            price: '\$0',
+                            features: const [
+                              'Owner + 2 members',
+                              'Manual SOS alerts',
+                              'Daily check-in',
+                              'Emergency contacts',
+                            ],
+                            selected: true,
+                          ),
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: _planCard(
+                            context: context,
+                            title: 'Premium',
+                            subtitle: 'Advanced features\nfor complete safety.',
+                            price: '\$4.99',
+                            features: const [
+                              'Owner + 10 members',
+                              'Approved device access',
+                              'Battery/offline alerts',
+                              'Emergency history',
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: _planCard(
-                    context: context,
-                    title: 'Premium',
-                    subtitle: 'Advanced features\nfor complete safety.',
-                    price: '\$4.99',
-                    features: const [
-                      'Owner + 10 members',
-                      'Approved device access',
-                      'Battery/offline alerts',
-                      'Emergency history',
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],
@@ -186,7 +224,6 @@ class PlanSelectionContent extends StatelessWidget {
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-
             child: ElevatedButton(
               onPressed: selected
                   ? null
