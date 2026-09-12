@@ -1,9 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:country_picker/country_picker.dart';
 
+import '../../../../core/domain/mobile_phone_number.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_text_form_field.dart';
 import '../../../../core/widgets/bounded_dropdown_form_field.dart';
+import '../../../../core/widgets/country_name_field.dart';
+import '../../../../core/widgets/mobile_phone_field.dart';
 import '../../../../models/user_profile.dart';
 import '../../../../services/auth_service.dart';
 import '../../../../services/profile_service.dart';
@@ -36,7 +40,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _email;
+  late final TextEditingController _phone;
   String? _relationship;
+  late Country _country;
+  bool _localeApplied = false;
   bool _busy = false;
 
   @override
@@ -45,6 +52,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     _name = TextEditingController(text: widget.existingProfile.name);
     _email = TextEditingController(
       text: widget.user.email ?? widget.existingProfile.email,
+    );
+    _country = CountryService().findByCode(
+          widget.existingProfile.phoneCountryIso ??
+              widget.existingProfile.address['countryIso'],
+        ) ??
+        CountryService().findByCode('PK')!;
+    _phone = TextEditingController(
+      text: MobilePhoneNumber.localFromStored(
+        widget.existingProfile.phone,
+        _country.phoneCode,
+      ),
     );
     _relationship =
         AuthValidators.relationships.contains(
@@ -55,9 +73,22 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_localeApplied || widget.existingProfile.phoneCountryIso != null) return;
+    _localeApplied = true;
+    final localeCountry = Localizations.localeOf(context).countryCode;
+    final suggested = CountryService().findByCode(localeCountry);
+    if (suggested != null && widget.existingProfile.phone.isEmpty) {
+      _country = suggested;
+    }
+  }
+
+  @override
   void dispose() {
     _name.dispose();
     _email.dispose();
+    _phone.dispose();
     super.dispose();
   }
 
@@ -68,7 +99,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       await widget.profileService.completeProfile(
         widget.user,
         name: _name.text.trim(),
-        signupPhone: widget.existingProfile.phone,
+        phone: MobilePhoneNumber.normalize(_phone.text, _country.phoneCode),
+        countryIso: _country.countryCode,
+        countryCode: MobilePhoneNumber.callingCode(_country.phoneCode),
         relationship: _relationship!,
       );
       if (mounted) widget.onCompleted();
@@ -162,15 +195,21 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 prefixIcon: Icons.mail_outline_rounded,
                 enabled: false,
               ),
-              if (widget.existingProfile.phone.isNotEmpty) ...[
-                const SizedBox(height: 18),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.phone_outlined),
-                  title: const Text('Signup phone number'),
-                  subtitle: Text(widget.existingProfile.phone),
-                ),
-              ],
+              const SizedBox(height: 18),
+              CountryNameField(
+                countryIso: _country.countryCode,
+                enabled: !_busy,
+                onChanged: (country) => setState(() => _country = country),
+              ),
+              const SizedBox(height: 18),
+              MobilePhoneField(
+                controller: _phone,
+                country: _country,
+                enabled: !_busy,
+                textInputAction: TextInputAction.next,
+                onCountryChanged: (country) =>
+                    setState(() => _country = country),
+              ),
               const SizedBox(height: 18),
               BoundedDropdownFormField<String>(
                 autovalidateMode: AutovalidateMode.onUnfocus,

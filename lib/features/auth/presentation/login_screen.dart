@@ -237,12 +237,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                     ),
                                   ),
+                            style: TextButton.styleFrom(
+                              foregroundColor: kEmerald,
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                            ),
                             child: const Text(
                               'Sign Up',
                               style: TextStyle(
-                                color: Color(0xFF2563EB),
+                                fontSize: 15,
                                 fontWeight: FontWeight.w600,
-                                decoration: TextDecoration.underline,
                               ),
                             ),
                           ),

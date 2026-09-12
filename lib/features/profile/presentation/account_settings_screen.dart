@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:country_picker/country_picker.dart';
 
+import '../../../core/domain/mobile_phone_number.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/light_ui.dart';
 import '../../../core/widgets/country_name_field.dart';
 import '../../../core/widgets/bounded_dropdown_form_field.dart';
 import '../../../core/widgets/profile_image.dart';
+import '../../../core/widgets/mobile_phone_field.dart';
 import '../../auth/domain/auth_validators.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
@@ -15,12 +18,15 @@ class AccountSettingsScreen extends StatefulWidget {
     super.key,
     required this.initialName,
     required this.email,
+    this.initialPhone = '',
+    this.initialPhoneCountryIso,
     this.initialPhotoUrl,
     this.initialAddress = const {},
     required this.onSaveAddress,
     required this.relationship,
     required this.relationships,
     required this.onSave,
+    this.onSavePhone,
     this.onSavePhoto,
     this.pickProfilePhoto,
     required this.onUpdatePassword,
@@ -28,12 +34,20 @@ class AccountSettingsScreen extends StatefulWidget {
 
   final String initialName;
   final String email;
+  final String initialPhone;
+  final String? initialPhoneCountryIso;
   final String? initialPhotoUrl;
   final Map<String, String> initialAddress;
   final Future<bool> Function(Map<String, String> address) onSaveAddress;
   final String? relationship;
   final List<String> relationships;
   final Future<bool> Function(String name, String? relationship) onSave;
+  final Future<bool> Function(
+    String phone,
+    String countryIso,
+    String countryCode,
+  )?
+  onSavePhone;
   final Future<bool> Function(String photoUrl)? onSavePhoto;
   final Future<String?> Function()? pickProfilePhoto;
   final VoidCallback onUpdatePassword;
@@ -45,6 +59,10 @@ class AccountSettingsScreen extends StatefulWidget {
 class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
+  late final TextEditingController _phone;
+  late Country _phoneCountry;
+  late String _savedPhone;
+  late String _savedPhoneCountryIso;
   late String? _relationship;
   late String _savedName;
   late String? _savedRelationship;
@@ -69,9 +87,17 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     'countryIso': _countryIso ?? '',
   };
 
+  bool get _phoneDirty {
+    if (_phone.text.trim().isEmpty && _savedPhone.isEmpty) return false;
+    return MobilePhoneNumber.normalize(_phone.text, _phoneCountry.phoneCode) !=
+            _savedPhone ||
+        _phoneCountry.countryCode != _savedPhoneCountryIso;
+  }
+
   bool get _dirty =>
       _name.text.trim() != _savedName ||
       _relationship != _savedRelationship ||
+      _phoneDirty ||
       !mapEquals(_currentAddress, _savedAddress) ||
       _draftPhotoUrl != _savedPhotoUrl;
 
@@ -80,6 +106,19 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     super.initState();
     _name = TextEditingController(text: widget.initialName)
       ..addListener(_refresh);
+    _phoneCountry =
+        CountryService().findByCode(
+          widget.initialPhoneCountryIso ?? widget.initialAddress['countryIso'],
+        ) ??
+        CountryService().findByCode('PK')!;
+    _phone = TextEditingController(
+      text: MobilePhoneNumber.localFromStored(
+        widget.initialPhone,
+        _phoneCountry.phoneCode,
+      ),
+    )..addListener(_refresh);
+    _savedPhone = widget.initialPhone;
+    _savedPhoneCountryIso = _phoneCountry.countryCode;
     _relationship = widget.relationship;
     _savedName = widget.initialName.trim();
     _savedRelationship = widget.relationship;
@@ -138,6 +177,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   void dispose() {
     _name.removeListener(_refresh);
     _name.dispose();
+    _phone.removeListener(_refresh);
+    _phone.dispose();
     for (final controller in _address.values) {
       controller.removeListener(_refresh);
       controller.dispose();
@@ -190,11 +231,25 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       final personalDirty =
           _name.text.trim() != _savedName ||
           _relationship != _savedRelationship;
+      final currentPhone = MobilePhoneNumber.normalize(
+        _phone.text,
+        _phoneCountry.phoneCode,
+      );
+      final phoneDirty = _phoneDirty;
       final addressDirty = !mapEquals(_currentAddress, _savedAddress);
       final photoDirty = _draftPhotoUrl != _savedPhotoUrl;
       saved =
           !personalDirty ||
           await widget.onSave(_name.text.trim(), _relationship);
+      if (saved && phoneDirty) {
+        saved =
+            widget.onSavePhone != null &&
+            await widget.onSavePhone!(
+              currentPhone,
+              _phoneCountry.countryCode,
+              MobilePhoneNumber.callingCode(_phoneCountry.phoneCode),
+            );
+      }
       if (saved && addressDirty) {
         saved = await widget.onSaveAddress(_currentAddress);
       }
@@ -212,6 +267,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       if (saved) {
         _savedName = _name.text.trim();
         _savedRelationship = _relationship;
+        _savedPhone = MobilePhoneNumber.normalize(
+          _phone.text,
+          _phoneCountry.phoneCode,
+        );
+        _savedPhoneCountryIso = _phoneCountry.countryCode;
         _savedAddress = Map.of(_currentAddress);
         _savedPhotoUrl = _draftPhotoUrl;
       } else {
@@ -311,6 +371,18 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                       'Email',
                       widget.email,
                       Icons.mail_outline_rounded,
+                    ),
+                    const SizedBox(height: 18),
+                    MobilePhoneField(
+                      controller: _phone,
+                      country: _phoneCountry,
+                      enabled: !_saving,
+                      required: widget.initialPhone.isNotEmpty,
+                      textInputAction: TextInputAction.next,
+                      onCountryChanged: (country) => setState(() {
+                        _phoneCountry = country;
+                        _saveError = null;
+                      }),
                     ),
                     const SizedBox(height: 18),
                     BoundedDropdownFormField<String>(

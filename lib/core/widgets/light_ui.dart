@@ -77,9 +77,41 @@ class AppAlertDialog extends StatelessWidget {
       ],
     ),
     content: content,
-    actions: actions,
+    actions: actions == null || actions!.isEmpty
+        ? null
+        : [AppActionLayout(children: actions!)],
     actionsAlignment: actionsAlignment,
   );
+}
+
+class AppActionLayout extends StatelessWidget {
+  const AppActionLayout({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    if (children.length == 1) {
+      return Center(
+        child: SizedBox(width: 160, height: 54, child: children.single),
+      );
+    }
+    if (children.length == 2) {
+      return Row(
+        children: [
+          Expanded(child: SizedBox(height: 54, child: children.first)),
+          const SizedBox(width: 12),
+          Expanded(child: SizedBox(height: 54, child: children.last)),
+        ],
+      );
+    }
+    return Wrap(
+      alignment: WrapAlignment.end,
+      spacing: 10,
+      runSpacing: 8,
+      children: children,
+    );
+  }
 }
 
 class LightCard extends StatelessWidget {

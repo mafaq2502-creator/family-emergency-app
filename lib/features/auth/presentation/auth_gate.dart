@@ -228,7 +228,6 @@ class _AuthGateState extends State<AuthGate> {
                   case AuthDestination.circleSetup:
                     return CircleOnboardingScreen(
                       user: user,
-                      groupService: _groupService,
                       pendingCircleId: resolution.profile.pendingJoinCircleId,
                       profileName: resolution.profile.name,
                       profilePhone: resolution.profile.phone,
@@ -236,6 +235,10 @@ class _AuthGateState extends State<AuthGate> {
                       onInviteHandled: _clearInvite,
                       onSignOut: _authService.signOut,
                       onCompleted: _refresh,
+                      onContinueWithoutCircle: () async {
+                        await _profileService.markOnboardingCompleted(user);
+                        _refresh();
+                      },
                     );
                   case AuthDestination.home:
                     return HomeScreen(

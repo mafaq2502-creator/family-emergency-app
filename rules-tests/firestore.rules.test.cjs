@@ -65,6 +65,7 @@ beforeEach(async () => {
     ]) {
       await setDoc(doc(db, `users/${id}`), {
         uid: id, name, email: `${id}@example.test`, relationship,
+        phone: '+923001234567', phoneCountryIso: 'PK', phoneCountryCode: '+92',
         profileCompleted: true, onboardingCompleted: true,
         planTier: 'premium', subscriptionStatus: 'active',
         circleIds: ['circle-1'], activeCircleId: 'circle-1',
@@ -144,6 +145,7 @@ test('profile creation is canonical, owner-scoped and server validated', async (
   const outsider = testEnvironment.authenticatedContext('outsider', {email: 'outside@example.test'}).firestore();
   const valid = {
     uid: 'new-user', name: 'New User', email: 'new@example.test',
+    phone: '+923001234567', phoneCountryIso: 'PK', phoneCountryCode: '+92',
     relationship: 'Self', profileCompleted: true, onboardingCompleted: false,
     createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
   };

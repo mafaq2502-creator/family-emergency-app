@@ -83,16 +83,22 @@ void main() {
               ),
             );
             final positions = [
-              'Family',
               'Progress',
+              'Family',
               'Home',
               'Plan',
               'Profile',
             ].map((label) => tester.getTopLeft(find.text(label)).dy).toList();
             expect(
-              positions.every((value) => (value - positions.first).abs() < .01),
+              [
+                positions[0],
+                positions[1],
+                positions[3],
+                positions[4],
+              ].every((value) => (value - positions.first).abs() < .01),
               isTrue,
             );
+            expect(positions.first - positions[2], closeTo(2, .01));
             final icons = tester.widgetList<Icon>(find.byType(Icon)).toList();
             expect(icons.map((icon) => icon.size).toSet().length, 1);
             final iconY = find

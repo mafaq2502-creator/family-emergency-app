@@ -24,7 +24,6 @@ import 'package:family_emergency_app/models/circle_role.dart';
 import 'package:family_emergency_app/models/family_group.dart';
 import 'package:family_emergency_app/models/family_member.dart';
 import 'package:family_emergency_app/models/paired_device.dart';
-import 'package:family_emergency_app/services/group_service.dart';
 import 'package:family_emergency_app/services/auth_service.dart';
 import 'package:family_emergency_app/services/circle_join_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -303,7 +302,7 @@ void main() {
     },
   );
 
-  testWidgets('Circle create errors stay scoped and Join uses secure links', (
+  testWidgets('Circle onboarding contains only secure Join functionality', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(430, 932);
@@ -314,25 +313,19 @@ void main() {
       FamilyEmergencyApp(
         home: CircleOnboardingScreen(
           user: _FakeUser(),
-          groupService: GroupService(),
           joinService: _FakeCircleJoin(),
           onSignOut: () async {},
           onCompleted: () {},
+          onContinueWithoutCircle: () async {},
         ),
       ),
     );
 
-    await tester.tap(find.text('Create Family Circle'));
-    await tester.pump();
-    expect(find.text('Please enter a family Circle name.'), findsOneWidget);
-    expect(find.byKey(const ValueKey('circle-tab-error-0')), findsOneWidget);
-
-    await tester.tap(find.text('Join Circle'));
-    await tester.pumpAndSettle();
-    expect(find.text('Please enter a family Circle name.'), findsNothing);
+    expect(find.textContaining('Create Family Circle'), findsNothing);
+    expect(find.textContaining('Create Circle'), findsNothing);
     expect(find.text('Scan Invitation QR'), findsOneWidget);
     expect(find.byType(TextFormField), findsNothing);
-    expect(find.byKey(const ValueKey('circle-tab-error-1')), findsNothing);
+    expect(find.text('Continue to Family'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

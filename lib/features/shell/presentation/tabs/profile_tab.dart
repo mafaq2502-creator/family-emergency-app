@@ -68,12 +68,15 @@ extension _ProfileTab on _HomeScreenState {
                       builder: (_) => AccountSettingsScreen(
                         initialName: _profileNameController.text,
                         email: _profileEmail,
+                        initialPhone: _profilePhone,
+                        initialPhoneCountryIso: _profilePhoneCountryIso,
                         initialPhotoUrl: _profilePhotoUrl,
                         initialAddress: _profileAddress,
                         onSaveAddress: _saveAccountAddress,
                         relationship: _profileRole,
                         relationships: _HomeScreenState._roles,
                         onSave: _saveAccountSettings,
+                        onSavePhone: _saveAccountPhone,
                         onSavePhoto: _saveAccountPhoto,
                         onUpdatePassword: () => Navigator.push(
                           context,

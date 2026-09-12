@@ -36,6 +36,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
   bool _resending = false;
   bool _verified = false;
   bool _continued = false;
+  bool _cancelling = false;
   int _resendSeconds = 0;
   String? _message;
   bool _messageIsError = false;
@@ -72,21 +73,42 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
   }
 
   void _continueOnce(bool firebaseVerified) {
-    if (_continued) return;
+    if (_continued || _cancelling) return;
     _continued = true;
     _verificationTimer?.cancel();
     widget.onContinue(firebaseVerified);
   }
 
+  Future<void> _cancel() async {
+    if (_cancelling) return;
+    _cancelling = true;
+    _verificationTimer?.cancel();
+    _resendTimer?.cancel();
+    FocusManager.instance.primaryFocus?.unfocus();
+    try {
+      await widget.verification.signOut();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _cancelling = false;
+        _messageIsError = true;
+        _message = AuthErrorMapper.message(
+          error,
+          fallback: 'Could not cancel verification. Please try again.',
+        );
+      });
+    }
+  }
+
   Future<void> _check({bool silent = false}) async {
-    if (_checking || _verified) return;
+    if (_checking || _verified || _cancelling) return;
     setState(() {
       _checking = true;
       if (!silent) _message = null;
     });
     try {
       final verified = await widget.verification.refreshEmailVerification();
-      if (!mounted) return;
+      if (!mounted || _cancelling) return;
       setState(() {
         _verified = verified;
         _messageIsError = false;
@@ -102,7 +124,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
         });
       }
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || _cancelling) return;
       setState(() {
         _messageIsError = true;
         _message = AuthErrorMapper.message(
@@ -111,7 +133,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
         );
       });
     } finally {
-      if (mounted) setState(() => _checking = false);
+      if (mounted && !_cancelling) setState(() => _checking = false);
     }
   }
 
@@ -258,10 +280,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
                       children: [
                         Expanded(
                           child: TextButton(
-                            onPressed: _checking || _resending
-                                ? null
-                                : widget.verification.signOut,
-                            child: const Text('Cancel'),
+                            onPressed: _cancelling ? null : _cancel,
+                            child: Text(_cancelling ? 'Cancelling…' : 'Cancel'),
                           ),
                         ),
                         const SizedBox(width: 10),

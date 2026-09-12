@@ -243,7 +243,13 @@ service cloud.firestore {
            request.resource.data.name.size() <= 80)) &&
         (!('phone' in request.resource.data) ||
           (request.resource.data.phone is string &&
-           request.resource.data.phone.size() <= 32)) &&
+           request.resource.data.phone.size() <= 32 &&
+           (request.resource.data.phone == '' ||
+            request.resource.data.phone.matches('^\\+[1-9][0-9]{6,14}$')))) &&
+        (!('phoneCountryIso' in request.resource.data) ||
+          request.resource.data.phoneCountryIso.matches('^[A-Z]{2}$')) &&
+        (!('phoneCountryCode' in request.resource.data) ||
+          request.resource.data.phoneCountryCode.matches('^\\+[1-9][0-9]{0,2}$')) &&
         (!('relationship' in request.resource.data) ||
           request.resource.data.relationship == null ||
           request.resource.data.relationship in [
@@ -258,7 +264,10 @@ service cloud.firestore {
           request.resource.data.profileCompleted != true ||
           (request.resource.data.name is string &&
            request.resource.data.name.size() >= 2 &&
-           request.resource.data.relationship is string)) &&
+           request.resource.data.relationship is string &&
+           request.resource.data.get('phone', '').matches('^\\+[1-9][0-9]{6,14}$') &&
+           request.resource.data.get('phoneCountryIso', '').matches('^[A-Z]{2}$') &&
+           request.resource.data.get('phoneCountryCode', '').matches('^\\+[1-9][0-9]{0,2}$'))) &&
         (!('planTier' in request.resource.data) ||
           request.resource.data.planTier in ['free', 'premium']) &&
         (!('subscriptionStatus' in request.resource.data) ||

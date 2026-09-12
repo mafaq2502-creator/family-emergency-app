@@ -39,7 +39,7 @@ void main() {
     expect(find.text('CA'), findsNothing);
   });
 
-  test('completed provider profile does not require a signup phone number', () {
+  test('provider profile without a mobile number returns to profile setup', () {
     final profile = UserProfile.fromData(
       uid: 'provider-user',
       data: {
@@ -51,7 +51,7 @@ void main() {
     );
     expect(
       AuthDestinationResolver.resolve(signedIn: true, profile: profile),
-      AuthDestination.circleSetup,
+      AuthDestination.profileSetup,
     );
   });
 
@@ -94,7 +94,7 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Phone Number'), findsNothing);
+      expect(find.text('Mobile Phone Number'), findsOneWidget);
       await tester.tap(find.widgetWithText(TextButton, 'Address'));
       await tester.pumpAndSettle();
       expect(find.text('Pakistan'), findsOneWidget);

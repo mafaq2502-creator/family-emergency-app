@@ -86,8 +86,17 @@ class UserProfile {
     final phone = _string(source['phone']) ?? fallbackPhone?.trim() ?? '';
     final relationship =
         _string(source['relationship']) ?? _string(source['role']);
+    final phoneCountryIso = _string(source['phoneCountryIso']);
+    final phoneCountryCode = _string(source['phoneCountryCode']);
     final safelyComplete =
-        name.isNotEmpty && email.isNotEmpty && relationship != null;
+        name.isNotEmpty &&
+        email.isNotEmpty &&
+        relationship != null &&
+        phoneCountryIso != null &&
+        RegExp(r'^[A-Z]{2}$').hasMatch(phoneCountryIso) &&
+        phoneCountryCode != null &&
+        RegExp(r'^\+[1-9][0-9]{0,3}$').hasMatch(phoneCountryCode) &&
+        RegExp(r'^\+[1-9][0-9]{6,14}$').hasMatch(phone);
 
     return UserProfile(
       uid: uid,
@@ -108,8 +117,8 @@ class UserProfile {
             key: _string((source['address'] as Map)[key]) ?? '',
       },
       relationship: relationship,
-      phoneCountryIso: _string(source['phoneCountryIso']),
-      phoneCountryCode: _string(source['phoneCountryCode']),
+      phoneCountryIso: phoneCountryIso,
+      phoneCountryCode: phoneCountryCode,
       photoUrl: _string(source['photoUrl']) ?? fallbackPhotoUrl,
       providerIds: _stringList(source['providerIds']),
       notificationSettings: NotificationSettings.fromMap(

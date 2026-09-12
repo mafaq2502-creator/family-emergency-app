@@ -21,7 +21,6 @@ abstract interface class AuthActions {
     required String phone,
     required String countryIso,
     required String countryCode,
-    required String relationship,
   });
 
   Future<void> signInWithGoogle();
@@ -119,7 +118,6 @@ class AuthService implements AuthActions, EmailVerificationActions {
     required String phone,
     required String countryIso,
     required String countryCode,
-    required String relationship,
   }) async {
     _profilePreparation = Completer<void>();
     try {
@@ -153,7 +151,6 @@ class AuthService implements AuthActions, EmailVerificationActions {
           phone: phone,
           countryIso: countryIso,
           countryCode: countryCode,
-          relationship: relationship,
         );
       } catch (error) {
         throw ProfileCreationException(error);

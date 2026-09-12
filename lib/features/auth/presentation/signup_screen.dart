@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_text_form_field.dart';
-import '../../../core/widgets/bounded_dropdown_form_field.dart';
+import '../../../core/domain/mobile_phone_number.dart';
+import '../../../core/widgets/mobile_phone_field.dart';
 import '../../../services/auth_service.dart';
 import '../domain/auth_error_mapper.dart';
 import '../domain/auth_validators.dart';
@@ -26,7 +27,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _phone = TextEditingController();
   final _password = TextEditingController();
   final _confirmPassword = TextEditingController();
-  String? _relationship;
   bool _hidePassword = true;
   bool _hideConfirmation = true;
   bool _acceptedTerms = false;
@@ -66,11 +66,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
     setState(() => _loading = true);
     try {
-      final normalizedNumber = _phone.text.replaceAll(RegExp(r'[^0-9]'), '');
-      final rawPhone = _phone.text.trim();
-      final phoneE164 = rawPhone.startsWith('+')
-          ? '+$normalizedNumber'
-          : '+${_selectedCountry.phoneCode}$normalizedNumber';
+      final phoneE164 = MobilePhoneNumber.normalize(
+        _phone.text,
+        _selectedCountry.phoneCode,
+      );
       await _authService.signUp(
         name: _name.text.trim(),
         email: AuthValidators.normalizeEmail(_email.text),
@@ -78,7 +77,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         phone: phoneE164,
         countryIso: _selectedCountry.countryCode,
         countryCode: '+${_selectedCountry.phoneCode}',
-        relationship: _relationship!,
       );
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (error) {
@@ -185,28 +183,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           setState(() => _selectedCountry = country),
                     ),
                     const SizedBox(height: 18),
-                    _phoneField(),
-                    const SizedBox(height: 18),
-                    BoundedDropdownFormField<String>(
-                      autovalidateMode: AutovalidateMode.onUnfocus,
-                      initialValue: _relationship,
-                      decoration: const InputDecoration(
-                        labelText: 'Relationship',
-                        hintText: 'Select your relationship',
-                        prefixIcon: Icon(Icons.favorite_outline_rounded),
-                      ),
-                      items: AuthValidators.relationships
-                          .map(
-                            (value) => DropdownMenuItem(
-                              value: value,
-                              child: Text(value),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: _loading
-                          ? null
-                          : (value) => setState(() => _relationship = value),
-                      validator: AuthValidators.relationship,
+                    MobilePhoneField(
+                      controller: _phone,
+                      country: _selectedCountry,
+                      enabled: !_loading,
+                      textInputAction: TextInputAction.next,
+                      onCountryChanged: (country) =>
+                          setState(() => _selectedCountry = country),
                     ),
                     const SizedBox(height: 18),
                     _field(
@@ -366,23 +349,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               ? null
                               : () => Navigator.pop(context),
                           style: TextButton.styleFrom(
-                            foregroundColor:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? const Color(0xFF93C5FD)
-                                : const Color(0xFF2563EB),
-                            backgroundColor:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? const Color(0x1A60A5FA)
-                                : const Color(0x142563EB),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 5,
-                            ),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(7),
-                            ),
+                            foregroundColor: kEmerald,
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
                           ),
                           child: const Text(
                             'Login',
@@ -390,8 +358,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                               letterSpacing: .15,
-                              decoration: TextDecoration.underline,
-                              decorationThickness: 1.5,
                             ),
                           ),
                         ),
@@ -415,43 +381,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       color: context.appMuted,
     ),
   );
-
-  Widget _phoneField() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final muted = isDark ? kDarkMuted : kLightMuted;
-    return TextFormField(
-      autovalidateMode: AutovalidateMode.onUnfocus,
-      controller: _phone,
-      enabled: !_loading,
-      keyboardType: TextInputType.phone,
-      validator: (value) => AuthValidators.phone(
-        value?.trim().startsWith('+') == true
-            ? value
-            : '+${_selectedCountry.phoneCode}${value ?? ''}',
-      ),
-      style: TextStyle(color: isDark ? Colors.white : kLightNavy, fontSize: 13),
-      decoration: InputDecoration(
-        labelText: 'Phone Number',
-        hintText: 'Enter your phone number',
-        floatingLabelBehavior: FloatingLabelBehavior.auto,
-        hintStyle: TextStyle(color: muted, fontSize: 12),
-        prefixText: '+${_selectedCountry.phoneCode} ',
-        filled: true,
-        fillColor: isDark ? kDarkCard : Colors.white,
-        contentPadding: const EdgeInsets.symmetric(vertical: 13),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: isDark ? const Color(0xFF233846) : const Color(0xFFE2E8F0),
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: kEmerald),
-        ),
-      ),
-    );
-  }
 
   Widget _field(
     TextEditingController controller,

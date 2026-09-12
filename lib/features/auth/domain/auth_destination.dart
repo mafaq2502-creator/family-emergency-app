@@ -16,6 +16,7 @@ class AuthDestinationResolver {
       return AuthDestination.profileRecovery;
     }
     if (!profile.profileCompleted ||
+        AuthValidators.phone(profile.phone) != null ||
         AuthValidators.relationship(profile.relationship) != null) {
       return AuthDestination.profileSetup;
     }

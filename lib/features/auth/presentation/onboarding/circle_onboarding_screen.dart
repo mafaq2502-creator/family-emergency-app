@@ -3,24 +3,20 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/domain/invite_code_policy.dart';
-import '../../../../core/widgets/app_text_form_field.dart';
 import '../../../../core/widgets/light_ui.dart';
 import '../../../../models/circle_join_request.dart';
 import '../../../../services/circle_join_service.dart';
-import '../../../../services/group_service.dart';
 import '../../../groups/presentation/qr_scanner_screen.dart';
 import '../../domain/auth_error_mapper.dart';
-import '../../domain/auth_validators.dart';
 
 class CircleOnboardingScreen extends StatefulWidget {
   const CircleOnboardingScreen({
     super.key,
     required this.user,
-    required this.groupService,
     required this.onSignOut,
     required this.onCompleted,
+    required this.onContinueWithoutCircle,
     this.joinService,
     this.pendingCircleId,
     this.initialInviteCode,
@@ -30,7 +26,6 @@ class CircleOnboardingScreen extends StatefulWidget {
   });
 
   final User user;
-  final GroupService groupService;
   final Future<void> Function() onSignOut;
   final CircleJoinActions? joinService;
   final String? pendingCircleId;
@@ -39,23 +34,19 @@ class CircleOnboardingScreen extends StatefulWidget {
   final String profileName;
   final String profilePhone;
   final VoidCallback onCompleted;
+  final Future<void> Function() onContinueWithoutCircle;
 
   @override
   State<CircleOnboardingScreen> createState() => _CircleOnboardingScreenState();
 }
 
-class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
-    with SingleTickerProviderStateMixin {
-  final _createForm = GlobalKey<FormState>();
-  final _circleName = TextEditingController();
+class _CircleOnboardingScreenState extends State<CircleOnboardingScreen> {
   late final _inviteCode = TextEditingController(
     text: widget.initialInviteCode,
   );
   late final CircleJoinActions _joinService =
       widget.joinService ?? CircleJoinService();
   bool _busy = false;
-  late final TabController _tabController;
-  final List<bool> _tabHasValidationError = [false, false];
   String? _pendingCircleId;
   String? _pendingCircleName;
 
@@ -63,11 +54,6 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
   void initState() {
     super.initState();
     _pendingCircleId = widget.pendingCircleId;
-    _tabController = TabController(
-      length: 2,
-      vsync: this,
-      initialIndex: widget.initialInviteCode == null ? 0 : 1,
-    );
     if (widget.initialInviteCode != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         widget.onInviteHandled?.call();
@@ -78,53 +64,16 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _circleName.dispose();
     _inviteCode.dispose();
     super.dispose();
-  }
-
-  Future<void> _create() async {
-    if (_busy) return;
-    final valid = _createForm.currentState?.validate() ?? false;
-    if (!valid) {
-      setState(() => _tabHasValidationError[0] = true);
-      _tabController.animateTo(0);
-      return;
-    }
-    if (_tabHasValidationError[0]) {
-      setState(() => _tabHasValidationError[0] = false);
-    }
-    setState(() => _busy = true);
-    try {
-      await widget.groupService.createGroup(
-        widget.user,
-        _circleName.text.trim(),
-      );
-      if (mounted) widget.onCompleted();
-    } catch (error) {
-      _showError(
-        AuthErrorMapper.message(
-          error,
-          fallback: 'We could not create your Circle. Please try again.',
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   Future<void> _join() async {
     if (_busy) return;
     final validation = InviteCodePolicy.validate(_inviteCode.text);
     if (validation != null) {
-      setState(() => _tabHasValidationError[1] = true);
-      _tabController.animateTo(1);
       _showError(validation);
       return;
-    }
-    if (_tabHasValidationError[1]) {
-      setState(() => _tabHasValidationError[1] = false);
     }
     setState(() => _busy = true);
     try {
@@ -191,7 +140,7 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
               const Icon(Icons.diversity_1_rounded, color: kEmerald, size: 58),
               const SizedBox(height: 12),
               Text(
-                'Set Up Your Family Circle',
+                'Join a Family Circle',
                 style: TextStyle(
                   color: titleColor,
                   fontSize: 22,
@@ -200,7 +149,7 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
               ),
               const SizedBox(height: 5),
               Text(
-                'Create a new Circle or join one with a secure invitation.',
+                'Join an existing Circle with a secure invitation. You can create your own Circle later from Family.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: muted),
               ),
@@ -216,44 +165,13 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
                   Text(widget.profilePhone, textAlign: TextAlign.center),
                 const SizedBox(height: 18),
               ],
-              Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  color: isDark ? kDarkCard : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF233846) : kLightBorder,
-                  ),
-                ),
-                child: TabBar(
-                  controller: _tabController,
-                  dividerColor: Colors.transparent,
-                  indicator: const UnderlineTabIndicator(
-                    borderSide: BorderSide(color: kEmerald, width: 3),
-                    insets: EdgeInsets.symmetric(horizontal: 22),
-                  ),
-                  labelColor: kEmerald,
-                  unselectedLabelColor: muted,
-                  labelStyle: const TextStyle(
-                    fontSize: AppTypography.tabLabel,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontSize: AppTypography.tabLabel,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  tabs: [
-                    _onboardingTab('Create Circle', 0),
-                    _onboardingTab('Join Circle', 1),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
               Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [_createPanel(), _joinPanel()],
-                ),
+                child: _joinPanel(),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: _busy ? null : widget.onContinueWithoutCircle,
+                child: const Text('Continue to Family'),
               ),
             ],
           ),
@@ -261,49 +179,6 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
       ),
     );
   }
-
-  Widget _onboardingTab(String label, int index) => Tab(
-    child: Stack(
-      clipBehavior: Clip.none,
-      alignment: Alignment.center,
-      children: [
-        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-        if (_tabHasValidationError[index])
-          Positioned(
-            right: -4,
-            top: 4,
-            child: DecoratedBox(
-              key: ValueKey('circle-tab-error-$index'),
-              decoration: const BoxDecoration(
-                color: kEmergency,
-                shape: BoxShape.circle,
-              ),
-              child: const SizedBox(width: 7, height: 7),
-            ),
-          ),
-      ],
-    ),
-  );
-
-  Widget _createPanel() => Form(
-    key: _createForm,
-    child: Column(
-      children: [
-        const SizedBox(height: 8),
-        AppTextFormField(
-          controller: _circleName,
-          label: 'Family Circle Name',
-          placeholder: 'Example: Khan Family',
-          prefixIcon: Icons.groups_rounded,
-          enabled: !_busy,
-          validator: AuthValidators.circleName,
-          onFieldSubmitted: (_) => _create(),
-        ),
-        const SizedBox(height: 18),
-        _actionButton('Create Family Circle', _create),
-      ],
-    ),
-  );
 
   Widget _joinPanel() => _pendingCircleId != null
       ? _pendingPanel()
@@ -413,25 +288,4 @@ class _CircleOnboardingScreenState extends State<CircleOnboardingScreen>
     );
   }
 
-  Widget _actionButton(String label, VoidCallback action) => SizedBox(
-    width: double.infinity,
-    height: 52,
-    child: ElevatedButton(
-      onPressed: _busy ? null : action,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: kEmerald,
-        foregroundColor: Colors.white,
-      ),
-      child: _busy
-          ? const SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                color: Colors.white,
-                strokeWidth: 2,
-              ),
-            )
-          : Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-    ),
-  );
 }

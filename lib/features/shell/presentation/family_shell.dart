@@ -98,6 +98,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String _initialProfileName = '';
   String? _initialProfileRole;
   String _profileEmail = '';
+  String _profilePhone = '';
+  String? _profilePhoneCountryIso;
   String? _profilePhotoUrl;
   Map<String, String> _profileAddress = {};
   String? _pendingJoinCircleId;
@@ -444,6 +446,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _initialProfileRole = _profileRole;
         _profileNameController.text = _initialProfileName;
         _profileEmail = profile.email;
+        _profilePhone = profile.phone;
+        _profilePhoneCountryIso = profile.phoneCountryIso;
         _profilePhotoUrl = profile.photoUrl;
         _profileAddress = profile.address;
         _pendingJoinCircleId = profile.pendingJoinCircleId;
@@ -855,6 +859,28 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
     if (upgrade == true && mounted) _openPlansFromProfile();
+  }
+
+  Future<bool> _saveAccountPhone(
+    String phone,
+    String countryIso,
+    String countryCode,
+  ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    await _profileService.savePhone(
+      user,
+      phone: phone,
+      countryIso: countryIso,
+      countryCode: countryCode,
+    );
+    if (mounted) {
+      setState(() {
+        _profilePhone = phone;
+        _profilePhoneCountryIso = countryIso;
+      });
+    }
+    return true;
   }
 
   void _showPlanLimit(String message) {

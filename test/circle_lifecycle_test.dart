@@ -193,6 +193,8 @@ void main() {
         'name': 'Adult',
         'email': 'adult@example.com',
         'phone': '+923001234567',
+        'phoneCountryIso': 'PK',
+        'phoneCountryCode': '+92',
         'relationship': 'Brother',
         'profileCompleted': true,
         'onboardingCompleted': true,

@@ -1,5 +1,42 @@
 # Family Emergency App — Codex Handoff
 
+## Phone, onboarding, navigation, and shared-control follow-up (2026-09-13)
+
+Status: **SOURCE COMPLETE, LOCAL VERIFICATION PASSES, AND APK BUILT.**
+
+- Circle onboarding is now Join-only. Create Circle remains available from the
+  Family flow, and a user may continue without joining a Circle.
+- Mobile number entry is shared by Sign Up, profile onboarding, and Account
+  Settings. It supports a searchable country-code picker, manual override,
+  paste normalization, E.164 storage, and validation against duplicated codes,
+  letters, malformed plus signs, and invalid lengths. Failed Account Settings
+  saves retain the entered value and report the error.
+- Relationship moved from Sign Up to profile onboarding. Provider users with an
+  incomplete profile are sent through the same required country, phone, and
+  relationship step. A profile cannot be marked complete without these fields.
+- Login/Sign Up cross-links are simple emerald text. Email verification Cancel
+  stops pending timers/checks and signs out on the first tap, with repeated taps
+  safely ignored.
+- Bottom navigation is ordered Progress, Family, Home, Plan, Profile while
+  preserving the existing destination indices. Non-Home items sit 2dp lower;
+  the green painter stroke is limited to the top wave, with no green side or
+  bottom border.
+- Global switch theming keeps off and disabled tracks/thumbs visible in dark
+  mode. Shared dialogs use equal-width two-action rows and centered single
+  actions; their close control discards unsaved input.
+- Firestore profile rules accept an empty legacy phone only while a profile is
+  incomplete. Completed profiles require a canonical E.164 number, ISO country,
+  and calling code.
+- Verification: 305/305 Flutter tests pass; `flutter analyze --no-pub` reports
+  no issues; 20/20 Firestore emulator test cases pass; and `git diff --check`
+  reports no whitespace errors (only line-ending warnings).
+- After a separate explicit request, a standard release APK was created without
+  the email-verification testing override:
+  `build/app/outputs/flutter-apk/app-release.apk`, 76,509,162 bytes (72.96 MiB),
+  SHA-256 `5AE81043F4A489DCDC80CA0E98198BCD7272982D25F9832BA77C68C2F442BEF7`.
+  APK Signature Scheme v2 verification passed with one Android debug signer.
+  Future builds still require a separate user request.
+
 ## SOS, Free Plan limits, single-use invitations, and deletion authority (2026-09-13)
 
 Status: **SOURCE COMPLETE AND LOCAL TESTS PASS. PRODUCTION DEPLOYMENT PENDING.**

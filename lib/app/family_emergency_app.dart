@@ -138,6 +138,23 @@ class FamilyEmergencyApp extends StatelessWidget {
               ),
             ),
           ),
+          switchTheme: SwitchThemeData(
+            thumbColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.disabled)
+                  ? const Color(0xFFCBD5E1)
+                  : states.contains(WidgetState.selected)
+                  ? Colors.white
+                  : const Color(0xFF64748B),
+            ),
+            trackColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.disabled)
+                  ? const Color(0xFFE2E8F0)
+                  : states.contains(WidgetState.selected)
+                  ? kLightPrimary
+                  : const Color(0xFFD5DEE8),
+            ),
+            trackOutlineColor: const WidgetStatePropertyAll(Color(0xFF94A3B8)),
+          ),
           iconButtonTheme: IconButtonThemeData(
             style: _interactiveButtonStyle(Brightness.light),
           ),
@@ -401,6 +418,27 @@ class FamilyEmergencyApp extends StatelessWidget {
               textStyle: WidgetStatePropertyAll(
                 GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.w600),
               ),
+            ),
+          ),
+          switchTheme: SwitchThemeData(
+            thumbColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.disabled)
+                  ? const Color(0xFF526575)
+                  : states.contains(WidgetState.selected)
+                  ? Colors.white
+                  : const Color(0xFFD5DEE8),
+            ),
+            trackColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.disabled)
+                  ? const Color(0xFF243642)
+                  : states.contains(WidgetState.selected)
+                  ? kEmerald
+                  : const Color(0xFF405464),
+            ),
+            trackOutlineColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.disabled)
+                  ? const Color(0xFF526575)
+                  : const Color(0xFF8CA0AF),
             ),
           ),
           iconButtonTheme: IconButtonThemeData(

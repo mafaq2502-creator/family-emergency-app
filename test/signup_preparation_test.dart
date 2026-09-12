@@ -66,7 +66,6 @@ class _Profiles extends ProfileService {
     required String phone,
     required String countryIso,
     required String countryCode,
-    String relationship = 'Self',
   }) async {
     started.complete();
     await save.future;
@@ -99,12 +98,12 @@ void main() {
         ),
       );
       expect(find.text('Test User'), findsOneWidget);
-      expect(find.text('+923001234567'), findsOneWidget);
+      expect(find.text('+92'), findsOneWidget);
       expect(
         find.byWidgetPredicate(
           (w) => w is TextField && w.keyboardType == TextInputType.phone,
         ),
-        findsNothing,
+        findsOneWidget,
       );
     },
   );
@@ -120,7 +119,6 @@ void main() {
       phone: '+923001234567',
       countryIso: 'PK',
       countryCode: '+92',
-      relationship: 'Self',
     );
     await profiles.started.future;
     var ready = false;

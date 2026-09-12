@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:family_emergency_app/features/auth/presentation/forgot_password_screen.dart';
 import 'package:family_emergency_app/features/auth/presentation/login_screen.dart';
 import 'package:family_emergency_app/features/auth/presentation/signup_screen.dart';
-import 'package:family_emergency_app/core/widgets/bounded_dropdown_form_field.dart';
 import 'package:family_emergency_app/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -45,7 +44,6 @@ class FakeAuthActions implements AuthActions {
     required String phone,
     required String countryIso,
     required String countryCode,
-    required String relationship,
   }) async {
     signupCalls++;
     signedUpEmail = email;
@@ -150,12 +148,7 @@ void main() {
     await tester.enterText(fields.at(2), '3001234567');
     await tester.enterText(fields.at(3), 'strong-password');
     await tester.enterText(fields.at(4), 'strong-password');
-    final relationship = find.byType(BoundedDropdownFormField<String>);
-    await tester.ensureVisible(relationship);
-    await tester.tap(relationship);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Self').last);
-    await tester.pumpAndSettle();
+    expect(find.text('Relationship'), findsNothing);
     await tester.tap(find.widgetWithText(ElevatedButton, 'Sign Up'));
     await tester.pump();
     expect(find.text('Please accept the Terms & Conditions.'), findsOneWidget);

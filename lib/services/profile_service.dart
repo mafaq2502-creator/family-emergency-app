@@ -87,7 +87,6 @@ class ProfileService {
     required String phone,
     required String countryIso,
     required String countryCode,
-    String relationship = 'Self',
   }) {
     final now = FieldValue.serverTimestamp();
     return _documentFor(user).set({
@@ -97,13 +96,13 @@ class ProfileService {
       'phone': phone.trim(),
       'phoneCountryIso': countryIso,
       'phoneCountryCode': countryCode,
-      'relationship': relationship,
+      'relationship': null,
       'photoUrl': user.photoURL,
       'providerIds': user.providerData
           .map((provider) => provider.providerId)
           .toSet()
           .toList(),
-      'profileCompleted': true,
+      'profileCompleted': false,
       'onboardingCompleted': false,
       'notificationSettings': const NotificationSettings().toMap(),
       'createdAt': now,
@@ -167,7 +166,9 @@ class ProfileService {
     User user, {
     required String name,
     required String relationship,
-    String? signupPhone,
+    required String phone,
+    required String countryIso,
+    required String countryCode,
   }) async {
     final reference = _documentFor(user);
     final snapshot = await reference.get();
@@ -175,11 +176,9 @@ class ProfileService {
       'uid': user.uid,
       'name': name.trim(),
       'email': user.email?.trim() ?? '',
-      if ((snapshot.data()?['phone'] == null ||
-              snapshot.data()?['phone'] == '') &&
-          signupPhone != null &&
-          signupPhone.trim().isNotEmpty)
-        'phone': signupPhone.trim(),
+      'phone': phone.trim(),
+      'phoneCountryIso': countryIso,
+      'phoneCountryCode': countryCode,
       'relationship': relationship,
       if (user.photoURL != null) 'photoUrl': user.photoURL,
       'providerIds': user.providerData
@@ -231,6 +230,18 @@ class ProfileService {
     await batch.commit();
     await user.updateDisplayName(name.trim());
   }
+
+  Future<void> savePhone(
+    User user, {
+    required String phone,
+    required String countryIso,
+    required String countryCode,
+  }) => _documentFor(user).set({
+    'phone': phone.trim(),
+    'phoneCountryIso': countryIso,
+    'phoneCountryCode': countryCode,
+    'updatedAt': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
 
   Future<void> saveAddress(User user, Map<String, String> address) =>
       _documentFor(user).set({

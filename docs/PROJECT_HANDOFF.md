@@ -1,5 +1,24 @@
 # Family Emergency — Project Handoff Reference
 
+## Latest auth, phone, navigation, and dialog update (September 13, 2026)
+
+- Circle onboarding exposes secure Join only; Circle creation stays in Family.
+- Country-aware mobile phone capture is shared across Sign Up, required profile
+  onboarding, and Account Settings, and stores canonical E.164 values.
+- Relationship is collected during onboarding. Incomplete Google/provider
+  profiles must supply country, phone, and relationship before entering the app.
+- Navigation is Progress, Family, raised Home, Plan, Profile. Only the top wave
+  has a green stroke, and non-Home items use the same lowered alignment.
+- Dark-theme switches have visible on, off, and disabled states. Shared dialog
+  actions use consistent one-action and two-action geometry, and close buttons
+  discard unsaved edits.
+- Email-verification Cancel handles the first tap during pending checks and
+  prevents duplicate asynchronous work.
+- Local verification passes: 305 Flutter tests, zero analyzer findings, and 20
+  Firestore emulator test cases. A standard release APK was subsequently built
+  at `build/app/outputs/flutter-apk/app-release.apk` without testing overrides;
+  future builds require a separate user instruction.
+
 ## Latest UI/group update (September 7, 2026)
 
 - Group creation now updates Home/Members optimistically, selects the new owner group immediately, enables Add Member, restarts the Firestore watcher, and exposes/retries watcher failures instead of silently swallowing them.

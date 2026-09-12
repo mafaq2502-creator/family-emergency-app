@@ -21,8 +21,8 @@ class AppBottomNavigation extends StatelessWidget {
     final surface = dark ? kDarkSurface : kLightSurface;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     const items = [
-      (Icons.groups_rounded, 'Family', 0),
       (Icons.bar_chart_rounded, 'Progress', 1),
+      (Icons.groups_rounded, 'Family', 0),
       (Icons.home_rounded, 'Home', 2),
       (Icons.assignment_outlined, 'Plan', 3),
       (Icons.person_outline_rounded, 'Profile', 4),
@@ -117,73 +117,76 @@ class _NavigationItem extends StatelessWidget {
       key: ValueKey('nav-$label'),
       borderRadius: BorderRadius.circular(18),
       onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 68,
-            height: 44,
-            child: Transform.translate(
-              offset: Offset(0, raised ? -20 : 0),
-              child: OverflowBox(
-                minWidth: raised ? 64 : 0,
-                maxWidth: raised ? 64 : 68,
-                minHeight: raised ? 64 : 0,
-                maxHeight: raised ? 64 : 44,
-                child: Container(
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: raised
-                        ? (selected ? active : surface)
-                        : selected
-                        ? active.withValues(alpha: .13)
-                        : Colors.transparent,
-                    shape: raised ? BoxShape.circle : BoxShape.rectangle,
-                    borderRadius: raised ? null : BorderRadius.circular(14),
-                    border: raised
-                        ? Border.all(
-                            color: selected
-                                ? Colors.white
-                                : active.withValues(alpha: .45),
-                            width: 3,
-                          )
-                        : null,
-                    boxShadow: raised
-                        ? [
-                            BoxShadow(
-                              color: active.withValues(alpha: .25),
-                              blurRadius: 18,
-                              spreadRadius: 2,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Icon(
-                    icon,
-                    size: AppTypography.tabIcon,
-                    color: raised && selected
-                        ? Colors.white
-                        : selected
-                        ? active
-                        : inactive,
+      child: Transform.translate(
+        offset: Offset(0, raised ? 0 : 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 68,
+              height: 44,
+              child: Transform.translate(
+                offset: Offset(0, raised ? -20 : 0),
+                child: OverflowBox(
+                  minWidth: raised ? 64 : 0,
+                  maxWidth: raised ? 64 : 68,
+                  minHeight: raised ? 64 : 0,
+                  maxHeight: raised ? 64 : 44,
+                  child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: raised
+                          ? (selected ? active : surface)
+                          : selected
+                          ? active.withValues(alpha: .13)
+                          : Colors.transparent,
+                      shape: raised ? BoxShape.circle : BoxShape.rectangle,
+                      borderRadius: raised ? null : BorderRadius.circular(14),
+                      border: raised
+                          ? Border.all(
+                              color: selected
+                                  ? Colors.white
+                                  : active.withValues(alpha: .45),
+                              width: 3,
+                            )
+                          : null,
+                      boxShadow: raised
+                          ? [
+                              BoxShadow(
+                                color: active.withValues(alpha: .25),
+                                blurRadius: 18,
+                                spreadRadius: 2,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Icon(
+                      icon,
+                      size: AppTypography.tabIcon,
+                      color: raised && selected
+                          ? Colors.white
+                          : selected
+                          ? active
+                          : inactive,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            textScaler: TextScaler.linear(textScale),
-            maxLines: 1,
-            style: TextStyle(
-              fontSize: AppTypography.tabLabel,
-              height: 1.3,
-              color: selected ? active : inactive,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            const SizedBox(height: 3),
+            Text(
+              label,
+              textScaler: TextScaler.linear(textScale),
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: AppTypography.tabLabel,
+                height: 1.3,
+                color: selected ? active : inactive,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
   );
@@ -200,7 +203,7 @@ class _NavigationBarPainter extends CustomPainter {
   final Color accent;
   final bool dark;
 
-  Path _path(Size size) {
+  Path _topPath(Size size) {
     final center = size.width / 2;
     return Path()
       ..moveTo(0, 25)
@@ -208,15 +211,18 @@ class _NavigationBarPainter extends CustomPainter {
       ..cubicTo(size.width * .29, 37, center - 54, 38, center - 30, 14)
       ..cubicTo(center - 13, -2, center + 13, -2, center + 30, 14)
       ..cubicTo(center + 54, 38, size.width * .71, 37, size.width * .79, 22)
-      ..cubicTo(size.width * .87, 8, size.width * .92, 8, size.width, 25)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
+      ..cubicTo(size.width * .87, 8, size.width * .92, 8, size.width, 25);
   }
+
+  Path _shapePath(Size size) => Path()
+    ..addPath(_topPath(size), Offset.zero)
+    ..lineTo(size.width, size.height)
+    ..lineTo(0, size.height)
+    ..close();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = _path(size);
+    final path = _shapePath(size);
     canvas.drawShadow(
       path,
       dark ? Colors.black : accent.withValues(alpha: .22),
@@ -225,7 +231,7 @@ class _NavigationBarPainter extends CustomPainter {
     );
     canvas.drawPath(path, Paint()..color = surface);
     canvas.drawPath(
-      path,
+      _topPath(size),
       Paint()
         ..color = accent.withValues(alpha: dark ? .65 : .55)
         ..style = PaintingStyle.stroke
