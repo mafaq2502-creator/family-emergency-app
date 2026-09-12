@@ -31,9 +31,11 @@ class EmailVerificationScreen extends StatefulWidget {
 class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     with WidgetsBindingObserver {
   Timer? _resendTimer;
+  Timer? _verificationTimer;
   bool _checking = false;
   bool _resending = false;
   bool _verified = false;
+  bool _continued = false;
   int _resendSeconds = 0;
   String? _message;
   bool _messageIsError = false;
@@ -45,7 +47,15 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _check(silent: true));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_check(silent: true));
+      _verificationTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (mounted && !_verified && !_checking) {
+          unawaited(_check(silent: true));
+        }
+      });
+    });
   }
 
   @override
@@ -57,7 +67,15 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _resendTimer?.cancel();
+    _verificationTimer?.cancel();
     super.dispose();
+  }
+
+  void _continueOnce(bool firebaseVerified) {
+    if (_continued) return;
+    _continued = true;
+    _verificationTimer?.cancel();
+    widget.onContinue(firebaseVerified);
   }
 
   Future<void> _check({bool silent = false}) async {
@@ -78,6 +96,11 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
             ? _message
             : 'Email is not verified yet. Open the link in your inbox, then check again.';
       });
+      if (verified) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _continueOnce(true);
+        });
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -183,7 +206,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
                     Text(
                       _testingBypassAllowed
                           ? 'Open the email and select Verify Email. For testing, you can select Next and continue this session without completing the link.'
-                          : 'Open the email and select Verify Email. Return to this app when verification is complete.',
+                          : 'Open the email and select Verify Email. Return here when verification is complete; the app will check automatically.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: context.appMuted, height: 1.45),
                     ),
@@ -244,10 +267,12 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
                         const SizedBox(width: 10),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: _verified || _testingBypassAllowed
-                                ? () => widget.onContinue(_verified)
-                                : null,
-                            child: const Text('Next'),
+                            onPressed: _checking
+                                ? null
+                                : _verified || _testingBypassAllowed
+                                ? () => _continueOnce(_verified)
+                                : () => _check(),
+                            child: Text(_checking ? 'Checking…' : 'Next'),
                           ),
                         ),
                       ],

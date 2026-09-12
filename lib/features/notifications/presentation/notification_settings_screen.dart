@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_surface_card.dart';
 import '../../../models/notification_settings.dart';
 import '../../../services/notification_settings_service.dart';
+import '../../../services/push_notification_service.dart';
 import 'notification_bell_button.dart';
 
 const _emerald = kEmerald;
@@ -27,8 +28,8 @@ class NotificationSettingsScreen extends StatefulWidget {
       _NotificationSettingsScreenState();
 }
 
-class _NotificationSettingsScreenState
-    extends State<NotificationSettingsScreen> {
+class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
+    with WidgetsBindingObserver {
   late bool _missedCheckInAlerts;
   late bool _emergencyAlerts;
   late bool _batteryAlerts;
@@ -41,6 +42,8 @@ class _NotificationSettingsScreenState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    PushNotificationService.instance.refreshPermissionState();
     final settings = widget.initialSettings;
     _missedCheckInAlerts = settings['missedCheckInAlerts'] as bool? ?? true;
     _emergencyAlerts = settings['emergencyAlerts'] as bool? ?? true;
@@ -49,6 +52,46 @@ class _NotificationSettingsScreenState
     _locationSharing = settings['locationSharing'] as bool? ?? false;
     _ownerMissedCheckInAlerts =
         settings['ownerMissedCheckInAlerts'] as bool? ?? true;
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      PushNotificationService.instance.bindCurrentUser().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  Future<void> _enablePush() async {
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Allow safety notifications?'),
+        content: const Text(
+          'Android notifications let this device show emergency SOS, family activity, and device safety alerts. Your in-app notification history remains available if you decline.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Not now'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true) return;
+    await PushNotificationService.instance.requestPermission();
+    if (mounted) setState(() {});
   }
 
   Future<void> _save() async {
@@ -128,6 +171,61 @@ class _NotificationSettingsScreenState
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [
+          ValueListenableBuilder<PushPermissionState>(
+            valueListenable: PushNotificationService.instance.permission,
+            builder: (context, state, _) => AppSurfaceCard(
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 6,
+                ),
+                leading: Icon(
+                  state == PushPermissionState.granted
+                      ? Icons.notifications_active_rounded
+                      : Icons.notifications_off_outlined,
+                  color: state == PushPermissionState.granted
+                      ? _emerald
+                      : kEmergency,
+                ),
+                title: Text(
+                  state == PushPermissionState.granted
+                      ? 'Android notifications are on'
+                      : 'Android notifications are off',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  state == PushPermissionState.granted
+                      ? 'This device can receive notification-shade alerts.'
+                      : 'Enable permission to receive alerts outside the app.',
+                ),
+                trailing: state == PushPermissionState.granted
+                    ? const Icon(Icons.check_circle_rounded, color: _emerald)
+                    : TextButton(
+                        onPressed: state == PushPermissionState.settingsRequired
+                            ? PushNotificationService.instance.openSettings
+                            : _enablePush,
+                        child: Text(
+                          state == PushPermissionState.settingsRequired
+                              ? 'Settings'
+                              : 'Enable',
+                        ),
+                      ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          ValueListenableBuilder<String?>(
+            valueListenable: PushNotificationService.instance.syncError,
+            builder: (_, error, _) => error == null
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(error),
+                  ),
+          ),
           Text(
             'Personal alerts',
             style: TextStyle(

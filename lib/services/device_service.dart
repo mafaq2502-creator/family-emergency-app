@@ -615,6 +615,11 @@ extension PairedDeviceCopy on PairedDevice {
     removedAt: removedAt,
     lastScreenTimeSyncAt: lastScreenTimeSyncAt,
     screenTimePermissionState: screenTimePermissionState,
+    manufacturer: manufacturer,
+    androidApiLevel: androidApiLevel,
+    appBuildNumber: appBuildNumber,
+    notificationPermissionState: notificationPermissionState,
+    notificationsEnabled: notificationsEnabled,
     permissions: permissions,
   );
 }

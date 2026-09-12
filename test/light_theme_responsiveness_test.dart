@@ -152,9 +152,7 @@ void main() {
     await tester.tap(find.text('Share Link'));
     await tester.pump();
     expect(
-      find.text(
-        'https://familyemergencyapp.web.app/join?code=$fakeInviteCode',
-      ),
+      find.text('https://familyemergencyapp.web.app/join?code=$fakeInviteCode'),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);

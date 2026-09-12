@@ -4,6 +4,7 @@
          network access in release builds as well as debug builds. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- Special access only: Android still requires the user to enable this app
          on the system Usage access screen. It is never requested at startup. -->
     <uses-permission

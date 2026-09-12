@@ -15,7 +15,57 @@ class ProfileService {
 
   Future<UserProfile> load(User user) async {
     final snapshot = await _documentFor(user).get();
-    return UserProfile.fromFirestore(user, snapshot.data());
+    final data = snapshot.data();
+    if (data != null) {
+      try {
+        // Other members' private profiles are never exposed to a deleting
+        // owner. Reconcile this user's references from a server-backed list.
+        final groups = await _firestore
+            .collection('groups')
+            .where('memberIds', arrayContains: user.uid)
+            .where('status', isEqualTo: 'active')
+            .get(const GetOptions(source: Source.server));
+        final active = groups.docs.map((doc) => doc.id).toSet();
+        final stale = (data['circleIds'] as List? ?? [])
+            .whereType<String>()
+            .where((id) => !active.contains(id))
+            .toList();
+        final updates = <String, dynamic>{};
+        if (stale.isNotEmpty) {
+          updates['circleIds'] = FieldValue.arrayRemove(stale);
+          data['circleIds'] = (data['circleIds'] as List)
+              .where((id) => !stale.contains(id))
+              .toList();
+        }
+        if (data['activeCircleId'] != null &&
+            !active.contains(data['activeCircleId'])) {
+          updates['activeCircleId'] = FieldValue.delete();
+          data.remove('activeCircleId');
+        }
+        final pending = data['pendingJoinCircleId'];
+        if (pending is String) {
+          final request = await _firestore
+              .collection('groups')
+              .doc(pending)
+              .collection('joinRequests')
+              .doc(user.uid)
+              .get(const GetOptions(source: Source.server));
+          if (request.data()?['status'] != 'pending') {
+            updates['pendingJoinCircleId'] = FieldValue.delete();
+            updates['pendingJoinInviteId'] = FieldValue.delete();
+            data.remove('pendingJoinCircleId');
+            data.remove('pendingJoinInviteId');
+          }
+        }
+        if (updates.isNotEmpty) {
+          await _documentFor(user)
+              .update({...updates, 'updatedAt': FieldValue.serverTimestamp()});
+        }
+      } on FirebaseException catch (_) {
+        // Offline/cache results must not erase references. Retry on next load.
+      }
+    }
+    return UserProfile.fromFirestore(user, data);
   }
 
   Future<void> syncCanonicalIdentity(User user) async {

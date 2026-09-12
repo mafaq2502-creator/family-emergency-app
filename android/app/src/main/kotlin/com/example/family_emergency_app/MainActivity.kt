@@ -1,6 +1,9 @@
 package com.example.family_emergency_app
 
 import android.app.AppOpsManager
+import android.app.NotificationManager
+import android.Manifest
+import android.content.pm.PackageManager
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
@@ -13,6 +16,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val channelName = "com.familyemergency.app/screen_time"
+    private val notificationChannelName = "com.familyemergency.app/notifications"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -39,6 +43,37 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, notificationChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getNotificationStatus" -> result.success(notificationStatus())
+                    "openNotificationSettings" -> result.success(openNotificationSettings())
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    private fun notificationStatus(): Map<String, Any> {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val runtimeGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        val rationale = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
+        return mapOf(
+            "requiresRuntimePermission" to (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU),
+            "runtimeGranted" to runtimeGranted,
+            "notificationsEnabled" to manager.areNotificationsEnabled(),
+            "canShowRationale" to rationale,
+        )
+    }
+
+    private fun openNotificationSettings(): Boolean = try {
+        startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+        })
+        true
+    } catch (_: Exception) {
+        false
     }
 
     private fun permissionState(): String {

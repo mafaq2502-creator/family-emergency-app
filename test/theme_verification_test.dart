@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:family_emergency_app/app/family_emergency_app.dart';
+import 'package:family_emergency_app/app/notification_navigation.dart';
 import 'package:family_emergency_app/core/theme/app_colors.dart';
 import 'package:family_emergency_app/core/theme/theme_mode_controller.dart';
 import 'package:family_emergency_app/core/widgets/light_ui.dart';
@@ -377,5 +378,29 @@ void main() {
       expect(find.text('Account Settings'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     }
+  });
+
+  testWidgets('Android routes use the supported predictive back transition', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const FamilyEmergencyApp(home: Scaffold(body: Text('Parent'))),
+    );
+    final context = tester.element(find.text('Parent'));
+    final builder = Theme.of(context)
+        .pageTransitionsTheme
+        .builders[TargetPlatform.android];
+    expect(builder, isA<PredictiveBackFullscreenPageTransitionsBuilder>());
+    appNavigatorKey.currentState!.push(
+      MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(body: Text('Child')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Child'), findsOneWidget);
+    appNavigatorKey.currentState!.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Parent'), findsOneWidget);
+    expect(find.text('Child'), findsNothing);
   });
 }

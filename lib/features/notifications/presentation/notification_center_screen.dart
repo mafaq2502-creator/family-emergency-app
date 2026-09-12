@@ -8,6 +8,7 @@ import '../../../services/app_notification_service.dart';
 import '../../../core/widgets/light_ui.dart';
 import '../../../core/widgets/bounded_dropdown_form_field.dart';
 import 'notification_bell_button.dart';
+import '../../../app/notification_navigation.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
   const NotificationCenterScreen({super.key, required this.groups});
@@ -158,7 +159,18 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                     final item = notices[index];
                     return LightCard(
                       padding: EdgeInsets.zero,
-                      onTap: () => _service.markRead(user, item.id),
+                      onTap: () async {
+                        await _service.markRead(user, item.id);
+                        await openNotificationPayload({
+                          'type': item.type,
+                          'groupId': item.groupId,
+                          if (item.emergencyId != null)
+                            'emergencyId': item.emergencyId,
+                          if (item.deviceId != null) 'deviceId': item.deviceId,
+                          if (item.memberUserId != null)
+                            'memberUserId': item.memberUserId,
+                        });
+                      },
                       child: ListTile(
                         leading: CircleAvatar(
                           backgroundColor: item.isRead

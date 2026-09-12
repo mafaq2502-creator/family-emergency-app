@@ -85,6 +85,16 @@ async function seedCircle(circleId, members) {
         circleIds: [circleId, 'another-circle'],
         updatedAt: new Date(),
       });
+      await firestore.collection('users').doc(member.uid)
+        .collection('notifications').doc('circle-notice').set({
+          groupId: circleId, title: 'Circle alert', isRead: false,
+          createdAt: new Date(),
+        });
+      await firestore.collection('users').doc(member.uid)
+        .collection('notifications').doc('other-notice').set({
+          groupId: 'another-circle', title: 'Other alert', isRead: false,
+          createdAt: new Date(),
+        });
     }
   });
 }
@@ -219,6 +229,8 @@ test('only owner deletes a Circle and every membership/profile is cleaned', asyn
     assert.equal(membership.status, 'removed');
     assert.equal(profile.activeCircleId, undefined);
     assert.deepEqual(profile.circleIds, ['another-circle']);
+    assert.equal((await read(`users/${member.uid}/notifications/circle-notice`)).exists, false);
+    assert.equal((await read(`users/${member.uid}/notifications/other-notice`)).exists, true);
   }
 });
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'app/family_emergency_app.dart';
 import 'core/theme/theme_mode_controller.dart';
 import 'services/screen_time_service.dart';
+import 'services/push_notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -67,7 +68,10 @@ class _FirebaseBootstrapAppState extends State<FirebaseBootstrapApp> {
           ),
         );
       }
-      return const FamilyEmergencyApp();
+      return FutureBuilder<void>(
+        future: PushNotificationService.instance.initialize(),
+        builder: (_, _) => const FamilyEmergencyApp(),
+      );
     },
   );
 }

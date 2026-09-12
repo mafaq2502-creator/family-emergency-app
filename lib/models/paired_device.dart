@@ -30,6 +30,11 @@ class PairedDevice {
     this.removedAt,
     this.lastScreenTimeSyncAt,
     this.screenTimePermissionState,
+    this.manufacturer,
+    this.androidApiLevel,
+    this.appBuildNumber,
+    this.notificationPermissionState,
+    this.notificationsEnabled = false,
     this.permissions = const {},
   });
 
@@ -55,6 +60,11 @@ class PairedDevice {
   final DateTime? removedAt;
   final DateTime? lastScreenTimeSyncAt;
   final String? screenTimePermissionState;
+  final String? manufacturer;
+  final int? androidApiLevel;
+  final String? appBuildNumber;
+  final String? notificationPermissionState;
+  final bool notificationsEnabled;
   final Map<String, bool> permissions;
 
   bool isOnline(DateTime now, {Duration timeout = DevicePolicy.staleAfter}) {
@@ -110,6 +120,12 @@ class PairedDevice {
       lastScreenTimeSyncAt: (map['lastScreenTimeSyncAt'] as Timestamp?)
           ?.toDate(),
       screenTimePermissionState: map['screenTimePermissionState'] as String?,
+      manufacturer: map['manufacturer'] as String?,
+      androidApiLevel: map['androidApiLevel'] as int?,
+      appBuildNumber: map['appBuildNumber'] as String?,
+      notificationPermissionState:
+          map['notificationPermissionState'] as String?,
+      notificationsEnabled: map['notificationsEnabled'] as bool? ?? false,
       permissions: Map<String, bool>.from(
         map['permissions'] as Map? ?? const {},
       ),

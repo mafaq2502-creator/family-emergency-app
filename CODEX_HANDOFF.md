@@ -1,5 +1,211 @@
 # Family Emergency App — Codex Handoff
 
+## Email verification and Google Sign-In follow-up (2026-09-12)
+
+- Email verification now observes Firebase `userChanges()`, reloads verification
+  automatically every five seconds while the gate is visible, rechecks on app
+  resume, and advances once Firebase reports `emailVerified=true`.
+- Production **Next** is tappable and performs a real Firebase check instead of
+  looking permanently disabled. It does not bypass verification.
+- No Firestore `emailVerified` boolean was added; Firebase Authentication remains
+  the single source of truth.
+- Current `android/app/google-services.json` has no OAuth client entries. Google
+  provider/support-email configuration alone is insufficient. Exact current
+  debug signing SHA-1/SHA-256 and replacement steps are recorded in
+  `docs/FIREBASE_AUTH_SETUP.md`.
+
+## Resumed Account A task — Circle deletion, navigation, push/device permissions (2026-09-12)
+
+Status: **SOURCE IMPLEMENTED, AUTOMATED TESTS PASS, AND ANDROID APK BUILT.
+Production rules deployment and physical-device acceptance remain pending.**
+Do not call this fully runtime verified. This section supersedes older notes for
+these four fixes. The original 23-section prompt was read from the previous task's
+attachment `5f59dac3-1364-4357-8604-faf6f49cdb8d/pasted-text.txt`. Account A stopped
+at its usage limit while finishing cleanup and verification. Existing local work
+was inspected and preserved, then corrected rather than restarted.
+
+### 1. Status and scope
+
+- Complete locally: Spark-compatible Circle deletion, shared bottom navigation,
+  Android permission/settings/channels, device metadata/token lifecycle,
+  notification destinations and route-layer predictive-back separation.
+- No production user/Circle data was deleted during this task.
+- No paid Firebase feature, Functions deployment, commit or push was performed.
+- A rules-only production deployment was attempted after final verification, but
+  automatic approval review rejected it pending fresh explicit approval for the
+  exact `familyemergencyapp` production access-control change. It was not bypassed.
+- No physical Android device was attached according to `adb devices -l`.
+
+### 2. Principal modified files
+
+- `lib/services/group_service.dart`, `profile_service.dart`, `auth_service.dart`,
+  `push_notification_service.dart`, `device_service.dart`.
+- `lib/app/notification_navigation.dart`, `family_emergency_app.dart`, `lib/main.dart`.
+- `lib/core/domain/push_policy.dart`, `circle_error_mapper.dart`,
+  `lib/core/theme/app_page_transitions.dart`, `lib/core/widgets/app_bottom_navigation.dart`.
+- Family shell, notification settings/center and device detail presentation.
+- Notification/device models, `firestore.rules`, `functions/src/index.ts`,
+  Android manifest and native notification status/settings bridge.
+- Package lock/declarations and generated platform plugin registration.
+- `test/task_stabilization_test.dart`, existing lifecycle/theme/responsive tests,
+  `rules-tests/firestore.rules.test.cjs`, `device.rules.test.cjs`, and this handoff.
+
+### 3. Delete Circle root cause
+
+The UI called `deleteCircle`, a Cloud Function that was intentionally undeployed
+because the project remains on Spark. A functioning dialog did not imply a
+working production backend. The unfinished fallback also left pending invites,
+join requests and Circle device associations active.
+
+### 4. Delete fix, data ownership and navigation
+
+- Default Spark path uses the existing GroupService with a rules-protected atomic
+  batch. A future configured Functions deployment can opt in with
+  `USE_CIRCLE_LIFECYCLE_FUNCTIONS=true`; the callable source is retained.
+- Only the actual owner can tombstone the Circle. Rules validate owner identity,
+  timestamps, cleared role/member/recipient caches and allowed changed fields.
+- Batch deactivates memberships, revokes invites, rejects pending requests,
+  unpairs Circle-specific device associations, removes the owner's private
+  notifications for that Circle and clears the owner's selected Circle/profile
+  reference. No success is returned before the batch commits.
+- Existing soft-delete/tombstone retention is preserved. Historical child records
+  remain stored but Circle access rules revoke reads; they are not a physical
+  recursive purge. Global users, installations and their private usage are retained.
+- Private profiles belonging to other members are not exposed to the owner.
+  Their stale references reconcile on their next successful server-backed profile
+  load; live Circle queries remove the deleted Circle immediately. Pending users
+  can read their rejected request and leave the pending flow.
+- The future callable transaction also handles requester profiles, invites and
+  Circle device links, and Circle-specific notifications for every affected user.
+  Large cleanups exceeding the conservative 450-write limit stop without
+  mutations and require a future server cleanup job.
+- Existing confirmation/cancel, in-flight guard, failure/retry and route-result
+  behavior are retained. Successful delete returns to Family; selected member
+  filters are cleared when their Circle disappears. Failure stays on Circle Detail.
+
+### 5. Bottom navigation
+
+All five tabs now share AppBottomNavigation: 28dp icons in equal 48x44 slots,
+3dp icon/label gap, shared label baseline and stable selected/unselected geometry.
+Home follows the same geometry as the other destinations. Labels use a common
+responsive scale rather than independently shrinking each word. SafeArea keeps
+gesture/three-button insets below the controls. Both themes, all selections,
+320px width, 1.5 text scale and 0/24/48dp bottom insets pass layout tests.
+
+### 6. Android notification permission
+
+Native status distinguishes not requested, granted, denied, settings required
+and unavailable. Runtime permission is requested only when applicable; no
+startup permission popup or duplicate Firebase/local permission request occurs.
+The settings screen explains the choice, supports declining, opens Android
+notification settings and refreshes actual state on resume. Setup/sync failures
+are displayed independently of in-app history. Unsupported platforms do not run
+Android device APIs or claim successful Android permission.
+
+### 7. Channels
+
+Four channels only: `emergency_sos` (maximum importance), `family_activity`
+(high), `device_safety` (high), `general` (default). Channel creation does not
+override user-selected channel settings.
+
+### 8. FCM, routing and session lifecycle
+
+- Foreground FCM uses one local notification; background/terminated notification
+  payload display is delegated to FCM/Android, avoiding dual display paths.
+- Launch taps are retained until the authenticated/onboarded Home shell is ready;
+  there is no recursive per-frame retry loop. Logout clears queued taps.
+- Existing records route to Emergency Detail, Device Detail or manager join
+  requests; missing/inaccessible records safely fall back. The current user is
+  rechecked after asynchronous reads; addressed payloads for another user are ignored.
+- Device token refresh uses the refreshed value. Metadata writes compare actual
+  stored values, skip unchanged updates and never mirror private tokens to Circles.
+- Token invalidation still runs if the Firestore logout cleanup fails. Binding
+  is serialized, suspended during logout and tokens rotate before a different
+  account can bind. Offline token invalidation may need the next online session;
+  no offline remote-revocation guarantee is claimed.
+- The prepared server sender includes recipient UID, chunks multicast requests
+  at 500 tokens and avoids deleting a newly refreshed token after an old-token error.
+- Automatic app-event push remains **not live**: Functions are intentionally
+  undeployed on Spark. Client/channel configuration alone is not end-to-end delivery.
+
+### 9. Exact device metadata
+
+Existing installation ID, owner UID, platform/name/pairing status, heartbeat/last
+seen and screen-time fields are preserved. Added/synced: `manufacturer`, `model`,
+`osVersion`, `androidApiLevel`, `appVersion`, `appBuildNumber`, private `fcmToken`,
+`notificationPermissionState`, `notificationsEnabled`, `notificationCapable`,
+`pushUpdatedAt`, `updatedAt`. Circle mirrors omit `fcmToken`.
+
+### 10. Information not collected
+
+No IMEI, IMSI, SIM serial, MAC address, advertising ID or new sensitive hardware
+identifier was added. No fabricated location permission/status was introduced;
+only existing modeled capabilities were extended.
+
+### 11. Predictive back
+
+AppPageTransitionsBuilder extends Flutter's supported fullscreen predictive-back
+builder and supplies an opaque themed AppPageBackground per real route. Previously
+transparent scaffolds/app bars shared a single background outside Navigator,
+allowing parent and child text to mix. The route's own background now moves with
+its content/header. Flutter owns interactive movement, retreat, cancellation and
+the exactly-once pop; the fallback uses matching theme colors. No screenshots,
+duplicate parents, heavy blur, manual pop at gesture start or disabled predictive
+back were introduced. Child cancellation and completion are tested through the
+real Flutter backgesture platform channel, in light and dark themes.
+
+### 12. Verification evidence
+
+- Latest pass after notification-cleanup completion: `flutter analyze --no-pub`
+  reports no issues; all 291 Flutter tests pass; all 6 callable lifecycle emulator
+  tests pass; Functions TypeScript compiles; Firestore security-rule emulator
+  suite exits successfully. The Android release testing APK was rebuilt.
+
+- `flutter analyze --no-pub`: **No issues found**.
+- Full `flutter test --no-pub`: **291 passed, 0 failed**.
+- Local Firestore emulator: **39 passed, 0 failed**. This is a local Firebase
+  test server, not an Android emulator. Includes atomic cleanup, non-owner denial,
+  installation privacy, metadata matching, global-device preservation, and existing
+  invite approval/concurrency/security regressions.
+- Functions TypeScript compile: **passed**.
+- `git diff --check`: no whitespace errors (Windows LF/CRLF notices only).
+- Android release testing build: **passed** after enabling the notification
+  plugin's required core-library desugaring in `android/app/build.gradle.kts`.
+- APK: `build/app/outputs/flutter-apk/app-release.apk`
+  - Size: **76,557,822 bytes (73.01 MiB)**
+  - SHA-256: `E43AF583BBD0D672738881580448162412BB14A140A87054C472B7CDF8229BD3`
+  - APK Signature Scheme v2: **verified**, one signer.
+  - Signed with the current Android debug certificate; this is a testing APK,
+    not a Play Store production artifact.
+
+### 13. Regression results
+
+Existing authentication, onboarding, profile/address/security, image handling,
+theme persistence, Plans, Circle details/lifecycle, invite/QR/join approval,
+device/screen-time and responsive widget tests pass. This is automated coverage,
+not a claim that future/disabled ownership transfer, location collection or paid
+backend features became implemented or live in this task.
+
+### 14. External requirements
+
+- Deploy the reviewed `firestore.rules` to `familyemergencyapp` after the required
+  explicit production approval. Previous automatic review required fresh approval
+  for that exact production access-control change. Local tests do not deploy rules.
+- Keep Spark/free. Do not enable billing or deploy Functions without a separate
+  explicit instruction. Automatic server-triggered push therefore remains deferred.
+- Connect a physical phone for grant/deny/settings, foreground/background/terminated
+  notification delivery, device metadata and slow-swipe visual acceptance.
+
+### 15. Remaining acceptance work / exact next steps
+
+1. Obtain the exact production rules-deployment approval and deploy rules only.
+2. On a disposable test Circle verify delete success, denial and failure, and
+   immediate Family-list removal. Do not delete real family data for a test.
+3. On Android 13+ verify permission denial/recovery and notification shade/taps;
+   repeat slow, cancelled and completed back on the requested nested routes.
+4. Never label background push delivery or physical-device performance verified
+   until there is actual evidence. Current working-tree changes remain uncommitted.
+
 ## Phase 9 — Real Android screen-time collection (2026-09-12)
 
 Status: **IMPLEMENTED, SECURED, TESTED, AND ANDROID-BUILT. Real-device runtime
@@ -48,10 +254,13 @@ Android phone grants Usage access and confirms a real sync end to end.
 - Firestore emulator rules: **36 passed, 0 failed**, including screen-time
   idempotency, ownership, Circle visibility, spoof prevention, and permission
   publication cases.
-- Android debug build succeeded:
-  `build/app/outputs/flutter-apk/app-debug.apk`
-  - Size: **216,870,234 bytes (206.82 MiB)**
-  - SHA-256: `5014D4FE30F49DB09DFB9F617EC15BBC4E1889A49B7545D1795A4C85DE26A209`
+- Latest Android testing release build succeeded with
+  `--dart-define=AUTO_VERIFY_EMAIL_FOR_TESTING=true`:
+  `build/app/outputs/flutter-apk/app-release.apk`
+  - Size: **75,896,591 bytes (72.38 MiB)**
+  - SHA-256: `64FA97EBA9D2859EF22073E3C6DEDD25D00F84E7E9133DB5C3F3F7A7FCDCB770`
+  - The current release Gradle configuration uses the debug signing key, so
+    this artifact is for testing and is not a Play Store production artifact.
 - No emulator was used. `adb devices -l` found no connected physical Android
   device, so real UsageStats grant/data collection could not be exercised in
   this environment.

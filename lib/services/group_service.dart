@@ -177,8 +177,144 @@ class GroupService {
   /// Marks the Circle deleted through a trusted server operation. Related
   /// records remain as an auditable tombstone instead of being partially
   /// removed by several client batches.
-  Future<void> deleteGroup(FamilyGroup group) =>
-      _callLifecycle('deleteCircle', {'circleId': group.id});
+  Future<void> deleteGroup(FamilyGroup group) async {
+    // The deployed product currently uses Spark. Do not call an undeployed
+    // endpoint on every deletion. Keep the server implementation for an
+    // explicitly configured future deployment.
+    if (!const bool.fromEnvironment('USE_CIRCLE_LIFECYCLE_FUNCTIONS')) {
+      return _deleteGroupWithClientBatch(group);
+    }
+    try {
+      await _callLifecycle('deleteCircle', {'circleId': group.id});
+      return;
+    } on FirebaseFunctionsException catch (error) {
+      // Spark projects cannot execute callable Functions. Keep the trusted
+      // server path as the default, and use the rules-validated atomic path
+      // only when that endpoint is unavailable.
+      if (!const {
+        'not-found',
+        'unavailable',
+        'internal',
+      }.contains(error.code)) {
+        rethrow;
+      }
+    }
+    await _deleteGroupWithClientBatch(group);
+  }
+
+  Future<void> _deleteGroupWithClientBatch(FamilyGroup group) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'unauthenticated',
+        message: 'Please sign in again.',
+      );
+    }
+    final groupRef = _client.collection('groups').doc(group.id);
+    final groupSnapshot = await groupRef.get();
+    final data = groupSnapshot.data();
+    if (!groupSnapshot.exists || data == null || data['status'] != 'active') {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'not-found',
+        message: 'This family Circle is no longer available.',
+      );
+    }
+    if (data['ownerId'] != user.uid ||
+        Map<String, dynamic>.from(data['roles'] as Map? ?? {})[user.uid] !=
+            CircleRole.owner.value) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+        message: 'Only the Circle owner can delete this Circle.',
+      );
+    }
+    final memberships = await groupRef.collection('memberships').get();
+    final invites = await _client
+        .collection('circleInvites')
+        .where('circleId', isEqualTo: group.id)
+        .get();
+    final requests = await groupRef
+        .collection('joinRequests')
+        .where('status', isEqualTo: 'pending')
+        .get();
+    final devices = await groupRef.collection('devices').get();
+    final notifications = await _client
+        .collection('users')
+        .doc(user.uid)
+        .collection('notifications')
+        .where('groupId', isEqualTo: group.id)
+        .get();
+    if (memberships.size +
+            invites.size +
+            requests.size +
+            devices.size +
+            notifications.size +
+            2 >
+        450) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'failed-precondition',
+        message: 'This Circle requires server cleanup. No data was changed.',
+      );
+    }
+    final profileRef = _client.collection('users').doc(user.uid);
+    final profile = await profileRef.get();
+    final batch = _client.batch();
+    final now = FieldValue.serverTimestamp();
+    batch.update(groupRef, {
+      'status': 'deleted',
+      'deletedAt': now,
+      'deletedBy': user.uid,
+      'memberIds': <String>[],
+      'roles': <String, String>{},
+      'emergencyRecipientIds': <String>[],
+      'updatedAt': now,
+    });
+    for (final membership in memberships.docs) {
+      batch.update(membership.reference, {
+        'status': 'removed',
+        'endedAt': now,
+        'endedBy': user.uid,
+        'updatedAt': now,
+      });
+    }
+    for (final invite in invites.docs) {
+      batch.update(invite.reference, {
+        'status': 'revoked',
+        'revokedAt': now,
+        'revokedBy': user.uid,
+        'updatedAt': now,
+      });
+    }
+    for (final request in requests.docs) {
+      batch.update(request.reference, {
+        'status': 'rejected',
+        'reviewedAt': now,
+        'reviewedBy': user.uid,
+        'updatedAt': now,
+      });
+    }
+    for (final device in devices.docs) {
+      batch.update(device.reference, {
+        'pairingStatus': 'unpaired',
+        'removedAt': now,
+        'removedBy': user.uid,
+        'updatedAt': now,
+      });
+    }
+    for (final notification in notifications.docs) {
+      batch.delete(notification.reference);
+    }
+    batch.set(profileRef, {
+      'circleIds': FieldValue.arrayRemove([group.id]),
+      if (profile.data()?['activeCircleId'] == group.id)
+        'activeCircleId': FieldValue.delete(),
+      'updatedAt': now,
+    }, SetOptions(merge: true));
+    await batch.commit();
+  }
 
   Future<void> setEmergencyRecipients(FamilyGroup group, List<String> userIds) {
     final uniqueIds = userIds.toSet().toList();

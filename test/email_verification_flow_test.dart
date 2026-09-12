@@ -43,7 +43,7 @@ void main() {
   });
 
   testWidgets(
-    'production Next stays disabled until Firebase reports verified',
+    'production Next rechecks Firebase and verified users continue automatically',
     (tester) async {
       final verification = _Verification();
       var continued = 0;
@@ -66,24 +66,22 @@ void main() {
         tester
             .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Next'))
             .onPressed,
-        isNull,
+        isNotNull,
+      );
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Next'));
+      await tester.pump();
+      await tester.pump();
+      expect(continued, 0);
+      expect(
+        find.textContaining('Email is not verified yet'),
+        findsOneWidget,
       );
 
       verification.verified = true;
       await tester.tap(find.text('Check verification'));
       await tester.pump();
       await tester.pump();
-      expect(
-        find.text('Email verified. Select Next to continue.'),
-        findsOneWidget,
-      );
-      expect(
-        tester
-            .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Next'))
-            .onPressed,
-        isNotNull,
-      );
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Next'));
       expect(continued, 1);
     },
   );

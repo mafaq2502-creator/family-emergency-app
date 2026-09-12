@@ -109,6 +109,63 @@ service cloud.firestore {
         getAfter(joinRequestPath(groupId, userId)).data.reviewedBy == request.auth.uid;
     }
 
+    function validOwnerCircleDeletion(groupId) {
+      return isOwner(groupId) &&
+        resource.data.ownerId == request.auth.uid &&
+        request.resource.data.status == 'deleted' &&
+        request.resource.data.deletedBy == request.auth.uid &&
+        request.resource.data.deletedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.memberIds == [] &&
+        request.resource.data.roles == {} &&
+        request.resource.data.emergencyRecipientIds == [] &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'deletedBy', 'deletedAt', 'memberIds', 'roles',
+          'emergencyRecipientIds', 'updatedAt'
+        ]);
+    }
+
+    function ownerDeletingCircle(groupId) {
+      return isOwner(groupId) && group(groupId).data.ownerId == request.auth.uid &&
+        groupAfter(groupId).data.status == 'deleted' &&
+        groupAfter(groupId).data.deletedBy == request.auth.uid;
+    }
+
+    function deletionRevokesInvite(groupId) {
+      return ownerDeletingCircle(groupId) &&
+        request.resource.data.status == 'revoked' &&
+        request.resource.data.revokedBy == request.auth.uid &&
+        request.resource.data.revokedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'revokedBy', 'revokedAt', 'updatedAt'
+        ]);
+    }
+
+    function deletionUnpairsDevice(groupId) {
+      return ownerDeletingCircle(groupId) &&
+        request.resource.data.pairingStatus == 'unpaired' &&
+        request.resource.data.removedBy == request.auth.uid &&
+        request.resource.data.removedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'pairingStatus', 'removedBy', 'removedAt', 'updatedAt'
+        ]);
+    }
+
+    function validMembershipCircleDeletion(groupId) {
+      return isOwner(groupId) &&
+        groupAfter(groupId).data.status == 'deleted' &&
+        groupAfter(groupId).data.deletedBy == request.auth.uid &&
+        request.resource.data.status == 'removed' &&
+        request.resource.data.endedBy == request.auth.uid &&
+        request.resource.data.endedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'endedBy', 'endedAt', 'updatedAt'
+        ]);
+    }
+
     function approvedMembershipWrite(groupId, userId) {
       let requestAfter = getAfter(joinRequestPath(groupId, userId));
       return isCircleManager(groupId) &&
@@ -300,6 +357,56 @@ service cloud.firestore {
         request.resource.data.updatedAt == request.time &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'status', 'pairingStatus', 'revokedAt', 'revokedBy', 'updatedAt'
+        ]);
+    }
+
+    function validPushRegistration(userId, deviceId) {
+      return request.auth.uid == userId &&
+        resource.data.ownerUserId == userId &&
+        resource.data.installationId == deviceId &&
+        resource.data.status == 'active' &&
+        request.resource.data.notificationPermissionState in [
+          'notRequested', 'granted', 'denied', 'settingsRequired', 'unavailable'
+        ] &&
+        request.resource.data.notificationsEnabled is bool &&
+        request.resource.data.notificationCapable is bool &&
+        request.resource.data.manufacturer is string &&
+        request.resource.data.manufacturer.size() <= 100 &&
+        request.resource.data.model is string &&
+        request.resource.data.model.size() <= 100 &&
+        request.resource.data.osVersion is string &&
+        request.resource.data.osVersion.size() <= 64 &&
+        request.resource.data.androidApiLevel is int &&
+        request.resource.data.androidApiLevel >= 1 &&
+        request.resource.data.appVersion is string &&
+        request.resource.data.appVersion.size() <= 32 &&
+        request.resource.data.notificationsEnabled ==
+          (request.resource.data.notificationPermissionState == 'granted') &&
+        request.resource.data.appBuildNumber is string &&
+        request.resource.data.appBuildNumber.size() <= 32 &&
+        (!('fcmToken' in request.resource.data) ||
+          (request.resource.data.fcmToken is string &&
+           request.resource.data.fcmToken.size() <= 4096)) &&
+        request.resource.data.pushUpdatedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'fcmToken', 'notificationPermissionState', 'notificationsEnabled',
+          'notificationCapable', 'manufacturer', 'model', 'osVersion',
+          'androidApiLevel', 'appVersion', 'appBuildNumber', 'pushUpdatedAt',
+          'updatedAt'
+        ]);
+    }
+
+    function validPushDetach(userId, deviceId) {
+      return request.auth.uid == userId &&
+        resource.data.ownerUserId == userId &&
+        resource.data.installationId == deviceId &&
+        !('fcmToken' in request.resource.data) &&
+        request.resource.data.notificationsEnabled == false &&
+        request.resource.data.pushUpdatedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'fcmToken', 'notificationsEnabled', 'pushUpdatedAt', 'updatedAt'
         ]);
     }
 
@@ -561,6 +668,33 @@ service cloud.firestore {
         ]);
     }
 
+    function validAssociationNotificationMetadata(groupId) {
+      let installation = get(installationPath(
+        request.auth.uid, resource.data.installationId
+      ));
+      return isMember(groupId) &&
+        resource.data.ownerUserId == request.auth.uid &&
+        resource.data.pairingStatus == 'paired' &&
+        installation.data.status == 'active' &&
+        request.resource.data.manufacturer == installation.data.manufacturer &&
+        request.resource.data.model == installation.data.model &&
+        request.resource.data.osVersion == installation.data.osVersion &&
+        request.resource.data.androidApiLevel == installation.data.androidApiLevel &&
+        request.resource.data.appVersion == installation.data.appVersion &&
+        request.resource.data.appBuildNumber == installation.data.appBuildNumber &&
+        request.resource.data.notificationPermissionState == installation.data.notificationPermissionState &&
+        request.resource.data.notificationsEnabled == installation.data.notificationsEnabled &&
+        request.resource.data.notificationCapable == installation.data.notificationCapable &&
+        request.resource.data.pushUpdatedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'manufacturer', 'model', 'osVersion', 'androidApiLevel',
+          'appVersion', 'appBuildNumber', 'notificationPermissionState',
+          'notificationsEnabled', 'notificationCapable', 'pushUpdatedAt',
+          'updatedAt'
+        ]);
+    }
+
     match /users/{userId} {
       allow create: if signedIn() && request.auth.uid == userId &&
         validSelfProfile(userId);
@@ -575,7 +709,10 @@ service cloud.firestore {
         allow update: if signedIn() && request.auth.uid == userId &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['isRead', 'readAt']);
-        allow create, delete: if false;
+        allow delete: if signedIn() && request.auth.uid == userId &&
+          resource.data.groupId is string &&
+          ownerDeletingCircle(resource.data.groupId);
+        allow create: if false;
       }
 
       match /checkIns/{checkInId} {
@@ -593,6 +730,8 @@ service cloud.firestore {
           (validInstallationHeartbeat(userId, deviceId) ||
            validInstallationRename(userId, deviceId) ||
            validInstallationRevoke(userId, deviceId) ||
+           validPushRegistration(userId, deviceId) ||
+           validPushDetach(userId, deviceId) ||
            validScreenTimePermissionUpdate(userId, deviceId) ||
            validScreenTimeSyncStatus(userId, deviceId));
         allow delete: if false;
@@ -621,6 +760,7 @@ service cloud.firestore {
         request.resource.data.emergencyRecipientIds.hasOnly(resource.data.memberIds);
       allow update: if isCircleManager(groupId) &&
         validApprovalGroupUpdate(groupId);
+      allow update: if validOwnerCircleDeletion(groupId);
       // Lifecycle removal is a server transaction so member/profile references
       // cannot be left partially updated.
       allow delete: if false;
@@ -639,6 +779,7 @@ service cloud.firestore {
         // Approval is the narrowly validated getAfter-based client transaction.
         allow update: if approvedMembershipWrite(groupId, userId);
         allow update: if validOwnIdentitySync(userId);
+        allow update: if validMembershipCircleDeletion(groupId);
         allow delete: if false;
       }
 
@@ -696,7 +837,9 @@ service cloud.firestore {
            validAssociationRename(groupId) ||
            validAssociationRemoval(groupId) ||
            validAssociationScreenTimeStatus(groupId) ||
-           validAssociationScreenTimePermission(groupId));
+           validAssociationScreenTimePermission(groupId) ||
+           validAssociationNotificationMetadata(groupId) ||
+           deletionUnpairsDevice(groupId));
         allow delete: if false;
       }
 
@@ -738,6 +881,7 @@ service cloud.firestore {
     }
 
     match /circleInvites/{inviteId} {
+      allow update: if signedIn() && deletionRevokesInvite(resource.data.circleId);
       allow get: if signedIn();
       allow list: if signedIn() && isCircleManager(resource.data.circleId);
       allow create: if signedIn() &&

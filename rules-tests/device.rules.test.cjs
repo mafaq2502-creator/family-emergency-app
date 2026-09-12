@@ -19,6 +19,7 @@ const {
   updateDoc,
   where,
   writeBatch,
+  deleteField,
 } = require('firebase/firestore');
 
 const installationId = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -399,5 +400,36 @@ test('only a device owner can publish screen-time permission and sync state', as
     permissions: {screenTime: true},
     lastScreenTimeSyncAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+  }));
+});
+
+test('push token is private to its installation and notification metadata mirrors to its Circle association', async () => {
+  await seedOldInstallation();
+  await testEnvironment.withSecurityRulesDisabled(async context => {
+    const old = Timestamp.fromMillis(Date.now() - 5 * 60 * 1000);
+    await setDoc(doc(context.firestore(), `groups/circle-1/devices/${associationId}`), {
+      ...associationData(), pairedAt: old, lastSeenAt: old,
+      lastHeartbeatAt: old, createdAt: old, updatedAt: old,
+    });
+  });
+  const adult = testEnvironment.authenticatedContext('adult-1').firestore();
+  const outsider = testEnvironment.authenticatedContext('outsider-1').firestore();
+  const own = doc(adult, `users/adult-1/devices/${installationId}`);
+  const metadata = {
+    fcmToken: 'test-registration-token',
+    notificationPermissionState: 'granted', notificationsEnabled: true,
+    notificationCapable: true, manufacturer: 'Google', model: 'Pixel',
+    osVersion: '16', androidApiLevel: 36, appVersion: '1.0.0',
+    appBuildNumber: '1', pushUpdatedAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  };
+  await assertSucceeds(updateDoc(own, metadata));
+  await assertFails(updateDoc(doc(outsider, own.path), {...metadata, fcmToken: 'stolen'}));
+  const association = doc(adult, `groups/circle-1/devices/${associationId}`);
+  const {fcmToken, ...publicMetadata} = metadata;
+  await assertSucceeds(updateDoc(association, publicMetadata));
+  await assertFails(updateDoc(association, {...publicMetadata, manufacturer: 'Spoofed'}));
+  await assertSucceeds(updateDoc(own, {
+    fcmToken: deleteField(), notificationsEnabled: false,
+    pushUpdatedAt: serverTimestamp(), updatedAt: serverTimestamp(),
   }));
 });

@@ -23,6 +23,7 @@ class CircleErrorMapper {
         FirebaseFunctionsException value
             when value.message?.isNotEmpty == true =>
           value.message!,
+        FirebaseException value when value.message?.isNotEmpty == true => value.message!,
         _ => 'This action is no longer available.',
       },
       'unavailable' || 'deadline-exceeded' =>

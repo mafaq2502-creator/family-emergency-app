@@ -683,9 +683,41 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             _metric(Icons.devices_rounded, 'Platform', device.platform),
             _metric(Icons.info_outline_rounded, 'Model', device.model),
             _metric(
+              Icons.factory_outlined,
+              'Manufacturer',
+              device.manufacturer ?? 'Not reported',
+            ),
+            _metric(
+              Icons.android_rounded,
+              'Android / API',
+              [
+                    device.osVersion,
+                    if (device.androidApiLevel != null)
+                      'API ${device.androidApiLevel}',
+                  ].whereType<String>().join(' · ').isEmpty
+                  ? 'Not reported'
+                  : [
+                      device.osVersion,
+                      if (device.androidApiLevel != null)
+                        'API ${device.androidApiLevel}',
+                    ].whereType<String>().join(' · '),
+            ),
+            _metric(
               Icons.apps_rounded,
               'App Version',
               device.appVersion ?? 'Not reported',
+            ),
+            _metric(
+              Icons.notifications_active_outlined,
+              'Notifications',
+              device.notificationsEnabled
+                  ? 'Allowed'
+                  : switch (device.notificationPermissionState) {
+                      'settingsRequired' => 'Enable in Android Settings',
+                      'denied' => 'Denied',
+                      'notRequested' => 'Not requested',
+                      _ => 'Not allowed',
+                    },
             ),
             _metric(
               Icons.monitor_heart_outlined,

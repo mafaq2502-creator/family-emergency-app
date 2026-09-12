@@ -9,6 +9,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../features/auth/domain/auth_error_mapper.dart';
 import '../features/auth/domain/auth_validators.dart';
 import 'profile_service.dart';
+import 'push_notification_service.dart';
 
 abstract interface class AuthActions {
   Future<void> signIn({required String email, required String password});
@@ -59,7 +60,9 @@ class AuthService implements AuthActions, EmailVerificationActions {
 
   FirebaseAuth get _authClient => _auth ??= FirebaseAuth.instance;
 
-  Stream<User?> authStateChanges() => _authClient.authStateChanges();
+  // userChanges also emits after reload(), so an email-verification change can
+  // move AuthGate forward without requiring a sign-out/sign-in cycle.
+  Stream<User?> authStateChanges() => _authClient.userChanges();
 
   User? get currentUser => _authClient.currentUser;
 
@@ -186,6 +189,7 @@ class AuthService implements AuthActions, EmailVerificationActions {
   @override
   Future<void> signOut() async {
     signupDraft = null;
+    await PushNotificationService.instance.detachCurrentUser();
     await _authClient.signOut();
     try {
       await GoogleSignIn.instance.signOut();

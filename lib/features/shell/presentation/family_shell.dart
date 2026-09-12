@@ -5,6 +5,7 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'dart:async';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_bottom_navigation.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/domain/circle_error_mapper.dart';
 import '../../../core/domain/circle_policies.dart';
@@ -24,6 +25,8 @@ import '../../../services/emergency_service.dart';
 import '../../../services/app_notification_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/device_heartbeat_controller.dart';
+import '../../../services/push_notification_service.dart';
+import '../../../app/notification_navigation.dart';
 import '../../devices/presentation/device_screens.dart';
 import '../../members/presentation/member_profile_screen.dart';
 import '../../groups/presentation/group_settings_screen.dart';
@@ -142,6 +145,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    PushNotificationService.instance.pendingTap.addListener(
+      _openPendingNotification,
+    );
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _openPendingNotification(),
+    );
     _profileNameController.addListener(_updateProfileDirtyState);
     _loadDeviceTimeZone();
     _loadProfile();
@@ -153,6 +162,15 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) => _openInitialInvite());
+  }
+
+  void _openPendingNotification() {
+    if (!mounted) return;
+    final pending = PushNotificationService.instance.pendingTap;
+    final payload = pending.value;
+    if (payload == null) return;
+    pending.value = null;
+    unawaited(openNotificationPayload(payload));
   }
 
   @override
@@ -206,6 +224,9 @@ class _HomeScreenState extends State<HomeScreen> {
             setState(() {
               _groups = groups;
               final currentId = _selectedGroup?.id;
+              if (!groups.any((group) => group.id == currentId)) {
+                _progressMemberId = null;
+              }
               _selectedGroup =
                   groups
                       .where((group) => group.id == currentId)
@@ -641,6 +662,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    PushNotificationService.instance.pendingTap.removeListener(
+      _openPendingNotification,
+    );
     _groupsSubscription?.cancel();
     _membersSubscription?.cancel();
     _timer?.cancel();
@@ -837,177 +861,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Widget _buildNavigationBar() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    const items = [
-      (Icons.bar_chart_rounded, 'Progress', 1),
-      (Icons.groups_rounded, 'Family', 0),
-      (Icons.workspace_premium_rounded, 'Plan', 3),
-      (Icons.person_rounded, 'Profile', 4),
-    ];
-    return SafeArea(
-      top: false,
-      child: SizedBox(
-        height: 96,
-        child: Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.topCenter,
-          children: [
-            Positioned.fill(
-              child: PhysicalShape(
-                clipper: const _WaveNavigationClipper(),
-                color: isDark ? kDarkSurface : kLightSurface,
-                elevation: 10,
-                shadowColor: Colors.black26,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 22),
-                  child: Row(
-                    children: [
-                      for (final item in items.take(2))
-                        _navItem(item.$1, item.$2, item.$3),
-                      const Spacer(flex: 2),
-                      for (final item in items.skip(2))
-                        _navItem(item.$1, item.$2, item.$3),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: -8,
-              child: InkResponse(
-                onTap: () => setState(() => _currentIndex = 2),
-                radius: 40,
-                hoverColor: (isDark ? kEmerald : kLightAccent).withValues(
-                  alpha: .14,
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 68,
-                      height: 68,
-                      decoration: BoxDecoration(
-                        gradient: _currentIndex == 2 && !isDark
-                            ? const LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [kLightAccent, kLightPrimary],
-                              )
-                            : null,
-                        color: _currentIndex == 2
-                            ? (isDark ? kEmerald : null)
-                            : (isDark ? kDarkCardElevated : kLightSurfaceMuted),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isDark ? kDarkBackground : kLightBackground,
-                          width: 4,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (isDark ? kEmerald : kLightAccent)
-                                .withValues(alpha: .28),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        Icons.home_rounded,
-                        color: _currentIndex == 2
-                            ? Colors.white
-                            : (isDark ? kDarkMuted : kLightMuted),
-                        size: 34,
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      'Home',
-                      style: TextStyle(
-                        color: _currentIndex == 2
-                            ? (isDark ? kEmerald : kLightPrimary)
-                            : (isDark ? Colors.grey : kLightMuted),
-                        fontSize: AppTypography.tabLabel,
-                        fontWeight: _currentIndex == 2
-                            ? FontWeight.w600
-                            : FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _navItem(IconData icon, String label, int index) {
-    final selected = _currentIndex == index;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final activeColor = isDark ? kEmerald : kLightPrimary;
-    final inactiveColor = isDark ? Colors.grey : kLightMuted;
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _currentIndex = index),
-        hoverColor: activeColor.withValues(alpha: .10),
-        borderRadius: BorderRadius.circular(18),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: selected
-                    ? activeColor.withValues(alpha: .13)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: selected ? activeColor : inactiveColor,
-                size: AppTypography.tabIcon,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? activeColor : inactiveColor,
-                fontSize: AppTypography.tabLabel,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ================= LOCATION TAB =================
-}
-
-class _WaveNavigationClipper extends CustomClipper<Path> {
-  const _WaveNavigationClipper();
-
-  @override
-  Path getClip(Size size) {
-    final center = size.width / 2;
-    return Path()
-      ..moveTo(0, size.height)
-      ..lineTo(0, 22)
-      ..quadraticBezierTo(0, 10, 18, 10)
-      ..lineTo(center - 60, 10)
-      ..cubicTo(center - 43, 10, center - 44, 0, center - 27, 0)
-      ..quadraticBezierTo(center, -2, center + 27, 0)
-      ..cubicTo(center + 44, 0, center + 43, 10, center + 60, 10)
-      ..lineTo(size.width - 18, 10)
-      ..quadraticBezierTo(size.width, 10, size.width, 22)
-      ..lineTo(size.width, size.height)
-      ..close();
-  }
-
-  @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+  Widget _buildNavigationBar() => AppBottomNavigation(
+    selectedIndex: _currentIndex,
+    onSelected: (index) => setState(() => _currentIndex = index),
+  );
 }
