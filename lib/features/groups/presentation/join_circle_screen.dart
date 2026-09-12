@@ -5,6 +5,7 @@ import '../../../core/domain/invite_code_policy.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_text_form_field.dart';
 import '../../../core/widgets/light_ui.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/circle_invite.dart';
 import '../../../models/circle_join_request.dart';
 import '../../../services/circle_join_service.dart';
@@ -111,6 +112,7 @@ class _JoinCircleScreenState extends State<JoinCircleScreen> {
     return LightPage(
       title: 'Join Family Circle',
       subtitle: _submission?.circleName,
+      actions: const [NotificationBellButton()],
       child: pendingCircleId == null
           ? (_preview == null ? _codeEntry() : _previewCard(_preview!))
           : _pendingRequest(pendingCircleId),
@@ -180,7 +182,7 @@ class _JoinCircleScreenState extends State<JoinCircleScreen> {
               style: TextStyle(
                 color: context.appHeading,
                 fontSize: 20,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 8),

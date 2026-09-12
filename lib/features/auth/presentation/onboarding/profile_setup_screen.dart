@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_text_form_field.dart';
+import '../../../../core/widgets/bounded_dropdown_form_field.dart';
 import '../../../../models/user_profile.dart';
 import '../../../../services/auth_service.dart';
 import '../../../../services/profile_service.dart';
@@ -132,7 +133,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 style: TextStyle(
                   color: titleColor,
                   fontSize: 23,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 6),
@@ -171,10 +172,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ),
               ],
               const SizedBox(height: 18),
-              DropdownButtonFormField<String>(
+              BoundedDropdownFormField<String>(
                 autovalidateMode: AutovalidateMode.onUnfocus,
                 initialValue: _relationship,
-                isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Relationship',
                   prefixIcon: Icon(Icons.favorite_outline_rounded),
@@ -211,7 +211,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         )
                       : const Text(
                           'Save & Continue',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                          style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                 ),
               ),

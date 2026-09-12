@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_typography.dart';
 import '../core/theme/theme_mode_controller.dart';
 import '../core/widgets/app_page_background.dart';
 import '../features/auth/presentation/auth_gate.dart';
@@ -40,7 +41,7 @@ class FamilyEmergencyApp extends StatelessWidget {
         brightness: Brightness.light,
         useMaterial3: true,
         primaryColor: kLightPrimary,
-        textTheme: GoogleFonts.manropeTextTheme(ThemeData.light().textTheme)
+        textTheme: AppTypography.textTheme(Brightness.light)
             .apply(bodyColor: kLightText, displayColor: kLightNavy),
         primaryTextTheme: GoogleFonts.manropeTextTheme(
           ThemeData.light().primaryTextTheme,
@@ -62,8 +63,8 @@ class FamilyEmergencyApp extends StatelessWidget {
           centerTitle: false,
           titleTextStyle: GoogleFonts.manrope(
             color: kLightNavy,
-            fontSize: 19,
-            fontWeight: FontWeight.w800,
+            fontSize: AppTypography.screenTitle,
+            fontWeight: FontWeight.w600,
           ),
         ),
         cardTheme: CardThemeData(
@@ -82,7 +83,7 @@ class FamilyEmergencyApp extends StatelessWidget {
         splashColor: kLightAccent.withValues(alpha: .16),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: _interactiveButtonStyle(Brightness.light).copyWith(
-            minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+            minimumSize: const WidgetStatePropertyAll(Size(52, 54)),
             elevation: const WidgetStatePropertyAll(0),
             backgroundColor: WidgetStateProperty.resolveWith(
               (states) => states.contains(WidgetState.disabled)
@@ -91,7 +92,10 @@ class FamilyEmergencyApp extends StatelessWidget {
             ),
             foregroundColor: const WidgetStatePropertyAll(Colors.white),
             textStyle: WidgetStatePropertyAll(
-              GoogleFonts.manrope(fontWeight: FontWeight.w800),
+              GoogleFonts.manrope(
+                fontSize: AppTypography.button,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             shape: WidgetStatePropertyAll(
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
@@ -100,11 +104,11 @@ class FamilyEmergencyApp extends StatelessWidget {
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: _interactiveButtonStyle(Brightness.light).copyWith(
-            minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+            minimumSize: const WidgetStatePropertyAll(Size(50, 50)),
             foregroundColor: const WidgetStatePropertyAll(kLightPrimary),
             side: const WidgetStatePropertyAll(BorderSide(color: kLightBorder)),
             textStyle: WidgetStatePropertyAll(
-              GoogleFonts.manrope(fontWeight: FontWeight.w700),
+              GoogleFonts.manrope(fontSize: 15, fontWeight: FontWeight.w600),
             ),
             shape: WidgetStatePropertyAll(
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
@@ -112,7 +116,12 @@ class FamilyEmergencyApp extends StatelessWidget {
           ),
         ),
         textButtonTheme: TextButtonThemeData(
-          style: _interactiveButtonStyle(Brightness.light),
+          style: _interactiveButtonStyle(Brightness.light).copyWith(
+            minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+            textStyle: WidgetStatePropertyAll(
+              GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ),
         ),
         iconButtonTheme: IconButtonThemeData(
           style: _interactiveButtonStyle(Brightness.light),
@@ -127,7 +136,7 @@ class FamilyEmergencyApp extends StatelessWidget {
               color: states.contains(WidgetState.selected)
                   ? Colors.white
                   : const Color(0xFF789088),
-              size: states.contains(WidgetState.selected) ? 25 : 22,
+              size: states.contains(WidgetState.selected) ? 26 : 24,
             ),
           ),
           labelTextStyle: WidgetStateProperty.resolveWith(
@@ -135,12 +144,27 @@ class FamilyEmergencyApp extends StatelessWidget {
               color: states.contains(WidgetState.selected)
                   ? kLightPrimary
                   : kLightMuted,
-              fontSize: 10,
+              fontSize: states.contains(WidgetState.selected) ? 13 : 12,
               fontWeight: states.contains(WidgetState.selected)
-                  ? FontWeight.w800
-                  : FontWeight.w600,
+                  ? FontWeight.w600
+                  : FontWeight.w500,
             ),
           ),
+        ),
+        tabBarTheme: TabBarThemeData(
+          labelColor: kLightPrimary,
+          unselectedLabelColor: kLightMuted,
+          labelStyle: GoogleFonts.manrope(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: GoogleFonts.manrope(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+          indicatorColor: kLightPrimary,
+          indicatorSize: TabBarIndicatorSize.tab,
+          dividerColor: Colors.transparent,
         ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
           backgroundColor: Colors.white,
@@ -155,6 +179,16 @@ class FamilyEmergencyApp extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
+          titleTextStyle: GoogleFonts.manrope(
+            color: kLightNavy,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+          contentTextStyle: GoogleFonts.manrope(
+            color: kLightText,
+            fontSize: 15,
+            fontWeight: FontWeight.w400,
+          ),
         ),
         snackBarTheme: SnackBarThemeData(
           behavior: SnackBarBehavior.floating,
@@ -167,15 +201,29 @@ class FamilyEmergencyApp extends StatelessWidget {
           fillColor: Colors.white,
           focusColor: kLightAccent.withValues(alpha: .06),
           hoverColor: kLightAccent.withValues(alpha: .05),
-          labelStyle: const TextStyle(color: kLightMuted, fontSize: 12),
-          hintStyle: const TextStyle(color: kLightMuted, fontSize: 12),
+          labelStyle: const TextStyle(
+            color: kLightMuted,
+            fontSize: AppTypography.fieldLabel,
+            fontWeight: FontWeight.w500,
+          ),
+          hintStyle: const TextStyle(
+            color: kLightMuted,
+            fontSize: AppTypography.fieldHint,
+            fontWeight: FontWeight.w400,
+          ),
+          errorStyle: const TextStyle(
+            fontSize: AppTypography.error,
+            fontWeight: FontWeight.w400,
+          ),
+          prefixIconColor: kLightMuted,
+          suffixIconColor: kLightMuted,
           floatingLabelStyle: const TextStyle(
             color: kLightPrimary,
             fontWeight: FontWeight.w700,
           ),
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 15,
+            horizontal: 16,
+            vertical: 16,
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -199,11 +247,10 @@ class FamilyEmergencyApp extends StatelessWidget {
         brightness: Brightness.dark,
         useMaterial3: true,
         primaryColor: kEmerald,
-        textTheme: GoogleFonts.manropeTextTheme(ThemeData.dark().textTheme)
-            .apply(
-              bodyColor: const Color(0xFFF8FAFC),
-              displayColor: const Color(0xFFF8FAFC),
-            ),
+        textTheme: AppTypography.textTheme(Brightness.dark).apply(
+          bodyColor: const Color(0xFFF8FAFC),
+          displayColor: const Color(0xFFF8FAFC),
+        ),
         primaryTextTheme: GoogleFonts.manropeTextTheme(
           ThemeData.dark().primaryTextTheme,
         ),
@@ -227,8 +274,8 @@ class FamilyEmergencyApp extends StatelessWidget {
           scrolledUnderElevation: 0,
           centerTitle: false,
           titleTextStyle: GoogleFonts.manrope(
-            fontSize: 19,
-            fontWeight: FontWeight.w800,
+            fontSize: AppTypography.screenTitle,
+            fontWeight: FontWeight.w600,
             color: Colors.white,
           ),
         ),
@@ -248,6 +295,16 @@ class FamilyEmergencyApp extends StatelessWidget {
           surfaceTintColor: Colors.transparent,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
+          ),
+          titleTextStyle: GoogleFonts.manrope(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+          contentTextStyle: GoogleFonts.manrope(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w400,
           ),
         ),
         bottomSheetTheme: const BottomSheetThemeData(
@@ -272,7 +329,7 @@ class FamilyEmergencyApp extends StatelessWidget {
         splashColor: kEmerald.withValues(alpha: .20),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: _interactiveButtonStyle(Brightness.dark).copyWith(
-            minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+            minimumSize: const WidgetStatePropertyAll(Size(52, 54)),
             elevation: const WidgetStatePropertyAll(0),
             backgroundColor: WidgetStateProperty.resolveWith(
               (states) => states.contains(WidgetState.disabled)
@@ -285,7 +342,10 @@ class FamilyEmergencyApp extends StatelessWidget {
                   : Colors.white,
             ),
             textStyle: WidgetStatePropertyAll(
-              GoogleFonts.manrope(fontWeight: FontWeight.w800),
+              GoogleFonts.manrope(
+                fontSize: AppTypography.button,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             shape: WidgetStatePropertyAll(
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
@@ -294,7 +354,7 @@ class FamilyEmergencyApp extends StatelessWidget {
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: _interactiveButtonStyle(Brightness.dark).copyWith(
-            minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+            minimumSize: const WidgetStatePropertyAll(Size(50, 50)),
             foregroundColor: WidgetStateProperty.resolveWith(
               (states) =>
                   states.contains(WidgetState.disabled) ? kDarkMuted : kEmerald,
@@ -308,21 +368,53 @@ class FamilyEmergencyApp extends StatelessWidget {
           ),
         ),
         textButtonTheme: TextButtonThemeData(
-          style: _interactiveButtonStyle(Brightness.dark),
+          style: _interactiveButtonStyle(Brightness.dark).copyWith(
+            minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+            textStyle: WidgetStatePropertyAll(
+              GoogleFonts.manrope(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ),
         ),
         iconButtonTheme: IconButtonThemeData(
           style: _interactiveButtonStyle(Brightness.dark),
+        ),
+        tabBarTheme: TabBarThemeData(
+          labelColor: kEmerald,
+          unselectedLabelColor: kDarkMuted,
+          labelStyle: GoogleFonts.manrope(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: GoogleFonts.manrope(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+          indicatorColor: kEmerald,
+          indicatorSize: TabBarIndicatorSize.tab,
+          dividerColor: Colors.transparent,
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: kDarkCard,
           focusColor: kEmerald.withValues(alpha: .12),
           hoverColor: kEmerald.withValues(alpha: .10),
-          hintStyle: const TextStyle(color: kDarkMuted),
-          labelStyle: const TextStyle(color: kDarkMuted),
+          hintStyle: const TextStyle(
+            color: kDarkMuted,
+            fontSize: AppTypography.fieldHint,
+            fontWeight: FontWeight.w400,
+          ),
+          labelStyle: const TextStyle(
+            color: kDarkMuted,
+            fontSize: AppTypography.fieldLabel,
+            fontWeight: FontWeight.w500,
+          ),
+          errorStyle: const TextStyle(
+            fontSize: AppTypography.error,
+            fontWeight: FontWeight.w400,
+          ),
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 15,
+            horizontal: 16,
+            vertical: 16,
           ),
           floatingLabelStyle: const TextStyle(
             color: kEmerald,

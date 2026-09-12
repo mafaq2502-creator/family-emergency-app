@@ -6,6 +6,8 @@ import '../../../models/app_notification.dart';
 import '../../../models/family_group.dart';
 import '../../../services/app_notification_service.dart';
 import '../../../core/widgets/light_ui.dart';
+import '../../../core/widgets/bounded_dropdown_form_field.dart';
+import 'notification_bell_button.dart';
 
 class NotificationCenterScreen extends StatefulWidget {
   const NotificationCenterScreen({super.key, required this.groups});
@@ -51,6 +53,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       appBar: AppBar(
         title: const Text('Notifications'),
         actions: [
+          NotificationBellButton(groups: widget.groups),
           TextButton(
             onPressed: () => _markAllRead(user),
             child: const Text('Mark all read'),
@@ -78,9 +81,8 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                 ),
                 if (widget.groups.isNotEmpty) ...[
                   const SizedBox(height: 9),
-                  DropdownButtonFormField<String?>(
+                  BoundedDropdownFormField<String?>(
                     initialValue: _groupId,
-                    isExpanded: true,
                     decoration: const InputDecoration(
                       prefixIcon: Icon(Icons.groups_rounded),
                       labelText: 'Family Circle',
@@ -174,7 +176,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                           style: TextStyle(
                             fontWeight: item.isRead
                                 ? FontWeight.w500
-                                : FontWeight.w800,
+                                : FontWeight.w600,
                           ),
                         ),
                         subtitle: Text(
@@ -216,8 +218,8 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
           label,
           style: TextStyle(
             color: selected ? Colors.white : context.appMuted,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),

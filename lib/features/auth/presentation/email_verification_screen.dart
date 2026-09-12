@@ -39,8 +39,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
   bool _messageIsError = false;
 
   bool get _testingBypassAllowed =>
-      widget.allowTestingBypass ??
-      EmailVerificationPolicy.autoVerifyForTesting;
+      widget.allowTestingBypass ?? EmailVerificationPolicy.autoVerifyForTesting;
 
   @override
   void initState() {
@@ -162,7 +161,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
                       style: TextStyle(
                         color: context.appHeading,
                         fontSize: 22,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -177,7 +176,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: context.appHeading,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 12),

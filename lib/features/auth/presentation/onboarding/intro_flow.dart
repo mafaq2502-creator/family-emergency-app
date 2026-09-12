@@ -117,7 +117,7 @@ class _IntroPage extends StatelessWidget {
                   color: context.appHeading,
                   fontSize: 28,
                   height: 1.06,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 12),

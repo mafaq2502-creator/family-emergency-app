@@ -40,11 +40,11 @@ class MemberNotificationSettingsEditor extends StatelessWidget {
         const SizedBox(height: 10),
         Text(
           'Member Notifications',
-          style: TextStyle(fontWeight: FontWeight.w800, color: title),
+          style: TextStyle(fontWeight: FontWeight.w600, color: title),
         ),
         Text(
           'Choose alerts for this member only.',
-          style: TextStyle(fontSize: 11, color: muted),
+          style: TextStyle(fontSize: 13, color: muted),
         ),
         _toggle(
           Icons.event_busy_rounded,

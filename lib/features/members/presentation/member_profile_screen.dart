@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/bounded_dropdown_form_field.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/family_member.dart';
 import '../../progress/presentation/progress_detail_screens.dart';
 import 'member_notification_settings_screen.dart';
@@ -24,7 +26,10 @@ class MemberProfileScreen extends StatelessWidget {
     final muted = isDark ? kDarkMuted : kLightMuted;
     return Scaffold(
       backgroundColor: isDark ? kDarkBackground : kLightBackground,
-      appBar: AppBar(title: const Text('Member Profile')),
+      appBar: AppBar(
+        title: const Text('Member Profile'),
+        actions: const [NotificationBellButton()],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
@@ -36,7 +41,7 @@ class MemberProfileScreen extends StatelessWidget {
                 member.name.isEmpty ? '?' : member.name[0].toUpperCase(),
                 style: const TextStyle(
                   fontSize: 32,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                   color: kEmerald,
                 ),
               ),
@@ -48,7 +53,7 @@ class MemberProfileScreen extends StatelessWidget {
               member.name,
               style: TextStyle(
                 fontSize: 22,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
                 color: titleColor,
               ),
             ),
@@ -196,7 +201,7 @@ class MemberProfileScreen extends StatelessWidget {
             children: [
               const Text(
                 'Edit member details',
-                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 16),
               TextField(
@@ -210,10 +215,9 @@ class MemberProfileScreen extends StatelessWidget {
                 decoration: const InputDecoration(labelText: 'Email'),
               ),
               const SizedBox(height: 18),
-              DropdownButtonFormField<String>(
+              BoundedDropdownFormField<String>(
                 autovalidateMode: AutovalidateMode.onUnfocus,
                 initialValue: relation,
-                isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Relationship'),
                 items: relations
                     .map(

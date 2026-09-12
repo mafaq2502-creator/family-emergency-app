@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../models/family_member.dart';
 import '../../../models/notification_settings.dart';
 import 'member_notification_settings_editor.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../core/widgets/light_ui.dart';
 
 class MemberNotificationSettingsScreen extends StatefulWidget {
@@ -57,7 +58,10 @@ class _MemberNotificationSettingsScreenState
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text('${widget.member.name} Alerts')),
+    appBar: AppBar(
+      title: Text('${widget.member.name} Alerts'),
+      actions: const [NotificationBellButton()],
+    ),
     body: ListView(
       padding: const EdgeInsets.all(24),
       children: [

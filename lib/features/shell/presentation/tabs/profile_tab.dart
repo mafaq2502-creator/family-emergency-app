@@ -23,35 +23,69 @@ extension _ProfileTab on _HomeScreenState {
                       Text(
                         'My Profile',
                         style: TextStyle(
-                          fontSize: 23,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
                           color: titleColor,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Manage your account information.',
-                        style: TextStyle(fontSize: 12, color: mutedColor),
+                        style: TextStyle(fontSize: 14, color: mutedColor),
                       ),
                     ],
                   ),
                 ),
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: context.appSuccessSurface,
-                  foregroundImage:
-                      _profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty
-                      ? NetworkImage(_profilePhotoUrl!)
-                      : null,
-                  child: Text(
-                    _profileNameController.text.isEmpty
-                        ? '?'
-                        : _profileNameController.text[0].toUpperCase(),
-                    style: TextStyle(
-                      color: context.appPrimary,
-                      fontWeight: FontWeight.w800,
+                _notificationBell(),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: context.appSuccessSurface,
+                      foregroundImage: ProfileImageData.provider(
+                        _profilePhotoUrl,
+                      ),
+                      child: Text(
+                        _profileNameController.text.isEmpty
+                            ? '?'
+                            : _profileNameController.text[0].toUpperCase(),
+                        style: TextStyle(
+                          color: context.appPrimary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                  ),
+                    Positioned(
+                      right: -12,
+                      bottom: -12,
+                      child: IconButton.filled(
+                        tooltip: _profilePhotoUrl == null
+                            ? 'Add profile image'
+                            : 'Edit profile image',
+                        onPressed: _isSavingProfilePhoto
+                            ? null
+                            : _pickProfilePhoto,
+                        iconSize: 18,
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                          backgroundColor: context.appPrimary,
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: _isSavingProfilePhoto
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.camera_alt_rounded),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -105,21 +139,6 @@ extension _ProfileTab on _HomeScreenState {
               plan: true,
               onTap: _openPlanTab,
             ),
-            if (_selectedGroup != null) ...[
-              const SizedBox(height: 7),
-              _profileRow(
-                icon: Icons.groups_rounded,
-                iconColor: kEmerald,
-                label: _selectedGroup!.canManage
-                    ? 'Circle Settings'
-                    : 'Circle Details',
-                value: _selectedGroup!.name,
-                isDark: isDark,
-                onTap: _selectedGroup!.canManage
-                    ? _openGroupSettings
-                    : () => _openGroupHome(_selectedGroup!),
-              ),
-            ],
             const SizedBox(height: 7),
             _profileRow(
               icon: Icons.notifications_active_rounded,
@@ -141,20 +160,6 @@ extension _ProfileTab on _HomeScreenState {
                 );
                 if (saved == true && context.mounted) _loadProfile();
               },
-            ),
-            const SizedBox(height: 7),
-            _profileRow(
-              icon: Icons.manage_accounts_rounded,
-              iconColor: const Color(0xFF7C3AED),
-              label: 'Security',
-              value: 'Password, email and current session',
-              isDark: isDark,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const ProfileSettingsScreen(),
-                ),
-              ),
             ),
             const SizedBox(height: 7),
             _profileRow(
@@ -185,7 +190,7 @@ extension _ProfileTab on _HomeScreenState {
             const SizedBox(height: 22),
             SizedBox(
               width: double.infinity,
-              height: 45,
+              height: 54,
               child: ElevatedButton.icon(
                 onPressed: _logout,
                 icon: const Icon(Icons.logout_rounded),
@@ -219,14 +224,14 @@ extension _ProfileTab on _HomeScreenState {
     bool locked = false,
     bool plan = false,
     VoidCallback? onTap,
-    double height = 54,
+    double height = 68,
     bool showTrailing = true,
   }) {
     final titleColor = isDark ? Colors.white : kLightNavy;
     final mutedColor = isDark ? Colors.white60 : kLightMuted;
     final row = Container(
       height: height,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: isDark ? kDarkCard : kLightSurface,
         borderRadius: BorderRadius.circular(12),
@@ -246,13 +251,13 @@ extension _ProfileTab on _HomeScreenState {
       child: Row(
         children: [
           Container(
-            width: 30,
-            height: 30,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: iconColor.withValues(alpha: .16),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: iconColor, size: 18),
+            child: Icon(icon, color: iconColor, size: 22),
           ),
           const SizedBox(width: 11),
           Expanded(
@@ -263,7 +268,7 @@ extension _ProfileTab on _HomeScreenState {
                 Text(
                   label,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 15,
                     height: 1,
                     fontWeight: FontWeight.bold,
                     color: titleColor,
@@ -286,7 +291,7 @@ extension _ProfileTab on _HomeScreenState {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 13,
                               height: 1,
                               color: mutedColor,
                             ),

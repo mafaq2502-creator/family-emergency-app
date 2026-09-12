@@ -188,6 +188,12 @@ class ProfileService {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+  Future<void> saveProfilePhoto(User user, String photoUrl) =>
+      _documentFor(user).set({
+        'photoUrl': photoUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
   Future<void> recordDailyCheckIn(
     User user, {
     required String timeZone,

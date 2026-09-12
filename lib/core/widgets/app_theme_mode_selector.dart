@@ -63,7 +63,7 @@ class AppThemeModeSelector extends StatelessWidget {
                         Text(
                           choice.$2,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: selected ? Colors.white : enabledText,
                           ),

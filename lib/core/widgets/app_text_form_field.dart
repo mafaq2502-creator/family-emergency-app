@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_typography.dart';
 
 class AppTextFormField extends StatelessWidget {
   const AppTextFormField({
@@ -50,31 +51,40 @@ class AppTextFormField extends StatelessWidget {
       autofillHints: autofillHints,
       style: TextStyle(
         color: isDark ? Colors.white : kLightText,
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
+        fontSize: AppTypography.fieldText,
+        fontWeight: FontWeight.w400,
       ),
       decoration: InputDecoration(
         labelText: label,
         hintText: placeholder ?? label,
         floatingLabelBehavior: FloatingLabelBehavior.auto,
-        labelStyle: TextStyle(color: muted, fontSize: 12),
+        constraints: const BoxConstraints(minHeight: 56),
+        labelStyle: TextStyle(
+          color: muted,
+          fontSize: AppTypography.fieldLabel,
+          fontWeight: FontWeight.w500,
+        ),
         floatingLabelStyle: const TextStyle(
           color: kLightPrimary,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
+          fontSize: AppTypography.fieldLabel,
+          fontWeight: FontWeight.w500,
         ),
-        hintStyle: TextStyle(color: muted.withValues(alpha: .78), fontSize: 12),
+        hintStyle: TextStyle(
+          color: muted.withValues(alpha: .86),
+          fontSize: AppTypography.fieldHint,
+          fontWeight: FontWeight.w400,
+        ),
         prefixIcon:
             prefix ??
             (prefixIcon == null
                 ? null
-                : Icon(prefixIcon, color: muted, size: 20)),
+                : Icon(prefixIcon, color: muted, size: 23)),
         suffixIcon: suffixIcon,
         filled: true,
         fillColor: isDark ? kDarkCard : Colors.white,
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 15,
+          horizontal: 16,
+          vertical: 16,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(11),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/light_ui.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 
 const progressPeriods = ['Today', 'Yesterday', 'Last week', 'Last month'];
 
@@ -27,8 +28,8 @@ class ProgressPeriodSelector extends StatelessWidget {
             selectedColor: context.appPrimary,
             labelStyle: TextStyle(
               color: period == value ? Colors.white : context.appMuted,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
             side: BorderSide.none,
           ),
@@ -52,6 +53,7 @@ class _ScreenTimeDetailScreenState extends State<ScreenTimeDetailScreen> {
   Widget build(BuildContext context) => LightPage(
     title: 'Screen Time',
     subtitle: widget.memberName,
+    actions: const [NotificationBellButton()],
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -109,6 +111,7 @@ class _CheckInHistoryScreenState extends State<CheckInHistoryScreen> {
     return LightPage(
       title: 'Check-In History',
       subtitle: widget.memberName,
+      actions: const [NotificationBellButton()],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -129,14 +132,14 @@ class _CheckInHistoryScreenState extends State<CheckInHistoryScreen> {
                       children: [
                         const Text(
                           'Latest check-in',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                          style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                         Text(
                           MaterialLocalizations.of(context)
                               .formatTimeOfDay(TimeOfDay.fromDateTime(checkIn)),
                           style: TextStyle(
                             color: context.appMuted,
-                            fontSize: 11,
+                            fontSize: 13,
                           ),
                         ),
                       ],
@@ -158,7 +161,7 @@ class _CheckInHistoryScreenState extends State<CheckInHistoryScreen> {
           Center(
             child: Text(
               'Times are displayed in the device’s local timezone.',
-              style: TextStyle(color: context.appMuted, fontSize: 11),
+              style: TextStyle(color: context.appMuted, fontSize: 13),
             ),
           ),
         ],
@@ -180,6 +183,7 @@ class ProgressDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) => LightPage(
     title: 'Progress Details',
     subtitle: memberName,
+    actions: const [NotificationBellButton()],
     child: Column(
       children: [
         LightSettingRow(

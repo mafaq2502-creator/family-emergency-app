@@ -9,6 +9,7 @@ import '../../../models/family_group.dart';
 import '../../../services/group_service.dart';
 import '../../../services/device_service.dart';
 import '../../members/presentation/circle_member_detail_screen.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 import 'emergency_events_screen.dart';
 import 'group_settings_screen.dart';
 import 'join_requests_screen.dart';
@@ -88,6 +89,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
         appBar: AppBar(
           title: Text(group.name),
           actions: [
+            const NotificationBellButton(),
             IconButton(
               icon: const Icon(Icons.warning_amber_rounded),
               tooltip: 'SOS activity',
@@ -145,7 +147,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                                   style: TextStyle(
                                     color: context.appHeading,
                                     fontSize: 18,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 const SizedBox(height: 5),
@@ -283,7 +285,10 @@ class _UnavailableCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Family Circle')),
+    appBar: AppBar(
+      title: const Text('Family Circle'),
+      actions: const [NotificationBellButton()],
+    ),
     body: LightStateView(
       icon: Icons.group_off_rounded,
       title: title,

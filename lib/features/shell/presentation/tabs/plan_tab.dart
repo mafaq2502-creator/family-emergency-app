@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 
 class PlanSelectionContent extends StatelessWidget {
-  const PlanSelectionContent({super.key});
+  const PlanSelectionContent({super.key, this.action});
+
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -14,18 +16,25 @@ class PlanSelectionContent extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
         children: [
-          Text(
-            'Choose Your Plan',
-            style: TextStyle(
-              fontSize: 23,
-              fontWeight: FontWeight.bold,
-              color: titleColor,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Choose Your Plan',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: titleColor,
+                  ),
+                ),
+              ),
+              ?action,
+            ],
           ),
           const SizedBox(height: 4),
           Text(
             'Get more features to keep your family\nextra safe.',
-            style: TextStyle(fontSize: 12, color: mutedColor),
+            style: TextStyle(fontSize: 14, color: mutedColor),
           ),
           const SizedBox(height: 12),
           IntrinsicHeight(
@@ -111,7 +120,7 @@ class PlanSelectionContent extends StatelessWidget {
           Text(
             '$title Plan',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: isDark ? Colors.white : kLightNavy,
             ),
@@ -120,7 +129,7 @@ class PlanSelectionContent extends StatelessWidget {
           Text(
             subtitle,
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 13,
               height: 1.12,
               color: isDark ? Colors.white60 : kLightMuted,
             ),
@@ -142,7 +151,7 @@ class PlanSelectionContent extends StatelessWidget {
                 TextSpan(
                   text: ' / month',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 13,
                     color: isDark ? Colors.white60 : kLightMuted,
                   ),
                 ),
@@ -162,7 +171,7 @@ class PlanSelectionContent extends StatelessWidget {
                     child: Text(
                       feature,
                       style: TextStyle(
-                        fontSize: 9.5,
+                        fontSize: 13,
                         height: 1.1,
                         color: isDark
                             ? Colors.white70
@@ -205,7 +214,7 @@ class PlanSelectionContent extends StatelessWidget {
               child: Text(
                 selected ? 'Current Plan' : 'Upgrade Now',
                 style: const TextStyle(
-                  fontSize: 10,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -224,7 +233,7 @@ class PlanSelectionContent extends StatelessWidget {
                 ),
                 child: const Text(
                   'Manage Subscription',
-                  style: TextStyle(fontSize: 9),
+                  style: TextStyle(fontSize: 14),
                 ),
               ),
             ),

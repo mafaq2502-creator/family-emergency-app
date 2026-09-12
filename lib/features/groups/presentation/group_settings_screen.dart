@@ -5,6 +5,7 @@ import '../../../core/domain/circle_error_mapper.dart';
 import '../../../core/domain/circle_policies.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/light_ui.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/circle_membership.dart';
 import '../../../models/family_group.dart';
 import '../../../services/group_service.dart';
@@ -231,6 +232,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   Widget _settings(FamilyGroup group, String viewerId) => LightPage(
     title: 'Circle Settings',
     subtitle: group.name,
+    actions: const [NotificationBellButton()],
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -353,7 +355,10 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   );
 
   Widget _unavailable(String message) => Scaffold(
-    appBar: AppBar(title: const Text('Circle Settings')),
+    appBar: AppBar(
+      title: const Text('Circle Settings'),
+      actions: const [NotificationBellButton()],
+    ),
     body: LightStateView(
       icon: Icons.lock_outline_rounded,
       title: 'Settings unavailable',

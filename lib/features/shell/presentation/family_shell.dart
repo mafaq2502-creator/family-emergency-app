@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'dart:async';
 
@@ -10,6 +11,8 @@ import '../../../core/domain/circle_policies.dart';
 import '../../../core/theme/theme_mode_controller.dart';
 import '../../../core/widgets/light_ui.dart';
 import '../../../core/widgets/app_theme_mode_selector.dart';
+import '../../../core/widgets/profile_image.dart';
+import '../../../core/widgets/bounded_dropdown_form_field.dart';
 import '../../../models/family_member.dart';
 import '../../../models/family_group.dart';
 import '../../../models/circle_role.dart';
@@ -88,6 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _pendingJoinCircleId;
   bool _isProfileLoading = true;
   bool _isSavingProfile = false;
+  bool _isSavingProfilePhoto = false;
   bool _isProfileDirty = false;
   DateTime? _lastDailyCheckIn;
   bool _isMarkingAlive = false;
@@ -282,8 +286,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _openGroupSettings() {
-    final group = _selectedGroup;
+  void _openGroupSettings([FamilyGroup? targetGroup]) {
+    final group = targetGroup ?? _selectedGroup;
     if (group == null || !group.canManage) return;
     Navigator.push(
       context,
@@ -389,6 +393,55 @@ class _HomeScreenState extends State<HomeScreen> {
         _profileRole != _initialProfileRole;
     if (mounted && changed != _isProfileDirty) {
       setState(() => _isProfileDirty = changed);
+    }
+  }
+
+  Future<void> _pickProfilePhoto() async {
+    if (_isSavingProfilePhoto) return;
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 65,
+      );
+      if (picked == null || !mounted) return;
+      final bytes = await picked.readAsBytes();
+      if (bytes.length > ProfileImageData.maxBytes) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please choose a smaller profile image.'),
+              backgroundColor: kEmergency,
+            ),
+          );
+        }
+        return;
+      }
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      setState(() => _isSavingProfilePhoto = true);
+      final photo = ProfileImageData.encodeJpeg(bytes);
+      await _profileService.saveProfilePhoto(user, photo);
+      if (!mounted) return;
+      setState(() => _profilePhotoUrl = photo);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile image updated.'),
+          backgroundColor: kEmerald,
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile image could not be updated.'),
+            backgroundColor: kEmergency,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingProfilePhoto = false);
     }
   }
 
@@ -605,7 +658,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildFamilyTab(),
             _buildLocationTab(),
             _buildHomeTab(),
-            const PlanSelectionContent(),
+            PlanSelectionContent(action: _notificationBell()),
             _buildProfileTab(),
           ],
         ),
@@ -825,14 +878,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       width: 62,
                       height: 62,
                       decoration: BoxDecoration(
-                        gradient: isDark
-                            ? null
-                            : const LinearGradient(
+                        gradient: _currentIndex == 2 && !isDark
+                            ? const LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [kLightAccent, kLightPrimary],
-                              ),
-                        color: isDark ? kEmerald : null,
+                              )
+                            : null,
+                        color: _currentIndex == 2
+                            ? (isDark ? kEmerald : null)
+                            : (isDark ? kDarkCardElevated : kLightSurfaceMuted),
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: isDark ? kDarkBackground : kLightBackground,
@@ -847,9 +902,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.home_rounded,
-                        color: Colors.white,
+                        color: _currentIndex == 2
+                            ? Colors.white
+                            : (isDark ? kDarkMuted : kLightMuted),
                         size: 30,
                       ),
                     ),
@@ -860,8 +917,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: _currentIndex == 2
                             ? (isDark ? kEmerald : kLightPrimary)
                             : (isDark ? Colors.grey : kLightMuted),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                        fontSize: _currentIndex == 2 ? 13 : 12,
+                        fontWeight: _currentIndex == 2
+                            ? FontWeight.w600
+                            : FontWeight.w500,
                       ),
                     ),
                   ],
@@ -887,14 +946,28 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: selected ? activeColor : inactiveColor),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: selected
+                    ? activeColor.withValues(alpha: .13)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: selected ? activeColor : inactiveColor,
+                size: 24,
+              ),
+            ),
             const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
                 color: selected ? activeColor : inactiveColor,
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                fontSize: selected ? 13 : 12,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
           ],
@@ -996,13 +1069,13 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           Text('$title Plan', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : kNavy)),
           const SizedBox(height: 4),
-          Text(subtitle, style: TextStyle(fontSize: 10, height: 1.12, color: isDark ? Colors.white60 : const Color(0xFF64748B))),
+          Text(subtitle, style: TextStyle(fontSize: 13, height: 1.12, color: isDark ? Colors.white60 : const Color(0xFF64748B))),
           const SizedBox(height: 10),
-          RichText(text: TextSpan(children: [TextSpan(text: price, style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold, color: isDark ? Colors.white : kNavy)), TextSpan(text: ' / month', style: TextStyle(fontSize: 10, color: isDark ? Colors.white60 : const Color(0xFF52647B)))])),
+          RichText(text: TextSpan(children: [TextSpan(text: price, style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold, color: isDark ? Colors.white : kNavy)), TextSpan(text: ' / month', style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : const Color(0xFF52647B)))])),
           const SizedBox(height: 10),
           for (final feature in features) Padding(
             padding: const EdgeInsets.only(bottom: 5),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [const Icon(Icons.check, size: 15, color: kEmerald), const SizedBox(width: 4), Expanded(child: Text(feature, style: TextStyle(fontSize: 9.5, height: 1.1, color: isDark ? Colors.white70 : const Color(0xFF314761))))]),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [const Icon(Icons.check, size: 15, color: kEmerald), const SizedBox(width: 4), Expanded(child: Text(feature, style: TextStyle(fontSize: 13, height: 1.1, color: isDark ? Colors.white70 : const Color(0xFF314761))))]),
           ),
           const Spacer(),
           SizedBox(
@@ -1011,7 +1084,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ElevatedButton(
               onPressed: selected ? null : () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Premium upgrade will be available soon.'))),
               style: ElevatedButton.styleFrom(backgroundColor: selected ? const Color(0xFFF1F3F4) : kEmerald, foregroundColor: selected ? const Color(0xFF64748B) : Colors.white, disabledBackgroundColor: const Color(0xFFF1F3F4), disabledForegroundColor: const Color(0xFF64748B), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9))),
-              child: Text(selected ? 'Current Plan' : 'Upgrade Now', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+              child: Text(selected ? 'Current Plan' : 'Upgrade Now', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -1046,7 +1119,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
             const SizedBox(height: 15),
-            _legacyProfileRow(icon: Icons.person_rounded, iconColor: const Color(0xFF778BA0), label: 'User Name', value: _profileNameController.text, isDark: isDark, editable: TextField(controller: _profileNameController, style: TextStyle(fontSize: 11, color: mutedColor), decoration: const InputDecoration(isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.zero))),
+            _legacyProfileRow(icon: Icons.person_rounded, iconColor: const Color(0xFF778BA0), label: 'User Name', value: _profileNameController.text, isDark: isDark, editable: TextField(controller: _profileNameController, style: TextStyle(fontSize: 13, color: mutedColor), decoration: const InputDecoration(isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.zero))),
             const SizedBox(height: 7),
             _profileRow(icon: Icons.mail_rounded, iconColor: const Color(0xFF778BA0), label: 'Email', value: _profileEmail.isEmpty ? 'Not available' : _profileEmail, isDark: isDark, locked: true),
             const SizedBox(height: 7),
@@ -1069,7 +1142,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemHeight: kMinInteractiveDimension,
                     icon: Icon(Icons.keyboard_arrow_down_rounded, color: mutedColor, size: 18),
                     dropdownColor: isDark ? kDarkCard : Colors.white,
-                    style: TextStyle(fontSize: 11, color: mutedColor),
+                    style: TextStyle(fontSize: 13, color: mutedColor),
                     items: _roles.map((role) => DropdownMenuItem(value: role, child: Text(role))).toList(),
                     onChanged: _changeProfileRole,
                   ),
@@ -1121,7 +1194,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(children: [
         Container(width: 30, height: 30, decoration: BoxDecoration(color: iconColor.withValues(alpha: .16), shape: BoxShape.circle), child: Icon(icon, color: iconColor, size: 18)),
         const SizedBox(width: 11),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(label, style: TextStyle(fontSize: 11, height: 1, fontWeight: FontWeight.bold, color: titleColor)), const SizedBox(height: 5), editable ?? Row(children: [if (plan) const Icon(Icons.workspace_premium_rounded, size: 12, color: Color(0xFFFFAE00)), if (plan) const SizedBox(width: 3), Text(value, style: TextStyle(fontSize: 11, height: 1, color: mutedColor))])])),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(label, style: TextStyle(fontSize: 13, height: 1, fontWeight: FontWeight.bold, color: titleColor)), const SizedBox(height: 5), editable ?? Row(children: [if (plan) const Icon(Icons.workspace_premium_rounded, size: 12, color: Color(0xFFFFAE00)), if (plan) const SizedBox(width: 3), Text(value, style: TextStyle(fontSize: 13, height: 1, color: mutedColor))])])),
         if (showTrailing) ...[const SizedBox(width: 7), Icon(locked ? Icons.lock_outline_rounded : Icons.chevron_right_rounded, color: mutedColor, size: 19)],
       ]),
     );
@@ -1147,7 +1220,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(children: [
                   Icon(choice.$3, size: 19, color: selected ? Colors.white : mutedText),
                   const SizedBox(height: 3),
-                  Text(choice.$2, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: selected ? Colors.white : enabledText)),
+                  Text(choice.$2, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: selected ? Colors.white : enabledText)),
                 ]),
               ),
             ),

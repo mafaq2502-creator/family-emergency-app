@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/light_ui.dart';
 import '../../../core/widgets/country_name_field.dart';
+import '../../../core/widgets/bounded_dropdown_form_field.dart';
 import '../../auth/domain/auth_validators.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
   const AccountSettingsScreen({
@@ -177,6 +179,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     child: LightPage(
       title: 'Account Settings',
       subtitle: 'Keep your personal details up to date',
+      actions: const [NotificationBellButton()],
       child: AbsorbPointer(
         absorbing: _saving,
         child: Form(
@@ -184,35 +187,18 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => setState(() => _tab = 0),
-                      child: Text(
-                        'Personal',
-                        style: TextStyle(
-                          fontWeight: _tab == 0
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => setState(() => _tab = 1),
-                      child: Text(
-                        'Address',
-                        style: TextStyle(
-                          fontWeight: _tab == 1
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: context.appSurfaceMuted,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    _accountTab('Personal', 0),
+                    _accountTab('Address', 1),
+                  ],
+                ),
               ),
               const SizedBox(height: 18),
               Offstage(
@@ -239,10 +225,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                       Icons.mail_outline_rounded,
                     ),
                     const SizedBox(height: 18),
-                    DropdownButtonFormField<String>(
+                    BoundedDropdownFormField<String>(
                       autovalidateMode: AutovalidateMode.onUnfocus,
                       initialValue: _relationship,
-                      isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Relationship',
                         hintText: 'Select your relationship',
@@ -334,7 +319,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 child: Text(
                   'Your email is linked to your account.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: context.appMuted, fontSize: 10),
+                  style: TextStyle(color: context.appMuted, fontSize: 13),
                 ),
               ),
             ],
@@ -355,4 +340,29 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           suffixIcon: const Icon(Icons.lock_outline_rounded),
         ),
       );
+
+  Widget _accountTab(String label, int index) {
+    final selected = _tab == index;
+    return Expanded(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        constraints: const BoxConstraints(minHeight: 48),
+        decoration: BoxDecoration(
+          color: selected ? context.appPrimary : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: TextButton(
+          onPressed: () => setState(() => _tab = index),
+          style: TextButton.styleFrom(
+            foregroundColor: selected ? Colors.white : context.appText,
+            textStyle: TextStyle(
+              fontSize: 15,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            ),
+          ),
+          child: Text(label),
+        ),
+      ),
+    );
+  }
 }

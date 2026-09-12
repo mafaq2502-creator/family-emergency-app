@@ -14,122 +14,123 @@ extension _HomeTab on _HomeScreenState {
             padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
             child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: viewport.maxHeight - 36),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Hello, ${_profileNameController.text.isEmpty ? 'Afaq' : _profileNameController.text}',
-                              style: TextStyle(
-                                fontSize: 25,
-                                height: 1,
-                                fontWeight: FontWeight.bold,
-                                color: titleColor,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Text(
-                                  'Your family is safe',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: mutedColor,
-                                  ),
+              child: IntrinsicHeight(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Hello, ${_profileNameController.text.isEmpty ? 'Afaq' : _profileNameController.text}',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  height: 1.15,
+                                  fontWeight: FontWeight.w600,
+                                  color: titleColor,
                                 ),
-                                const SizedBox(width: 5),
-                                const Icon(
-                                  Icons.favorite,
-                                  size: 15,
-                                  color: kEmergency,
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Your family is safe',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: mutedColor,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  const Icon(
+                                    Icons.favorite,
+                                    size: 15,
+                                    color: kEmergency,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _notificationBell(),
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(
+                                  Icons.groups_rounded,
+                                  color: isDark ? kEmerald : kLightPrimary,
+                                  size: 37,
+                                ),
+                                Positioned(
+                                  right: -2,
+                                  top: -2,
+                                  child: Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: kEmergency,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: isDark
+                                            ? const Color(0xFF101916)
+                                            : kLightBackground,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
                           ],
                         ),
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _notificationBell(),
-                          Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Icon(
-                                Icons.groups_rounded,
-                                color: isDark ? kEmerald : kLightPrimary,
-                                size: 37,
-                              ),
-                              Positioned(
-                                right: -2,
-                                top: -2,
-                                child: Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                    color: kEmergency,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: isDark
-                                          ? const Color(0xFF101916)
-                                          : kLightBackground,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-                  Text(
-                    'Your Groups',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: titleColor,
-                    ),
-                  ),
-                  if (_groups.isEmpty) ...[
-                    SizedBox(height: (viewport.maxHeight - 330).clamp(28, 220)),
-                    Center(
-                      child: Text(
-                        'No groups yet. Create one from Members.',
-                        style: TextStyle(fontSize: 12, color: mutedColor),
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    _homeActions(isDark, mutedColor),
-                    const SizedBox(height: 18),
-                  ] else ...[
-                    const SizedBox(height: 10),
-                    // A Wrap is deliberately used here instead of a nested GridView.
-                    // This tab lives inside a SingleChildScrollView; a nested viewport
-                    // can receive an unbounded height after authentication and crash.
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        for (final group in _groups)
-                          SizedBox(
-                            width: cardWidth,
-                            height: cardWidth / 1.25,
-                            child: _groupHomeCard(group, isDark),
-                          ),
                       ],
                     ),
-                    const SizedBox(height: 13),
+                    const SizedBox(height: 15),
+                    Text(
+                      'Your Groups',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: titleColor,
+                      ),
+                    ),
+                    if (_groups.isEmpty) ...[
+                      const SizedBox(height: 28),
+                      Center(
+                        child: Text(
+                          'No groups yet. Create one from Members.',
+                          style: TextStyle(fontSize: 14, color: mutedColor),
+                        ),
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 10),
+                      // A Wrap is deliberately used here instead of a nested GridView.
+                      // This tab lives inside a SingleChildScrollView; a nested viewport
+                      // can receive an unbounded height after authentication and crash.
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          for (final group in _groups)
+                            SizedBox(
+                              width: cardWidth,
+                              height: cardWidth / 1.25,
+                              child: _groupHomeCard(group, isDark),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+                    const Spacer(),
                     _homeActions(isDark, mutedColor),
+                    const SizedBox(height: 12),
                   ],
-                ],
+                ),
               ),
             ),
           );
@@ -145,7 +146,7 @@ extension _HomeTab on _HomeScreenState {
         children: [
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 56,
             child: OutlinedButton.icon(
               onPressed: _isMarkingAlive ? null : _markAlive,
               icon: _isMarkingAlive
@@ -165,7 +166,7 @@ extension _HomeTab on _HomeScreenState {
                     ),
               label: const Text(
                 "I'm Alive",
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: _checkedInToday
@@ -188,18 +189,18 @@ extension _HomeTab on _HomeScreenState {
           const SizedBox(height: 4),
           Text(
             _checkedInToday ? 'Checked in today' : 'Tap once each day',
-            style: TextStyle(fontSize: 10, color: mutedColor),
+            style: TextStyle(fontSize: 13, color: mutedColor),
           ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: 64,
             child: ElevatedButton.icon(
               onPressed: _startSOS,
               icon: const Icon(Icons.warning_amber_rounded, size: 19),
               label: const Text(
                 'Emergency',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kEmergency,
@@ -239,7 +240,7 @@ extension _HomeTab on _HomeScreenState {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
                 color: isDark ? Colors.white : kLightNavy,
               ),
             ),
@@ -247,7 +248,7 @@ extension _HomeTab on _HomeScreenState {
             Text(
               group.canManage ? 'Owner/Admin' : 'Member',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 13,
                 color: isDark ? Colors.white60 : kLightMuted,
               ),
             ),
@@ -342,7 +343,7 @@ extension _HomeTab on _HomeScreenState {
                   'Online',
                   style: TextStyle(
                     color: kEmerald,
-                    fontSize: 11,
+                    fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -359,7 +360,7 @@ extension _HomeTab on _HomeScreenState {
                 const SizedBox(width: 4),
                 Text(
                   battery,
-                  style: TextStyle(fontSize: 11, color: mutedColor),
+                  style: TextStyle(fontSize: 13, color: mutedColor),
                 ),
               ],
             ),
@@ -372,7 +373,7 @@ extension _HomeTab on _HomeScreenState {
                   child: Text(
                     'Lahore, PK',
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 10, color: mutedColor),
+                    style: TextStyle(fontSize: 13, color: mutedColor),
                   ),
                 ),
               ],

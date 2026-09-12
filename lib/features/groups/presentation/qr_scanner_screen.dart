@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../notifications/presentation/notification_bell_button.dart';
+
 import '../../../core/domain/invite_code_policy.dart';
 import '../../../core/theme/app_colors.dart';
 
@@ -50,6 +52,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       title: const Text('Scan Invitation QR'),
       backgroundColor: Colors.black,
       foregroundColor: Colors.white,
+      actions: const [NotificationBellButton()],
     ),
     body: SafeArea(
       child: Stack(

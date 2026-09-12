@@ -1,5 +1,55 @@
 # Family Emergency App — Codex Handoff
 
+## App-wide UI sizing, navigation actions, profile photo, and rebuilt APK (2026-09-12)
+
+Status: **COMPLETE in code, automated tests, responsive renders, and Android
+artifact.** This pass implements the nine requested UI corrections without
+enabling a paid Firebase product or changing the current subscription/business
+logic.
+
+- Added centralized typography and component sizing. Page titles use 24sp,
+  app-bar titles 21sp, body/input text 15–16sp, supporting/error text 13–14sp,
+  regular actions 52–56dp, and Emergency SOS 64dp/18sp.
+- Family Circles Owned/Joined tabs now use a solid theme-colored selected state,
+  white selected text, stronger weight, and a 48dp touch target.
+- Added Circle Settings at the top-right of Family Circles. It opens the selected
+  manageable Circle or the first owned/manageable Circle. The Circle Settings
+  entry was removed from Profile.
+- Added the notification bell throughout authenticated primary and detail
+  screens, placing it beside existing top-right actions.
+- Added profile-image add/edit from the Profile avatar using the device gallery.
+  Images are resized/compressed and capped at 256 KiB, then stored in the existing
+  Firestore user profile field as a data URL. This uses the existing Spark/free
+  Firestore setup and does not enable Firebase Storage or any paid Firebase
+  feature. Existing Google/network profile-photo URLs remain supported.
+- Moved the Home check-in and Emergency actions to the bottom of the available
+  content area. They remain scrollable when Circle cards need more vertical room.
+- Replaced app form dropdowns with a bounded dropdown component whose popup width
+  is constrained to its field width.
+- Removed the duplicate Security entry from Profile. Security Settings remains
+  inside Account Settings.
+- Account Settings Personal/Address tabs and bottom navigation destinations now
+  have clear theme-colored selected states.
+- Added the iOS photo-library usage description required by the gallery picker.
+- `flutter analyze`: **No issues found**.
+- Final full `flutter test`: **274 passed, 0 failed**.
+- Responsive verification covered 320×568 and 430×932, light/dark themes, and
+  text scales 1.0 and 1.5. Fresh 430px light/dark render captures were also
+  generated under `build/ui-verification/` and visually inspected.
+- Build command:
+  `flutter build apk --release --dart-define=AUTO_VERIFY_EMAIL_FOR_TESTING=true`.
+- APK: `build/app/outputs/flutter-apk/app-release.apk`.
+- Size: **75,162,230 bytes (71.68 MiB)**.
+- SHA-256:
+  `6CA61204F9E10AA74AA831E8F30EDE3F72D6B1741325CB22B31E113509B5CDA3`.
+- Android `apksigner` verification passed with APK Signature Scheme v2 and one
+  signer. The release configuration still uses the Android debug certificate,
+  so this is a testing APK.
+- No emulator/device installation was run. The remaining manual check is to open
+  gallery selection on a real Android device, save a photo, restart the app, and
+  confirm the stored avatar reloads. Flutter also reports the existing future
+  Kotlin Gradle Plugin migration warning; it does not affect this build.
+
 ## Testing verification flow, blur validation, and rebuilt APK (2026-09-12)
 
 Status: **COMPLETE.** The testing APK now keeps the verification screen visible

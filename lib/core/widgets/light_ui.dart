@@ -29,8 +29,8 @@ class LightPage extends StatelessWidget {
           Text(
             title,
             style: TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.w800,
+              fontSize: 21,
+              fontWeight: FontWeight.w600,
               color: context.appHeading,
             ),
           ),
@@ -39,7 +39,7 @@ class LightPage extends StatelessWidget {
               subtitle!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 10, color: context.appMuted),
+              style: TextStyle(fontSize: 14, color: context.appMuted),
             ),
         ],
       ),
@@ -112,8 +112,8 @@ class LightSectionTitle extends StatelessWidget {
             title,
             style: TextStyle(
               color: context.appHeading,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -154,8 +154,8 @@ class LightStatusChip extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: color,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -187,7 +187,7 @@ class LightAvatar extends StatelessWidget {
           style: TextStyle(
             color: context.appPrimary,
             fontSize: radius * .7,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -233,7 +233,7 @@ class LightSettingRow extends StatelessWidget {
     color: destructive ? context.appDangerSurface : null,
     child: ListTile(
       minLeadingWidth: 30,
-      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       leading: Container(
         width: 32,
         height: 32,
@@ -253,8 +253,8 @@ class LightSettingRow extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: destructive ? kEmergency : context.appHeading,
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: subtitle == null
@@ -263,7 +263,7 @@ class LightSettingRow extends StatelessWidget {
               subtitle!,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 10, color: context.appMuted),
+              style: TextStyle(fontSize: 13, color: context.appMuted),
             ),
       trailing:
           trailing ??
@@ -319,14 +319,14 @@ class LightStateView extends StatelessWidget {
             style: TextStyle(
               color: context.appHeading,
               fontSize: 17,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(color: context.appMuted, fontSize: 12),
+            style: TextStyle(color: context.appMuted, fontSize: 14),
           ),
           if (actionLabel != null && onAction != null) ...[
             const SizedBox(height: 18),

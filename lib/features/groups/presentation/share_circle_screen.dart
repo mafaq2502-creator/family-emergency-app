@@ -9,6 +9,7 @@ import '../../../core/domain/circle_error_mapper.dart';
 import '../../../core/domain/invite_code_policy.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/light_ui.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/circle_invite.dart';
 import '../../../models/family_group.dart';
 import '../../../services/circle_join_service.dart';
@@ -136,6 +137,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
     return LightPage(
       title: 'Invite Member',
       subtitle: widget.group.name,
+      actions: const [NotificationBellButton()],
       child: invite == null
           ? StreamBuilder<List<CircleInvite>>(
               stream: _service.watchInvites(widget.group.id),
@@ -223,7 +225,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
                 style: TextStyle(
                   color: context.appHeading,
                   fontSize: 16,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -242,7 +244,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
           'Expires ${MaterialLocalizations.of(context).formatMediumDate(invite.expiresAt.toLocal())} • '
           '${invite.useCount}/${invite.maxUses} approved',
           textAlign: TextAlign.center,
-          style: TextStyle(color: context.appMuted, fontSize: 11),
+          style: TextStyle(color: context.appMuted, fontSize: 13),
         ),
         const SizedBox(height: 16),
         SizedBox(
@@ -308,8 +310,8 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: selected ? Colors.white : context.appMuted,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -346,7 +348,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
                   ? 'Scan to preview this Circle and request approval.'
                   : 'This QR can no longer be used.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: context.appMuted, fontSize: 11),
+              style: TextStyle(color: context.appMuted, fontSize: 13),
             ),
           ],
         ),
@@ -382,7 +384,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
               color: context.appHeading,
               fontSize: 18,
               letterSpacing: 1.4,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 8),

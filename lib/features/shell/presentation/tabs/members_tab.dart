@@ -12,18 +12,31 @@ extension _MembersTab on _HomeScreenState {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
         children: [
-          Text(
-            'Family Circles',
-            style: TextStyle(
-              fontSize: 23,
-              fontWeight: FontWeight.bold,
-              color: titleColor,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  'Family Circles',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: titleColor,
+                  ),
+                ),
+              ),
+              _notificationBell(),
+              IconButton(
+                tooltip: 'Circle Settings',
+                onPressed: _openFamilyCircleSettings,
+                icon: Icon(Icons.settings_outlined, color: context.appPrimary),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(
             'Open a Circle to view its active registered members.',
-            style: TextStyle(fontSize: 12, color: mutedColor),
+            style: TextStyle(fontSize: 14, color: mutedColor),
           ),
           const SizedBox(height: 12),
           Container(
@@ -73,7 +86,8 @@ extension _MembersTab on _HomeScreenState {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: titleColor,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                           const SizedBox(height: 3),
@@ -81,7 +95,7 @@ extension _MembersTab on _HomeScreenState {
                             '${group.isOwner ? 'owner' : group.role.value} • ${group.memberCount} active ${group.memberCount == 1 ? 'member' : 'members'}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 10, color: mutedColor),
+                            style: TextStyle(fontSize: 13, color: mutedColor),
                           ),
                         ],
                       ),
@@ -94,7 +108,7 @@ extension _MembersTab on _HomeScreenState {
             ],
           const SizedBox(height: 10),
           SizedBox(
-            height: 46,
+            height: 52,
             child: OutlinedButton.icon(
               onPressed: _isCreatingGroup ? null : _createGroup,
               icon: _isCreatingGroup
@@ -111,7 +125,7 @@ extension _MembersTab on _HomeScreenState {
           ),
           const SizedBox(height: 10),
           SizedBox(
-            height: 46,
+            height: 54,
             child: ElevatedButton.icon(
               onPressed: _joinAnotherCircle,
               icon: const Icon(Icons.qr_code_scanner_rounded),
@@ -121,6 +135,19 @@ extension _MembersTab on _HomeScreenState {
         ],
       ),
     );
+  }
+
+  void _openFamilyCircleSettings() {
+    final group = _selectedGroup?.canManage == true
+        ? _selectedGroup
+        : _groups.where((item) => item.canManage).firstOrNull;
+    if (group == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Create or own a Circle to manage it.')),
+      );
+      return;
+    }
+    _openGroupSettings(group);
   }
 
   Future<void> _joinAnotherCircle() async {
@@ -160,15 +187,24 @@ extension _MembersTab on _HomeScreenState {
   Widget _circleScopeButton(String label, bool owned, bool isDark) {
     final selected = _showOwnedCircles == owned;
     return Expanded(
-      child: GestureDetector(
+      child: InkWell(
         onTap: () => _setCircleScope(owned),
+        borderRadius: BorderRadius.circular(10),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 9),
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
-            gradient: selected && !isDark ? kPrimaryGradient : null,
-            color: selected && isDark ? kEmerald : Colors.transparent,
+            color: selected
+                ? (isDark ? kEmerald : kLightPrimary)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
+            border: selected
+                ? Border.all(
+                    color: isDark ? kEmerald : kLightPrimary,
+                    width: 1.5,
+                  )
+                : null,
           ),
           alignment: Alignment.center,
           child: Text(
@@ -177,8 +213,8 @@ extension _MembersTab on _HomeScreenState {
               color: selected
                   ? Colors.white
                   : (isDark ? Colors.white60 : kLightMuted),
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
+              fontSize: 15,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
             ),
           ),
         ),

@@ -25,7 +25,7 @@ class AppPrimaryButton extends StatelessWidget {
       duration: const Duration(milliseconds: 160),
       child: Container(
         width: double.infinity,
-        height: 50,
+        height: 54,
         decoration: BoxDecoration(
           color: usePrimaryGradient ? null : color,
           gradient: usePrimaryGradient ? kPrimaryGradient : null,
@@ -66,7 +66,8 @@ class AppPrimaryButton extends StatelessWidget {
                   label,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
         ),

@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_surface_card.dart';
 import '../../../models/notification_settings.dart';
 import '../../../services/notification_settings_service.dart';
+import 'notification_bell_button.dart';
 
 const _emerald = kEmerald;
 const _navy = kLightNavy;
@@ -99,9 +100,10 @@ class _NotificationSettingsScreenState
         elevation: 0,
         title: const Text(
           'Notification Settings',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600),
         ),
         actions: [
+          const NotificationBellButton(),
           TextButton(
             onPressed: _saving ? null : _save,
             child: _saving
@@ -117,7 +119,7 @@ class _NotificationSettingsScreenState
                     'Save',
                     style: TextStyle(
                       color: _emerald,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
           ),
@@ -130,7 +132,7 @@ class _NotificationSettingsScreenState
             'Personal alerts',
             style: TextStyle(
               fontSize: 13,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
               color: titleColor,
             ),
           ),
@@ -170,7 +172,7 @@ class _NotificationSettingsScreenState
             'Privacy & sharing',
             style: TextStyle(
               fontSize: 13,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
               color: titleColor,
             ),
           ),
@@ -189,7 +191,7 @@ class _NotificationSettingsScreenState
             'Family owner controls',
             style: TextStyle(
               fontSize: 13,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
               color: titleColor,
             ),
           ),
@@ -210,13 +212,13 @@ class _NotificationSettingsScreenState
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 'Only the family-circle owner can change family-wide alert rules.',
-                style: TextStyle(fontSize: 11, color: muted),
+                style: TextStyle(fontSize: 13, color: muted),
               ),
             ),
           const SizedBox(height: 18),
           Text(
             'Daily check-in uses the member’s own device time zone: 10:00 AM to 9:59 AM. Push delivery requires the family backend and notification permission.',
-            style: TextStyle(fontSize: 11, height: 1.4, color: muted),
+            style: TextStyle(fontSize: 13, height: 1.4, color: muted),
           ),
         ],
       ),
@@ -246,6 +248,6 @@ class _NotificationSettingsScreenState
         color: onChanged == null ? Colors.grey : null,
       ),
     ),
-    subtitle: Text(detail, style: const TextStyle(fontSize: 11, height: 1.25)),
+    subtitle: Text(detail, style: const TextStyle(fontSize: 13, height: 1.25)),
   );
 }

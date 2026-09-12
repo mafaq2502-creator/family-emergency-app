@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_primary_button.dart';
 import '../../../core/widgets/app_surface_card.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../features/auth/domain/auth_error_mapper.dart';
 import '../../../features/auth/domain/auth_validators.dart';
 import '../../../services/account_security_service.dart';
@@ -25,7 +26,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Security')),
+    appBar: AppBar(
+      title: const Text('Security'),
+      actions: const [NotificationBellButton()],
+    ),
     body: FutureBuilder<SecurityOverview>(
       future: _overview,
       builder: (context, snapshot) {
@@ -300,7 +304,10 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Change Password')),
+    appBar: AppBar(
+      title: const Text('Change Password'),
+      actions: const [NotificationBellButton()],
+    ),
     body: SafeArea(
       child: Form(
         key: _formKey,
@@ -349,7 +356,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
             const Text(
               'Your current Firebase session remains signed in after a successful password update.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: kLightMuted),
+              style: TextStyle(fontSize: 13, color: kLightMuted),
             ),
           ],
         ),
@@ -455,7 +462,10 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Change Email')),
+    appBar: AppBar(
+      title: const Text('Change Email'),
+      actions: const [NotificationBellButton()],
+    ),
     body: SafeArea(
       child: Form(
         key: _formKey,
@@ -536,7 +546,10 @@ class _AccountDeletionPreparationScreenState
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Delete Account')),
+    appBar: AppBar(
+      title: const Text('Delete Account'),
+      actions: const [NotificationBellButton()],
+    ),
     body: FutureBuilder<AccountDeletionReadiness>(
       future: _readiness,
       builder: (context, snapshot) {
@@ -572,7 +585,7 @@ class _AccountDeletionPreparationScreenState
                   ? 'Secure deletion is being prepared'
                   : 'Resolve Circle ownership first',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 14),
             if (!readiness.canRequestDeletion) ...[
@@ -627,7 +640,7 @@ class _SecurityRow extends StatelessWidget {
       backgroundColor: iconColor.withValues(alpha: .12),
       child: Icon(icon, color: iconColor),
     ),
-    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
     subtitle: Text(subtitle, maxLines: 3, overflow: TextOverflow.ellipsis),
     trailing:
         trailing ??
@@ -642,7 +655,7 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
     text,
-    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
   );
 }
 

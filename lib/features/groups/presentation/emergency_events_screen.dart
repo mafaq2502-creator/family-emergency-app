@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../models/emergency_event.dart';
 import '../../../models/family_group.dart';
 import '../../../services/emergency_service.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../core/widgets/light_ui.dart';
 import 'emergency_detail_screen.dart';
 
@@ -57,7 +58,10 @@ class _EmergencyEventsScreenState extends State<EmergencyEventsScreen> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     return Scaffold(
-      appBar: AppBar(title: Text('${widget.group.name} SOS activity')),
+      appBar: AppBar(
+        title: Text('${widget.group.name} SOS activity'),
+        actions: const [NotificationBellButton()],
+      ),
       body: Column(
         children: [
           Padding(
@@ -147,16 +151,16 @@ class _EmergencyEventsScreenState extends State<EmergencyEventsScreen> {
                                   child: Text(
                                     'SOS from ${event.senderName}',
                                     style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
                                 Text(
                                   event.status.toUpperCase(),
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 13,
                                     color: active ? kEmergency : kEmerald,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
@@ -266,8 +270,8 @@ class _EmergencyEventsScreenState extends State<EmergencyEventsScreen> {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: selected ? Colors.white : context.appMuted,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),

@@ -42,50 +42,51 @@ void main() {
     );
   });
 
-  testWidgets('production Next stays disabled until Firebase reports verified', (
-    tester,
-  ) async {
-    final verification = _Verification();
-    var continued = 0;
-    await tester.pumpWidget(
-      MaterialApp(
-        home: EmailVerificationScreen(
-          email: 'new.user@example.com',
-          verification: verification,
-          allowTestingBypass: false,
-          onContinue: (verified) {
-            expect(verified, isTrue);
-            continued++;
-          },
+  testWidgets(
+    'production Next stays disabled until Firebase reports verified',
+    (tester) async {
+      final verification = _Verification();
+      var continued = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: EmailVerificationScreen(
+            email: 'new.user@example.com',
+            verification: verification,
+            allowTestingBypass: false,
+            onContinue: (verified) {
+              expect(verified, isTrue);
+              continued++;
+            },
+          ),
         ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
-    expect(
-      tester
-          .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Next'))
-          .onPressed,
-      isNull,
-    );
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(
+        tester
+            .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Next'))
+            .onPressed,
+        isNull,
+      );
 
-    verification.verified = true;
-    await tester.tap(find.text('Check verification'));
-    await tester.pump();
-    await tester.pump();
-    expect(
-      find.text('Email verified. Select Next to continue.'),
-      findsOneWidget,
-    );
-    expect(
-      tester
-          .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Next'))
-          .onPressed,
-      isNotNull,
-    );
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Next'));
-    expect(continued, 1);
-  });
+      verification.verified = true;
+      await tester.tap(find.text('Check verification'));
+      await tester.pump();
+      await tester.pump();
+      expect(
+        find.text('Email verified. Select Next to continue.'),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Next'))
+            .onPressed,
+        isNotNull,
+      );
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Next'));
+      expect(continued, 1);
+    },
+  );
 
   testWidgets('resend and Cancel use the verification service', (tester) async {
     final verification = _Verification();

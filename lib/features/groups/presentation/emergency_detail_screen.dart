@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/light_ui.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/emergency_event.dart';
 import '../../../models/family_group.dart';
 import '../../../services/emergency_service.dart';
@@ -52,6 +53,7 @@ class EmergencyDetailScreen extends StatelessWidget {
     return LightPage(
       title: 'Emergency Alert',
       subtitle: group.name,
+      actions: const [NotificationBellButton()],
       child: Column(
         children: [
           Container(
@@ -69,7 +71,7 @@ class EmergencyDetailScreen extends StatelessWidget {
             style: TextStyle(
               color: context.appHeading,
               fontSize: 22,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const Text('Needs your help', style: TextStyle(color: kEmergency)),

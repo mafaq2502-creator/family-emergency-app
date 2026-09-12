@@ -15,12 +15,13 @@ extension _LocationTab on _HomeScreenState {
                 child: Text(
                   'Progress',
                   style: TextStyle(
-                    fontSize: 23,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
                     color: titleColor,
                   ),
                 ),
               ),
+              _notificationBell(),
               IconButton(
                 tooltip: 'Progress settings',
                 onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
@@ -35,9 +36,8 @@ extension _LocationTab on _HomeScreenState {
             ],
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<FamilyGroup>(
+          BoundedDropdownFormField<FamilyGroup>(
             initialValue: _selectedGroup,
-            isExpanded: true,
             decoration: const InputDecoration(
               labelText: 'Family Circle',
               prefixIcon: Icon(Icons.groups_rounded),
@@ -54,11 +54,10 @@ extension _LocationTab on _HomeScreenState {
             onChanged: _selectProgressGroup,
           ),
           const SizedBox(height: 10),
-          DropdownButtonFormField<String?>(
+          BoundedDropdownFormField<String?>(
             initialValue: familyMembers.any((m) => m.id == _progressMemberId)
                 ? _progressMemberId
                 : null,
-            isExpanded: true,
             decoration: const InputDecoration(
               labelText: 'Member / Child',
               prefixIcon: Icon(Icons.person_outline_rounded),
@@ -216,7 +215,7 @@ extension _LocationTab on _HomeScreenState {
                       style: TextStyle(
                         color: titleColor,
                         fontSize: 24,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -228,7 +227,7 @@ extension _LocationTab on _HomeScreenState {
           const SizedBox(height: 12),
           Text(
             'No screen-time telemetry exists for the selected Circle, member and period ($_progressPeriod).',
-            style: TextStyle(color: mutedColor, fontSize: 11),
+            style: TextStyle(color: mutedColor, fontSize: 13),
           ),
         ],
       ),
@@ -259,10 +258,10 @@ extension _LocationTab on _HomeScreenState {
                 label,
                 style: TextStyle(
                   color: isDark ? Colors.white60 : kLightMuted,
-                  fontSize: 10,
+                  fontSize: 13,
                 ),
               ),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+              Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
             ],
           ),
         ),

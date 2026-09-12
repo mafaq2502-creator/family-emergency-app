@@ -7,6 +7,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/domain/device_policies.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/light_ui.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 import '../../../models/device_pairing_request.dart';
 import '../../../models/family_group.dart';
 import '../../../models/family_member.dart';
@@ -31,7 +32,10 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('My Devices')),
+    appBar: AppBar(
+      title: const Text('My Devices'),
+      actions: const [NotificationBellButton()],
+    ),
     body: FutureBuilder<PairedDevice>(
       future: _registration,
       builder: (context, registration) {
@@ -164,7 +168,10 @@ class _DevicePairingCodeScreenState extends State<DevicePairingCodeScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Pair This Device')),
+    appBar: AppBar(
+      title: const Text('Pair This Device'),
+      actions: const [NotificationBellButton()],
+    ),
     body: FutureBuilder<DevicePairingRequest>(
       future: _request,
       builder: (context, snapshot) {
@@ -199,7 +206,7 @@ class _DevicePairingCodeScreenState extends State<DevicePairingCodeScreen> {
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -234,7 +241,7 @@ class _DevicePairingCodeScreenState extends State<DevicePairingCodeScreen> {
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 20,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w700,
                 letterSpacing: 1.2,
               ),
             ),
@@ -367,6 +374,7 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
   Widget build(BuildContext context) => LightPage(
     title: 'Pair Device',
     subtitle: 'Short-lived code and member approval',
+    actions: const [NotificationBellButton()],
     child: Form(
       key: _formKey,
       child: Column(
@@ -460,7 +468,7 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(fontSize: 10, color: context.appMuted),
+                    style: TextStyle(fontSize: 13, color: context.appMuted),
                   ),
                   Text(
                     value,
@@ -468,7 +476,7 @@ class _DevicePairingScreenState extends State<DevicePairingScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: context.appHeading,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -634,6 +642,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     return LightPage(
       title: 'Device Detail',
       subtitle: 'Assigned to ${widget.memberName}',
+      actions: const [NotificationBellButton()],
       child: AbsorbPointer(
         absorbing: _busy,
         child: Column(
@@ -661,7 +670,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
               style: TextStyle(
                 color: context.appHeading,
                 fontSize: 21,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
               ),
             ),
             if (device.isCurrentDevice) ...[
@@ -885,6 +894,7 @@ class _DeviceQrScannerScreenState extends State<DeviceQrScannerScreen> {
       title: const Text('Scan Device Pairing QR'),
       backgroundColor: Colors.black,
       foregroundColor: Colors.white,
+      actions: const [NotificationBellButton()],
     ),
     body: SafeArea(
       child: Stack(
@@ -989,7 +999,7 @@ class _DeviceCard extends StatelessWidget {
           device.name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w800),
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
           device.isCurrentDevice

@@ -85,7 +85,7 @@ class _NotificationBanner extends StatelessWidget {
                       'Notifications',
                       style: TextStyle(
                         fontSize: 17,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -148,7 +148,7 @@ class _NotificationBanner extends StatelessWidget {
                         style: TextStyle(
                           fontWeight: item.isRead
                               ? FontWeight.w500
-                              : FontWeight.w800,
+                              : FontWeight.w600,
                         ),
                       ),
                       subtitle: Text(

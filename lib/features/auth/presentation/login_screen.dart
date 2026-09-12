@@ -101,7 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: TextStyle(
                           color: titleColor,
                           fontSize: 25,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 5),
@@ -212,7 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: TextStyle(
                             color: Colors.red,
                             fontSize: 20,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         onPressed: _googleLogin,
@@ -241,7 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               'Sign Up',
                               style: TextStyle(
                                 color: Color(0xFF2563EB),
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w600,
                                 decoration: TextDecoration.underline,
                               ),
                             ),

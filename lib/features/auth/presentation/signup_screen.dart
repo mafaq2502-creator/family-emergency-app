@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_text_form_field.dart';
+import '../../../core/widgets/bounded_dropdown_form_field.dart';
 import '../../../services/auth_service.dart';
 import '../domain/auth_error_mapper.dart';
 import '../domain/auth_validators.dart';
@@ -186,10 +187,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     const SizedBox(height: 18),
                     _phoneField(),
                     const SizedBox(height: 18),
-                    DropdownButtonFormField<String>(
+                    BoundedDropdownFormField<String>(
                       autovalidateMode: AutovalidateMode.onUnfocus,
                       initialValue: _relationship,
-                      isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Relationship',
                         hintText: 'Select your relationship',
@@ -388,7 +388,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             'Login',
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w600,
                               letterSpacing: .15,
                               decoration: TextDecoration.underline,
                               decorationThickness: 1.5,
