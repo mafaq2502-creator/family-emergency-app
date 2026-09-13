@@ -158,7 +158,13 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                     return LightCard(
                       padding: EdgeInsets.zero,
                       onTap: () async {
-                        await _service.markRead(user, item.id);
+                        try {
+                          await _service.markRead(user, item.id);
+                        } catch (_) {
+                          // Do not block navigation when the read receipt
+                          // cannot be saved while the device is offline.
+                        }
+                        if (!context.mounted) return;
                         await openNotificationPayload({
                           'type': item.type,
                           'groupId': item.groupId,

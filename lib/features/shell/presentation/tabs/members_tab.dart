@@ -6,14 +6,7 @@ extension _MembersTab on _HomeScreenState {
     child: Scaffold(
       appBar: AppBar(
         title: const Text('Family'),
-        actions: [
-          _notificationBell(),
-          IconButton(
-            tooltip: 'Circle Settings',
-            onPressed: _openFamilyCircleSettings,
-            icon: Icon(Icons.settings_outlined, color: context.appPrimary),
-          ),
-        ],
+        actions: [_notificationBell()],
         bottom: const TabBar(
           tabs: [
             Tab(text: 'Circles'),
@@ -146,19 +139,6 @@ extension _MembersTab on _HomeScreenState {
         ),
       ),
     );
-  }
-
-  void _openFamilyCircleSettings() {
-    final group = _selectedGroup?.canManage == true
-        ? _selectedGroup
-        : _groups.where((item) => item.canManage).firstOrNull;
-    if (group == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Create or own a Circle to manage it.')),
-      );
-      return;
-    }
-    _openGroupSettings(group);
   }
 
   Future<void> _joinAnotherCircle() async {

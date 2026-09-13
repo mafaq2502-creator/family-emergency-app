@@ -245,7 +245,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Member Detail'), findsOneWidget);
       expect(
-        find.text('No screen-time or location data is available in Phase 5'),
+        find.text(
+          'Open Progress to view available shared activity and Screen Time data.',
+        ),
         findsOneWidget,
       );
       expect(find.text('Remove Member'), findsOneWidget);

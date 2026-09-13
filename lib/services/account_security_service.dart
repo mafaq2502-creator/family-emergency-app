@@ -149,7 +149,6 @@ class AccountSecurityService implements AccountSecurityActions {
         .collection('groups')
         .where('memberIds', arrayContains: user.uid)
         .where('status', isEqualTo: 'active')
-        .limit(20)
         .get();
     return AccountDeletionReadiness(
       ownedCircleNames: snapshot.docs

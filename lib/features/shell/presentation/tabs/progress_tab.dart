@@ -1,6 +1,6 @@
 part of '../family_shell.dart';
 
-extension _LocationTab on _HomeScreenState {
+extension _ProgressTab on _HomeScreenState {
   Widget _buildLocationTab() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
@@ -91,20 +91,22 @@ extension _LocationTab on _HomeScreenState {
                   context,
                   MaterialPageRoute(
                     builder: (_) => ScreenTimeDetailScreen(
-                    memberName: _progressMemberId == null
-                        ? 'All members'
-                        : familyMembers
-                                  .where((m) => m.id == _progressMemberId)
-                                  .map((m) => m.name)
-                                  .firstOrNull ??
-                              'Selected member',
-                    circleId: _selectedGroup?.id,
-                    memberUserId: _progressMemberId == null
-                        ? null
-                        : familyMembers
-                              .where((member) => member.id == _progressMemberId)
-                              .map((member) => member.userId ?? member.id)
-                              .firstOrNull,
+                      memberName: _progressMemberId == null
+                          ? 'All members'
+                          : familyMembers
+                                    .where((m) => m.id == _progressMemberId)
+                                    .map((m) => m.name)
+                                    .firstOrNull ??
+                                'Selected member',
+                      circleId: _selectedGroup?.id,
+                      memberUserId: _progressMemberId == null
+                          ? null
+                          : familyMembers
+                                .where(
+                                  (member) => member.id == _progressMemberId,
+                                )
+                                .map((member) => member.userId ?? member.id)
+                                .firstOrNull,
                     ),
                   ),
                 ),
@@ -165,25 +167,25 @@ extension _LocationTab on _HomeScreenState {
                     context,
                     MaterialPageRoute(
                       builder: (_) => ProgressDetailsScreen(
-                      memberName: _progressMemberId == null
-                          ? 'All members'
-                          : familyMembers
-                                    .where((m) => m.id == _progressMemberId)
-                                    .map((m) => m.name)
-                                    .firstOrNull ??
-                                'Selected member',
-                      latestCheckIn: _progressMemberId == null
-                          ? _lastDailyCheckIn
-                          : null,
-                      circleId: _selectedGroup?.id,
-                      memberUserId: _progressMemberId == null
-                          ? null
-                          : familyMembers
-                                .where(
-                                  (member) => member.id == _progressMemberId,
-                                )
-                                .map((member) => member.userId ?? member.id)
-                                .firstOrNull,
+                        memberName: _progressMemberId == null
+                            ? 'All members'
+                            : familyMembers
+                                      .where((m) => m.id == _progressMemberId)
+                                      .map((m) => m.name)
+                                      .firstOrNull ??
+                                  'Selected member',
+                        latestCheckIn: _progressMemberId == null
+                            ? _lastDailyCheckIn
+                            : null,
+                        circleId: _selectedGroup?.id,
+                        memberUserId: _progressMemberId == null
+                            ? null
+                            : familyMembers
+                                  .where(
+                                    (member) => member.id == _progressMemberId,
+                                  )
+                                  .map((member) => member.userId ?? member.id)
+                                  .firstOrNull,
                       ),
                     ),
                   ),
@@ -226,74 +228,6 @@ extension _LocationTab on _HomeScreenState {
               ),
               Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
             ],
-          ),
-        ),
-      ],
-    ),
-  );
-
-  // Kept for the legacy location illustration while the Progress UI is phased in.
-  // ignore: unused_element
-  Widget _locationEmptyArtwork(bool isDark) => SizedBox(
-    width: 195,
-    height: 150,
-    child: Stack(
-      alignment: Alignment.center,
-      children: [
-        Positioned(
-          bottom: 2,
-          child: Transform.rotate(
-            angle: -.18,
-            child: Container(
-              width: 150,
-              height: 72,
-              decoration: BoxDecoration(
-                color: const Color(0xFFBDECEE),
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: 21,
-          child: Transform.rotate(
-            angle: -.18,
-            child: Container(width: 156, height: 3, color: Colors.white70),
-          ),
-        ),
-        Positioned(
-          bottom: 40,
-          child: Transform.rotate(
-            angle: -.18,
-            child: Container(width: 156, height: 3, color: Colors.white70),
-          ),
-        ),
-        const Positioned(
-          left: 30,
-          bottom: 38,
-          child: Icon(Icons.park_rounded, color: Color(0xFF69CBBE), size: 32),
-        ),
-        const Positioned(
-          right: 25,
-          bottom: 20,
-          child: Icon(Icons.park_rounded, color: Color(0xFF69CBBE), size: 36),
-        ),
-        const Positioned(
-          right: 25,
-          top: 43,
-          child: Icon(Icons.cloud_rounded, color: Color(0xFFDCECF8), size: 44),
-        ),
-        Container(
-          width: 67,
-          height: 76,
-          decoration: const BoxDecoration(
-            color: kEmerald,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.location_on_rounded,
-            color: Colors.white,
-            size: 43,
           ),
         ),
       ],

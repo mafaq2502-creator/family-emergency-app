@@ -185,7 +185,7 @@ class _CircleMemberDetailScreenState extends State<CircleMemberDetailScreen> {
           const LightSettingRow(
             icon: Icons.query_stats_rounded,
             title: 'Progress',
-            subtitle: 'No screen-time or location data is available in Phase 5',
+            subtitle: 'Open Progress to view available shared activity and Screen Time data.',
           ),
           if (canRemove) ...[
             const SizedBox(height: 22),

@@ -174,74 +174,77 @@ class _SafetyRequestsViewState extends State<SafetyRequestsView> {
   }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) => StreamBuilder<List<Map<String, dynamic>>>(
-    stream: stream,
-    builder: (context, snapshot) {
-      if (snapshot.hasError) {
-        return const Center(
-          child: Text('Verify your invited email address to load requests.'),
-        );
-      }
-      if (!snapshot.hasData) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      if (snapshot.data!.isEmpty) {
-        return const Center(child: Text('No pending requests.'));
-      }
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          for (final invite in snapshot.data!)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: LightCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: LightAvatar(
-                        name: '${invite['senderName'] ?? 'Circle owner'}',
-                        photoUrl: invite['senderPhotoUrl'] as String?,
-                      ),
-                      title: Text('${invite['senderName'] ?? 'Circle owner'}'),
-                      subtitle: Text(
-                        widget.circle
-                            ? 'Invited you to ${invite['circleName']}'
-                            : 'Wants to add you',
-                      ),
-                    ),
-                    Row(
+  Widget build(BuildContext context) =>
+      StreamBuilder<List<Map<String, dynamic>>>(
+        stream: stream,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text(
+                'Could not load requests. Check your connection and verified email.',
+              ),
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.data!.isEmpty) {
+            return const Center(child: Text('No pending requests.'));
+          }
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              for (final invite in snapshot.data!)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: LightCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: busy.contains(invite['id'])
-                                ? null
-                                : () => respond(invite['id'], true),
-                            child: const Text('Accept'),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: LightAvatar(
+                            name: '${invite['senderName'] ?? 'Circle owner'}',
+                            photoUrl: invite['senderPhotoUrl'] as String?,
+                          ),
+                          title: Text(
+                            '${invite['senderName'] ?? 'Circle owner'}',
+                          ),
+                          subtitle: Text(
+                            widget.circle
+                                ? 'Invited you to ${invite['circleName']}'
+                                : 'Wants to add you',
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: busy.contains(invite['id'])
-                                ? null
-                                : () => respond(invite['id'], false),
-                            child: const Text('Cancel'),
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: busy.contains(invite['id'])
+                                    ? null
+                                    : () => respond(invite['id'], true),
+                                child: const Text('Accept'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: busy.contains(invite['id'])
+                                    ? null
+                                    : () => respond(invite['id'], false),
+                                child: const Text('Decline'),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-        ],
+            ],
+          );
+        },
       );
-    },
-  );
 }
 
 class AddSafetyUserScreen extends StatefulWidget {
@@ -427,6 +430,10 @@ class _SafetyUserDetailScreenState extends State<SafetyUserDetailScreen> {
   Widget build(BuildContext context) => StreamBuilder<Map<String, dynamic>?>(
     stream: stream,
     builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting &&
+          !snapshot.hasData) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
       final data = snapshot.hasError ? null : snapshot.data;
       return Scaffold(
         appBar: AppBar(
@@ -510,13 +517,23 @@ class _SafetyPreferencesScreenState extends State<SafetyPreferencesScreen> {
     body: StreamBuilder<Map<String, dynamic>>(
       stream: profile,
       builder: (context, owner) {
+        if (owner.hasError) {
+          return const Center(child: Text('User settings unavailable.'));
+        }
         final premium =
             owner.data?['planTier'] == 'premium' &&
             owner.data?['subscriptionStatus'] == 'active';
         return StreamBuilder<Map<String, dynamic>?>(
           stream: stream,
           builder: (context, snapshot) {
-            final data = snapshot.hasError ? null : snapshot.data;
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return const Center(child: Text('User settings unavailable.'));
+            }
+            final data = snapshot.data;
             if (data == null ||
                 data['ownerId'] != service.uid ||
                 data['status'] != 'connected') {

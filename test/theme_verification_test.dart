@@ -15,8 +15,6 @@ import 'package:family_emergency_app/features/auth/presentation/onboarding/intro
 import 'package:family_emergency_app/features/auth/presentation/onboarding/circle_onboarding_screen.dart';
 import 'package:family_emergency_app/features/devices/presentation/device_screens.dart';
 import 'package:family_emergency_app/features/groups/presentation/share_circle_screen.dart';
-import 'package:family_emergency_app/features/members/presentation/member_profile_screen.dart';
-import 'package:family_emergency_app/features/members/presentation/member_notification_settings_screen.dart';
 import 'package:family_emergency_app/features/profile/presentation/account_settings_screen.dart';
 import 'package:family_emergency_app/features/profile/presentation/profile_settings_screen.dart';
 import 'package:family_emergency_app/features/progress/presentation/progress_detail_screens.dart';
@@ -135,9 +133,6 @@ void main() {
     'delete_account_preparation': () => AccountDeletionPreparationScreen(
       securityService: FakeSecurityService(),
     ),
-    'member': () => const MemberProfileScreen(member: _member),
-    'member_notifications': () =>
-        MemberNotificationSettingsScreen(member: _member, onSave: (_) async {}),
     'share': () =>
         ShareCircleScreen(group: _group, joinService: FakeCircleJoinService()),
     'my_devices': () => DeviceListScreen(deviceService: FakeDeviceService()),

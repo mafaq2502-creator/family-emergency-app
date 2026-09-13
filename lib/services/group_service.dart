@@ -156,16 +156,6 @@ class GroupService {
     return data['circleId'] as String;
   }
 
-  Future<String> ensureDefaultGroup(User owner) async {
-    final existing = await _client
-        .collection('groups')
-        .where('ownerId', isEqualTo: owner.uid)
-        .limit(1)
-        .get();
-    if (existing.docs.isNotEmpty) return existing.docs.first.id;
-    return createGroup(owner, 'My Family');
-  }
-
   Future<void> renameGroup(FamilyGroup group, String name) {
     final trimmedName = CircleNamePolicy.normalize(name);
     final validation = CircleNamePolicy.validate(trimmedName);
@@ -191,122 +181,6 @@ class GroupService {
   /// removed by several client batches.
   Future<void> deleteGroup(FamilyGroup group) async {
     await _callLifecycle('deleteCircle', {'circleId': group.id});
-  }
-
-  // Retained as a migration utility for projects moving existing tombstones.
-  // ignore: unused_element
-  Future<void> _deleteGroupWithClientBatch(FamilyGroup group) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw FirebaseException(
-        plugin: 'cloud_firestore',
-        code: 'unauthenticated',
-        message: 'Please sign in again.',
-      );
-    }
-    final groupRef = _client.collection('groups').doc(group.id);
-    final groupSnapshot = await groupRef.get();
-    final data = groupSnapshot.data();
-    if (!groupSnapshot.exists || data == null || data['status'] != 'active') {
-      throw FirebaseException(
-        plugin: 'cloud_firestore',
-        code: 'not-found',
-        message: 'This family Circle is no longer available.',
-      );
-    }
-    if (data['ownerId'] != user.uid ||
-        Map<String, dynamic>.from(data['roles'] as Map? ?? {})[user.uid] !=
-            CircleRole.owner.value) {
-      throw FirebaseException(
-        plugin: 'cloud_firestore',
-        code: 'permission-denied',
-        message: 'Only the Circle owner can delete this Circle.',
-      );
-    }
-    final memberships = await groupRef.collection('memberships').get();
-    final invites = await _client
-        .collection('circleInvites')
-        .where('circleId', isEqualTo: group.id)
-        .get();
-    final requests = await groupRef
-        .collection('joinRequests')
-        .where('status', isEqualTo: 'pending')
-        .get();
-    final devices = await groupRef.collection('devices').get();
-    final notifications = await _client
-        .collection('users')
-        .doc(user.uid)
-        .collection('notifications')
-        .where('groupId', isEqualTo: group.id)
-        .get();
-    if (memberships.size +
-            invites.size +
-            requests.size +
-            devices.size +
-            notifications.size +
-            2 >
-        450) {
-      throw FirebaseException(
-        plugin: 'cloud_firestore',
-        code: 'failed-precondition',
-        message: 'This Circle requires server cleanup. No data was changed.',
-      );
-    }
-    final profileRef = _client.collection('users').doc(user.uid);
-    final profile = await profileRef.get();
-    final batch = _client.batch();
-    final now = FieldValue.serverTimestamp();
-    batch.update(groupRef, {
-      'status': 'deleted',
-      'deletedAt': now,
-      'deletedBy': user.uid,
-      'memberIds': <String>[],
-      'roles': <String, String>{},
-      'emergencyRecipientIds': <String>[],
-      'updatedAt': now,
-    });
-    for (final membership in memberships.docs) {
-      batch.update(membership.reference, {
-        'status': 'removed',
-        'endedAt': now,
-        'endedBy': user.uid,
-        'updatedAt': now,
-      });
-    }
-    for (final invite in invites.docs) {
-      batch.update(invite.reference, {
-        'status': 'revoked',
-        'revokedAt': now,
-        'revokedBy': user.uid,
-        'updatedAt': now,
-      });
-    }
-    for (final request in requests.docs) {
-      batch.update(request.reference, {
-        'status': 'rejected',
-        'reviewedAt': now,
-        'reviewedBy': user.uid,
-        'updatedAt': now,
-      });
-    }
-    for (final device in devices.docs) {
-      batch.update(device.reference, {
-        'pairingStatus': 'unpaired',
-        'removedAt': now,
-        'removedBy': user.uid,
-        'updatedAt': now,
-      });
-    }
-    for (final notification in notifications.docs) {
-      batch.delete(notification.reference);
-    }
-    batch.set(profileRef, {
-      'circleIds': FieldValue.arrayRemove([group.id]),
-      if (profile.data()?['activeCircleId'] == group.id)
-        'activeCircleId': FieldValue.delete(),
-      'updatedAt': now,
-    }, SetOptions(merge: true));
-    await batch.commit();
   }
 
   Future<void> setEmergencyRecipients(FamilyGroup group, List<String> userIds) {

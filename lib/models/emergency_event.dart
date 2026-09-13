@@ -20,7 +20,7 @@ class EmergencyEvent {
       EmergencyEvent(
         id: id,
         senderId: map['senderId'] as String? ?? '',
-        senderName: map['senderName'] as String? ?? 'A group member',
+        senderName: map['senderName'] as String? ?? 'A Circle member',
         status: map['status'] as String? ?? 'active',
         acknowledgedByName: map['acknowledgedByName'] as String?,
         createdAt: (map['createdAt'] as Timestamp?)?.toDate(),

@@ -845,17 +845,7 @@ service cloud.firestore {
           (request.auth.uid == userId || isCircleManager(groupId));
         allow create: if false;
         allow update: if false;
-        allow update: if false;
-        allow update: if false;
-        allow update: if false;
         allow delete: if false;
-      }
-
-      // Kept temporarily for the current UI while registered-user
-      // memberships replace manually-created member records.
-      match /members/{memberId} {
-        allow read: if isCircleManager(groupId);
-        allow create, update, delete: if isCircleManager(groupId);
       }
 
       match /devices/{deviceId} {

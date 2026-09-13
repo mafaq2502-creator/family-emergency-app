@@ -19,7 +19,6 @@ import '../../../models/family_group.dart';
 import '../../../models/circle_role.dart';
 import '../../../models/app_notification.dart';
 import '../../../services/profile_service.dart';
-import '../../../services/family_member_service.dart';
 import '../../../services/group_service.dart';
 import '../../../services/emergency_service.dart';
 import '../../../services/app_notification_service.dart';
@@ -28,8 +27,6 @@ import '../../../services/device_heartbeat_controller.dart';
 import '../../../services/push_notification_service.dart';
 import '../../../app/notification_navigation.dart';
 import '../../devices/presentation/device_screens.dart';
-import '../../members/presentation/member_profile_screen.dart';
-import '../../groups/presentation/group_settings_screen.dart';
 import '../../groups/presentation/group_members_screen.dart';
 import '../../groups/presentation/join_circle_screen.dart';
 import '../../notifications/presentation/notification_settings_screen.dart';
@@ -42,7 +39,7 @@ import '../../members/presentation/safety_users_screen.dart';
 
 part 'tabs/home_tab.dart';
 part 'tabs/members_tab.dart';
-part 'tabs/location_tab.dart';
+part 'tabs/progress_tab.dart';
 part 'tabs/profile_tab.dart';
 
 // ====================== HOME SCREEN ======================
@@ -182,7 +179,6 @@ class _HomeScreenState extends State<_HomeContent> {
   Map<String, dynamic> _notificationSettings = {};
   bool _isPremium = false;
   final ProfileService _profileService = ProfileService();
-  final FamilyMemberService _memberService = FamilyMemberService();
   final GroupService _groupService = GroupService();
   final EmergencyService _emergencyService = EmergencyService();
   final AppNotificationService _appNotificationService =
@@ -225,8 +221,7 @@ class _HomeScreenState extends State<_HomeContent> {
     _profileNameController.addListener(_updateProfileDirtyState);
     _loadDeviceTimeZone();
     _loadProfile();
-    _watchMembers();
-    _prepareGroups();
+    _watchGroups();
     unawaited(
       _deviceHeartbeat.start(
         onCurrentDeviceRevoked: () => AuthService().signOut(),
@@ -290,12 +285,6 @@ class _HomeScreenState extends State<_HomeContent> {
     if (!mounted || circleId == null) return;
     _watchGroups();
     setState(() => _currentIndex = 0);
-  }
-
-  Future<void> _prepareGroups() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    _watchGroups();
   }
 
   void _watchGroups() {
@@ -444,15 +433,6 @@ class _HomeScreenState extends State<_HomeContent> {
     }
   }
 
-  void _openGroupSettings([FamilyGroup? targetGroup]) {
-    final group = targetGroup ?? _selectedGroup;
-    if (group == null || !group.canManage) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group)),
-    );
-  }
-
   Future<void> _openGroupHome(FamilyGroup group) async {
     setState(() => _selectedGroup = group);
     final result = await Navigator.push<CircleDetailExit>(
@@ -497,7 +477,11 @@ class _HomeScreenState extends State<_HomeContent> {
     final group = _selectedGroup;
     _membersSubscription?.cancel();
     if (group == null) {
-      if (mounted) setState(() => familyMembers = const []);
+      if (mounted) {
+        setState(() {
+          familyMembers = const [];
+        });
+      }
       return;
     }
     _membersSubscription = _groupService
@@ -509,6 +493,7 @@ class _HomeScreenState extends State<_HomeContent> {
                   id: member.userId,
                   userId: member.userId,
                   name: member.displayName,
+                  relation: member.relationship,
                   status: 'Connected',
                 ),
               )
@@ -516,10 +501,18 @@ class _HomeScreenState extends State<_HomeContent> {
         )
         .listen(
           (members) {
-            if (mounted) setState(() => familyMembers = members);
+            if (mounted) {
+              setState(() {
+                familyMembers = members;
+              });
+            }
           },
           onError: (_) {
-            if (mounted) setState(() => familyMembers = const []);
+            if (mounted) {
+              setState(() {
+                familyMembers = const [];
+              });
+            }
           },
         );
   }
@@ -684,7 +677,7 @@ class _HomeScreenState extends State<_HomeContent> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Configure emergency recipients in Group Settings first.',
+            'Configure emergency recipients in Circle Settings first.',
           ),
           backgroundColor: kEmergency,
         ),
@@ -786,7 +779,7 @@ class _HomeScreenState extends State<_HomeContent> {
         groupId: group.id,
         sender: user,
         senderName: _profileNameController.text.trim().isEmpty
-            ? 'A group member'
+            ? 'A Circle member'
             : _profileNameController.text.trim(),
         recipientIds: recipientIds,
       );
@@ -808,72 +801,6 @@ class _HomeScreenState extends State<_HomeContent> {
       }
     }
   }
-
-  void _removeFamilyMember(int index) {
-    final member = familyMembers[index];
-    final group = _selectedGroup;
-    if (member.id == null || group == null || !group.canManage) {
-      setState(() => familyMembers.removeAt(index));
-      return;
-    }
-    _memberService.deleteInGroup(group.id, member.id!).catchError((_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not remove member.'),
-            backgroundColor: kEmergency,
-          ),
-        );
-      }
-    });
-  }
-
-  Future<void> _confirmRemoveFamilyMember(int index) async {
-    final member = familyMembers[index];
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AppAlertDialog(
-        icon: const Icon(Icons.person_remove_rounded, color: kEmergency),
-        title: const Text('Remove member?'),
-        content: Text(
-          'Remove ${member.name} from ${_selectedGroup?.name ?? 'this Circle'}? This does not delete their registered account.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kEmergency,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) _removeFamilyMember(index);
-  }
-
-  Future<void> _updateFamilyMember(FamilyMember member) async {
-    final group = _selectedGroup;
-    if (group == null || member.id == null || !group.canManage) return;
-    await _memberService.updateInGroup(group.id, member);
-  }
-
-  Future<void> _openMemberProfile(FamilyMember member, int index) =>
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => MemberProfileScreen(
-            member: member,
-            onDelete: () => _confirmRemoveFamilyMember(index),
-            onSave: _updateFamilyMember,
-          ),
-        ),
-      );
 
   bool get _checkedInToday {
     final checkIn = _lastDailyCheckIn;

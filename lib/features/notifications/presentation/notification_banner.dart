@@ -6,6 +6,7 @@ import '../../../models/app_notification.dart';
 import '../../../models/family_group.dart';
 import '../../../services/app_notification_service.dart';
 import '../../../core/widgets/light_ui.dart';
+import '../../../app/notification_navigation.dart';
 import 'notification_center_screen.dart';
 
 /// A compact in-place inbox opened from the notification bell.
@@ -156,9 +157,27 @@ class _NotificationBanner extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      onTap: item.isRead
-                          ? null
-                          : () => service.markRead(user, item.id),
+                      onTap: () async {
+                        if (!item.isRead) {
+                          try {
+                            await service.markRead(user, item.id);
+                          } catch (_) {
+                            // Opening the destination is still useful if the
+                            // read receipt could not be saved while offline.
+                          }
+                        }
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                        await openNotificationPayload({
+                          'type': item.type,
+                          'groupId': item.groupId,
+                          if (item.emergencyId != null)
+                            'emergencyId': item.emergencyId,
+                          if (item.deviceId != null) 'deviceId': item.deviceId,
+                          if (item.memberUserId != null)
+                            'memberUserId': item.memberUserId,
+                        });
+                      },
                     );
                   },
                 ),

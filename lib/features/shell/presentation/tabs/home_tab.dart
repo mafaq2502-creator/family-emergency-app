@@ -33,7 +33,7 @@ extension _HomeTab on _HomeScreenState {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Hello, ${_profileNameController.text.isEmpty ? 'Afaq' : _profileNameController.text}',
+                        'Hello, ${_profileNameController.text.isEmpty ? 'there' : _profileNameController.text}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -46,7 +46,7 @@ extension _HomeTab on _HomeScreenState {
                       Row(
                         children: [
                           Text(
-                            'Your family is safe',
+                            'Stay connected with your family',
                             style: TextStyle(fontSize: 13, color: mutedColor),
                           ),
                           const SizedBox(width: 5),
@@ -59,7 +59,7 @@ extension _HomeTab on _HomeScreenState {
                       ),
                       const SizedBox(height: 18),
                       Text(
-                        'Your Groups',
+                        'Your Circles',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -70,7 +70,7 @@ extension _HomeTab on _HomeScreenState {
                         const SizedBox(height: 28),
                         Center(
                           child: Text(
-                            'No groups yet. Create one from Members.',
+                            'No Circles yet. Create one from Family.',
                             style: TextStyle(fontSize: 14, color: mutedColor),
                           ),
                         ),
@@ -229,130 +229,4 @@ extension _HomeTab on _HomeScreenState {
       ),
     ),
   );
-
-  // ignore: unused_element
-  Widget _homeMemberCard(FamilyMember member, int index, bool isDark) {
-    final name = member.name;
-    final titleColor = isDark ? Colors.white : kLightNavy;
-    final mutedColor = isDark ? Colors.white60 : kLightMuted;
-    final battery = const ['85%', '72%', '60%', '40%'][index];
-    final batteryColor = index == 3 ? const Color(0xFFFFB21A) : kEmerald;
-    final avatarColors = const [
-      Color(0xFFE9EEF0),
-      Color(0xFFF2E9E8),
-      Color(0xFFF0E8DF),
-      Color(0xFFF5E8E8),
-    ];
-    final avatarIcons = const [
-      Icons.face_rounded,
-      Icons.face_3_rounded,
-      Icons.face_rounded,
-      Icons.face_3_rounded,
-    ];
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: () => _openMemberProfile(member, index),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 10, 10, 9),
-        decoration: BoxDecoration(
-          color: isDark ? kDarkCard : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: isDark ? Colors.white12 : kLightBorder),
-          boxShadow: isDark
-              ? null
-              : const [
-                  BoxShadow(
-                    color: Color(0x080F172A),
-                    blurRadius: 10,
-                    offset: Offset(0, 3),
-                  ),
-                ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: avatarColors[index],
-                  child: Icon(
-                    avatarIcons[index],
-                    color: const Color(0xFF536878),
-                    size: 29,
-                  ),
-                ),
-                const Positioned(
-                  right: -1,
-                  top: -1,
-                  child: CircleAvatar(
-                    radius: 5.5,
-                    backgroundColor: Colors.white,
-                    child: CircleAvatar(radius: 4, backgroundColor: kEmerald),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                height: 1,
-                fontWeight: FontWeight.bold,
-                color: titleColor,
-              ),
-            ),
-            const SizedBox(height: 5),
-            const Row(
-              children: [
-                Icon(Icons.circle, size: 8, color: kEmerald),
-                SizedBox(width: 4),
-                Text(
-                  'Online',
-                  style: TextStyle(
-                    color: kEmerald,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 7),
-            Row(
-              children: [
-                Icon(
-                  Icons.battery_5_bar_rounded,
-                  size: 16,
-                  color: batteryColor,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  battery,
-                  style: TextStyle(fontSize: 13, color: mutedColor),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.location_on_rounded, size: 14, color: mutedColor),
-                const SizedBox(width: 3),
-                Flexible(
-                  child: Text(
-                    'Lahore, PK',
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13, color: mutedColor),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

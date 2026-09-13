@@ -19,18 +19,26 @@ class SafetyUserService {
       .doc(id)
       .snapshots()
       .map((doc) => doc.exists ? {'id': doc.id, ...doc.data()!} : null);
-  Stream<List<Map<String, dynamic>>> requests({bool circle = false}) => db
-      .collection(circle ? 'circleInvites' : 'safetyInvites')
-      .where(
-        'email',
-        isEqualTo: FirebaseAuth.instance.currentUser!.email!.toLowerCase(),
-      )
-      .snapshots()
-      .transform(
-        StreamTransformer.fromBind(
-          (source) => _active(source, circle ? 'active' : 'pending'),
-        ),
+  Stream<List<Map<String, dynamic>>> requests({bool circle = false}) {
+    final email = FirebaseAuth.instance.currentUser?.email
+        ?.trim()
+        .toLowerCase();
+    if (email == null || email.isEmpty) {
+      return Stream.error(
+        StateError('A verified email address is required to load requests.'),
       );
+    }
+    return db
+        .collection(circle ? 'circleInvites' : 'safetyInvites')
+        .where('email', isEqualTo: email)
+        .snapshots()
+        .transform(
+          StreamTransformer.fromBind(
+            (source) => _active(source, circle ? 'active' : 'pending'),
+          ),
+        );
+  }
+
   Stream<Map<String, dynamic>> profile() => db
       .collection('users')
       .doc(uid)
