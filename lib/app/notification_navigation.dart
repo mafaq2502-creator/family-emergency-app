@@ -8,21 +8,38 @@ import '../features/groups/presentation/join_requests_screen.dart';
 import '../features/notifications/presentation/notification_center_screen.dart';
 import '../features/progress/presentation/progress_detail_screens.dart';
 import '../models/circle_role.dart';
+import '../features/members/presentation/safety_users_screen.dart';
+import '../features/groups/presentation/join_circle_screen.dart';
 import '../models/family_group.dart';
 import '../models/emergency_event.dart';
 import '../models/paired_device.dart';
 import '../features/groups/presentation/emergency_detail_screen.dart';
 
+final authenticatedNavigatorKey = GlobalKey<NavigatorState>();
+ValueChanged<int>? selectAuthenticatedSection;
+
 final appNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> openNotificationPayload(Map<String, dynamic> payload) async {
-  final navigator = appNavigatorKey.currentState;
+  final navigator =
+      authenticatedNavigatorKey.currentState ?? appNavigatorKey.currentState;
   final user = FirebaseAuth.instance.currentUser;
   if (navigator == null || user == null) return;
   if (payload['recipientUid'] != null && payload['recipientUid'] != user.uid) {
     return;
   }
   final type = payload['type']?.toString() ?? 'general';
+  if (type == 'safety_invite' || type == 'circle_invite') {
+    selectAuthenticatedSection?.call(0);
+    await navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => type == 'safety_invite'
+            ? const SafetyUsersScreen(initialRequests: true)
+            : const JoinCircleScreen(),
+      ),
+    );
+    return;
+  }
   final circleId = (payload['groupId'] ?? payload['circleId'])?.toString();
   FamilyGroup? group;
   try {

@@ -5,7 +5,7 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'dart:async';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/app_bottom_navigation.dart';
+import '../../../core/widgets/authenticated_navigation_shell.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/domain/circle_error_mapper.dart';
 import '../../../core/domain/circle_policies.dart';
@@ -38,6 +38,7 @@ import '../../profile/presentation/profile_settings_screen.dart';
 import '../../profile/presentation/account_settings_screen.dart';
 import '../../progress/presentation/progress_detail_screens.dart';
 import 'tabs/plan_tab.dart';
+import '../../members/presentation/safety_users_screen.dart';
 
 part 'tabs/home_tab.dart';
 part 'tabs/members_tab.dart';
@@ -51,19 +52,88 @@ class HomeScreen extends StatefulWidget {
     super.key,
     this.initialInviteCode,
     this.initialInviteError,
+    this.initialSafetyInvite,
+    this.onInviteHandled,
+  });
+  final String? initialInviteCode;
+  final String? initialInviteError;
+  final String? initialSafetyInvite;
+  final VoidCallback? onInviteHandled;
+  @override
+  State<HomeScreen> createState() => _PersistentShellState();
+}
+
+class _PersistentShellState extends State<HomeScreen> {
+  final selected = ValueNotifier<int>(2);
+  final revision = ValueNotifier<int>(0);
+  @override
+  void initState() {
+    super.initState();
+    selectAuthenticatedSection = (value) {
+      authenticatedNavigatorKey.currentState?.popUntil(
+        (route) => route.isFirst,
+      );
+      selected.value = value;
+    };
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    revision.value++;
+  }
+
+  @override
+  void dispose() {
+    selectAuthenticatedSection = null;
+    revision.dispose();
+    selected.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AuthenticatedNavigationShell(
+    navigatorKey: authenticatedNavigatorKey,
+    selected: selected,
+    rootBuilder: (_) => ValueListenableBuilder<int>(
+      valueListenable: revision,
+      builder: (_, value, child) => _HomeContent(
+        selected: selected,
+        initialInviteCode: widget.initialInviteCode,
+        initialInviteError: widget.initialInviteError,
+        initialSafetyInvite: widget.initialSafetyInvite,
+        onInviteHandled: widget.onInviteHandled,
+      ),
+    ),
+  );
+}
+
+class _HomeContent extends StatefulWidget {
+  const _HomeContent({
+    required this.selected,
+    this.initialInviteCode,
+    this.initialInviteError,
+    this.initialSafetyInvite,
     this.onInviteHandled,
   });
 
+  final ValueNotifier<int> selected;
+  final String? initialSafetyInvite;
   final String? initialInviteCode;
   final String? initialInviteError;
   final VoidCallback? onInviteHandled;
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<_HomeContent> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 2;
+class _HomeScreenState extends State<_HomeContent> {
+  int get _currentIndex => widget.selected.value;
+  set _currentIndex(int value) => widget.selected.value = value;
+  void _selectionChanged() {
+    if (mounted) setState(() {});
+  }
+
   bool _isCountingDown = false;
   Timer? _groupRetryTimer;
   bool _groupLoadErrorShown = false;
@@ -145,6 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    widget.selected.addListener(_selectionChanged);
     PushNotificationService.instance.pendingTap.addListener(
       _openPendingNotification,
     );
@@ -170,20 +241,37 @@ class _HomeScreenState extends State<HomeScreen> {
     final payload = pending.value;
     if (payload == null) return;
     pending.value = null;
+    if (payload['type'] == 'safety_invite' ||
+        payload['type'] == 'circle_invite') {
+      _currentIndex = 0;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
     unawaited(openNotificationPayload(payload));
   }
 
   @override
-  void didUpdateWidget(covariant HomeScreen oldWidget) {
+  void didUpdateWidget(covariant _HomeContent oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.initialInviteCode != oldWidget.initialInviteCode ||
-        widget.initialInviteError != oldWidget.initialInviteError) {
+        widget.initialInviteError != oldWidget.initialInviteError ||
+        widget.initialSafetyInvite != oldWidget.initialSafetyInvite) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _openInitialInvite());
     }
   }
 
   Future<void> _openInitialInvite() async {
     if (!mounted) return;
+    if (widget.initialSafetyInvite != null) {
+      widget.onInviteHandled?.call();
+      _currentIndex = 0;
+      await Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => const SafetyUsersScreen(initialRequests: true),
+        ),
+      );
+      return;
+    }
     final error = widget.initialInviteError;
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -412,11 +500,28 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) setState(() => familyMembers = const []);
       return;
     }
-    _membersSubscription = _memberService.watchGroupMembers(group.id).listen((
-      members,
-    ) {
-      if (mounted) setState(() => familyMembers = members);
-    }, onError: (_) {});
+    _membersSubscription = _groupService
+        .watchMemberships(group.id)
+        .map(
+          (members) => members
+              .map(
+                (member) => FamilyMember(
+                  id: member.userId,
+                  userId: member.userId,
+                  name: member.displayName,
+                  status: 'Connected',
+                ),
+              )
+              .toList(),
+        )
+        .listen(
+          (members) {
+            if (mounted) setState(() => familyMembers = members);
+          },
+          onError: (_) {
+            if (mounted) setState(() => familyMembers = const []);
+          },
+        );
   }
 
   Future<void> _loadDeviceTimeZone() async {
@@ -637,6 +742,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _membersSubscription?.cancel();
     _groupRetryTimer?.cancel();
     unawaited(_deviceHeartbeat.dispose());
+    widget.selected.removeListener(_selectionChanged);
     _profileNameController.dispose();
     super.dispose();
   }
@@ -658,11 +764,13 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildFamilyTab(),
             _buildLocationTab(),
             _buildHomeTab(),
-            PlanSelectionContent(action: _notificationBell()),
+            PlanSelectionContent(
+              action: _notificationBell(),
+              onPlanChanged: _loadProfile,
+            ),
             _buildProfileTab(),
           ],
         ),
-        bottomNavigationBar: _buildNavigationBar(),
       ),
     );
   }
@@ -829,11 +937,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) setState(() => _isMarkingAlive = false);
     }
   }
-
-  Widget _buildNavigationBar() => AppBottomNavigation(
-    selectedIndex: _currentIndex,
-    onSelected: (index) => setState(() => _currentIndex = index),
-  );
 
   Future<void> _openPremiumFeature(VoidCallback action) async {
     if (_isPremium) {

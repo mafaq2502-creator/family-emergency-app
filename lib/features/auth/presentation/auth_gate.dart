@@ -53,6 +53,7 @@ class _AuthGateState extends State<AuthGate> {
       widget.inviteLinkSource ?? InviteLinkService();
   StreamSubscription<Uri>? _inviteSubscription;
   String? _pendingInviteCode;
+  String? _pendingSafetyInvite;
   String? _inviteError;
 
   @override
@@ -76,6 +77,13 @@ class _AuthGateState extends State<AuthGate> {
 
   void _acceptInviteLink(Uri uri) {
     if (!InviteCodePolicy.isSupportedInviteUri(uri)) return;
+    if (uri.queryParameters.containsKey('safetyInvite')) {
+      final code = uri.queryParameters['safetyInvite']!;
+      if (InviteCodePolicy.validate(code) == null && mounted) {
+        setState(() => _pendingSafetyInvite = code);
+      }
+      return;
+    }
     final code = InviteCodePolicy.normalize(uri.toString());
     final error = InviteCodePolicy.validate(code);
     if (!mounted) return;
@@ -89,6 +97,7 @@ class _AuthGateState extends State<AuthGate> {
     if (!mounted) return;
     setState(() {
       _pendingInviteCode = null;
+      _pendingSafetyInvite = null;
       _inviteError = null;
     });
   }
@@ -245,6 +254,7 @@ class _AuthGateState extends State<AuthGate> {
                       key: ValueKey(user.uid),
                       initialInviteCode: _pendingInviteCode,
                       initialInviteError: _inviteError,
+                      initialSafetyInvite: _pendingSafetyInvite,
                       onInviteHandled: _clearInvite,
                     );
                   case AuthDestination.login:

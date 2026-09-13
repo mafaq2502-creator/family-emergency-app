@@ -13,8 +13,9 @@ import 'emergency_events_screen.dart';
 import 'group_settings_screen.dart';
 import 'join_requests_screen.dart';
 import 'share_circle_screen.dart';
+import '../../members/presentation/safety_users_screen.dart';
 
-enum CircleDetailExit { deleted, left }
+enum CircleDetailExit { deleted, left, unavailable }
 
 class GroupMembersScreen extends StatefulWidget {
   const GroupMembersScreen({
@@ -114,6 +115,20 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
           );
         }
         if (groupSnapshot.hasError) {
+          final error = groupSnapshot.error;
+          if (error is FirebaseException &&
+              ['permission-denied', 'not-found'].contains(error.code)) {
+            _service.invalidate(viewerId, widget.group.id);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                if (ModalRoute.of(context)?.isCurrent == true) {
+                  Navigator.pop(context, CircleDetailExit.unavailable);
+                } else {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                }
+              }
+            });
+          }
           return _UnavailableCircle(
             title: 'Circle could not be loaded',
             message: CircleErrorMapper.message(groupSnapshot.error!),
@@ -134,6 +149,15 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
         }
         final group = groupSnapshot.data;
         if (group == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              if (ModalRoute.of(context)?.isCurrent == true) {
+                Navigator.pop(context, CircleDetailExit.unavailable);
+              } else {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
+            }
+          });
           return _UnavailableCircle(
             title: 'Circle unavailable',
             message: 'This Circle was deleted, archived, or your access was removed.',
@@ -145,221 +169,239 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     );
   }
 
-  Widget _circle(BuildContext context, FamilyGroup group, String viewerId) =>
-      Scaffold(
-        appBar: AppBar(
-          title: Text(group.name),
-          actions: [
-            if (group.isOwner)
-              IconButton(
-                icon: _deleting
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.delete_outline_rounded),
-                color: kEmergency,
-                tooltip: 'Delete Circle',
-                onPressed: _deleting ? null : () => _deleteCircle(group),
-              ),
-            IconButton(
-              icon: const Icon(Icons.warning_amber_rounded),
-              tooltip: 'SOS activity',
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => EmergencyEventsScreen(
-                    group: group,
-                    currentUserName: 'You',
-                  ),
-                ),
-              ),
+  Widget _circle(
+    BuildContext context,
+    FamilyGroup group,
+    String viewerId,
+  ) => Scaffold(
+    appBar: AppBar(
+      title: Text(group.name),
+      actions: [
+        if (group.isOwner)
+          IconButton(
+            icon: _deleting
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.delete_outline_rounded),
+            color: kEmergency,
+            tooltip: 'Delete Circle',
+            onPressed: _deleting ? null : () => _deleteCircle(group),
+          ),
+        IconButton(
+          icon: const Icon(Icons.warning_amber_rounded),
+          tooltip: 'SOS activity',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  EmergencyEventsScreen(group: group, currentUserName: 'You'),
             ),
-          ],
+          ),
         ),
-        body: StreamBuilder<List<CircleMembership>>(
-          stream: _service.watchMemberships(group.id),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return LightStateView(
-                icon: Icons.cloud_off_rounded,
-                title: 'Members could not be loaded',
-                message: CircleErrorMapper.message(snapshot.error!),
-                actionLabel: 'Retry',
-                onAction: () => setState(() => _retryKey++),
-              );
-            }
-            if (!snapshot.hasData) {
-              return const LightStateView(
-                icon: Icons.sync_rounded,
-                title: 'Loading members',
-                message: 'Getting active Circle memberships…',
-                busy: true,
-              );
-            }
-            final members = snapshot.data!;
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-              children: [
-                LightCard(
-                  child: Column(
+      ],
+    ),
+    body: StreamBuilder<List<CircleMembership>>(
+      stream: _service.watchMemberships(group.id),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return LightStateView(
+            icon: Icons.cloud_off_rounded,
+            title: 'Members could not be loaded',
+            message: CircleErrorMapper.message(snapshot.error!),
+            actionLabel: 'Retry',
+            onAction: () => setState(() => _retryKey++),
+          );
+        }
+        if (!snapshot.hasData) {
+          return const LightStateView(
+            icon: Icons.sync_rounded,
+            title: 'Loading members',
+            message: 'Getting active Circle memberships…',
+            busy: true,
+          );
+        }
+        final members = snapshot.data!;
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+          children: [
+            LightCard(
+              child: Column(
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          LightAvatar(name: group.name, radius: 30),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      LightAvatar(name: group.name, radius: 30),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              group.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: context.appHeading,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
                               children: [
-                                Text(
-                                  group.name,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: context.appHeading,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 5),
-                                Wrap(
-                                  spacing: 6,
-                                  runSpacing: 6,
-                                  children: [
-                                    LightStatusChip(label: group.role.value),
-                                    LightStatusChip(
-                                      label: '${members.length} of ${group.memberLimit} members',
-                                      color: const Color(0xFF2563EB),
-                                    ),
-                                  ],
+                                LightStatusChip(label: group.role.value),
+                                LightStatusChip(
+                                  label:
+                                      '${members.length} of ${group.memberLimit} members',
+                                  color: const Color(0xFF2563EB),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          if (group.canManage)
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: members.length >= group.memberLimit
-                                    ? null
-                                    : () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        ShareCircleScreen(group: group),
-                                  ),
-                                ),
-                                icon: const Icon(Icons.ios_share_rounded),
-                                label: const Text('Invite'),
-                              ),
-                            ),
-                          if (group.canManage) const SizedBox(width: 9),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () async {
-                                final result =
-                                    await Navigator.push<GroupSettingsOutcome>(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => GroupSettingsScreen(
-                                          group: group,
-                                          memberships: members,
-                                          groupService: _service,
-                                          viewerId: viewerId,
-                                        ),
-                                      ),
-                                    );
-                                if (!context.mounted) return;
-                                if (result == GroupSettingsOutcome.left) {
-                                  Navigator.pop(context, CircleDetailExit.left);
-                                }
-                              },
-                              icon: const Icon(Icons.settings_rounded),
-                              label: const Text('Settings'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (group.canManage) ...[
-                        if (members.length >= group.memberLimit) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            group.isPremiumOwned
-                                ? 'Circle member limit reached.'
-                                : 'Free Plan member limit reached.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: kEmergency),
-                          ),
-                        ],
-                        const SizedBox(height: 9),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    JoinRequestsScreen(group: group),
-                              ),
-                            ),
-                            icon: const Icon(Icons.how_to_reg_rounded),
-                            label: const Text('Review Join Requests'),
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 18),
-                const LightSectionTitle('Active members'),
-                if (members.isEmpty)
-                  const LightStateView(
-                    icon: Icons.group_off_rounded,
-                    title: 'No active members',
-                    message: 'No active membership records are available.',
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      if (group.canManage)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: members.length >= group.memberLimit
+                                ? null
+                                : () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          ShareCircleScreen(group: group),
+                                    ),
+                                  ),
+                            icon: const Icon(Icons.ios_share_rounded),
+                            label: const Text('Invite'),
+                          ),
+                        ),
+                      if (group.canManage) const SizedBox(width: 9),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final result =
+                                await Navigator.push<GroupSettingsOutcome>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => GroupSettingsScreen(
+                                      group: group,
+                                      memberships: members,
+                                      groupService: _service,
+                                      viewerId: viewerId,
+                                    ),
+                                  ),
+                                );
+                            if (!context.mounted) return;
+                            if (result == GroupSettingsOutcome.left) {
+                              Navigator.pop(context, CircleDetailExit.left);
+                            }
+                          },
+                          icon: const Icon(Icons.settings_rounded),
+                          label: const Text('Settings'),
+                        ),
+                      ),
+                    ],
                   ),
-                for (final member in members) ...[
-                  LightCard(
-                    padding: EdgeInsets.zero,
-                    child: ListTile(
-                      leading: LightAvatar(name: member.displayName),
-                      title: Text(
-                        member.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                  if (group.canManage) ...[
+                    if (members.length >= group.memberLimit) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        group.isPremiumOwned
+                            ? 'Circle member limit reached.'
+                            : 'Free Plan member limit reached.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: kEmergency),
                       ),
-                      subtitle: Text(
-                        '${member.relationship} • ${member.role.value}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    ],
+                    const SizedBox(height: 9),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => JoinRequestsScreen(group: group),
+                          ),
+                        ),
+                        icon: const Icon(Icons.how_to_reg_rounded),
+                        label: const Text('Review Join Requests'),
                       ),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => Navigator.push(
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            if (group.isOwner)
+              OutlinedButton.icon(
+                onPressed: group.memberCount >= group.memberLimit
+                    ? null
+                    : () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => CircleMemberDetailScreen(
-                            group: group,
-                            initialMember: member,
-                            viewerId: viewerId,
-                            groupService: _service,
-                            deviceService: widget.deviceService,
+                          builder: (_) => InviteSafetyUserToCircleScreen(
+                            circleId: group.id,
                           ),
                         ),
                       ),
-                    ),
+                icon: const Icon(Icons.person_add_alt),
+                label: const Text('Invite User'),
+              ),
+            const LightSectionTitle('Active members'),
+            if (members.isEmpty)
+              const LightStateView(
+                icon: Icons.group_off_rounded,
+                title: 'No active members',
+                message: 'No active membership records are available.',
+              ),
+            for (final member in members) ...[
+              LightCard(
+                padding: EdgeInsets.zero,
+                child: ListTile(
+                  leading: LightAvatar(
+                    name: member.displayName,
+                    photoUrl: member.photoUrl,
                   ),
-                  const SizedBox(height: 9),
-                ],
-              ],
-            );
-          },
-        ),
-      );
+                  title: Text(
+                    member.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: (member.userId == viewerId || group.canManage)
+                      ? const Icon(Icons.chevron_right_rounded)
+                      : null,
+                  onTap: (member.userId != viewerId && !group.canManage)
+                      ? null
+                      : () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CircleMemberDetailScreen(
+                              group: group,
+                              initialMember: member,
+                              viewerId: viewerId,
+                              groupService: _service,
+                              deviceService: widget.deviceService,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 9),
+            ],
+          ],
+        );
+      },
+    ),
+  );
 }
 
 class _UnavailableCircle extends StatelessWidget {
@@ -376,9 +418,7 @@ class _UnavailableCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Family Circle'),
-    ),
+    appBar: AppBar(title: const Text('Family Circle')),
     body: LightStateView(
       icon: Icons.group_off_rounded,
       title: title,

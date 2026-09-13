@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../../../core/theme/app_colors.dart';
 
@@ -7,19 +10,31 @@ class PlansScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Plans'),
-    ),
+    appBar: AppBar(title: const Text('Plans')),
     body: const PlanSelectionContent(showHeader: false),
   );
 }
 
-class PlanSelectionContent extends StatelessWidget {
-  const PlanSelectionContent({super.key, this.action, this.showHeader = true});
+class PlanSelectionContent extends StatefulWidget {
+  const PlanSelectionContent({
+    super.key,
+    this.action,
+    this.showHeader = true,
+    this.onPlanChanged,
+  });
 
   final Widget? action;
   final bool showHeader;
+  final VoidCallback? onPlanChanged;
 
+  @override
+  State<PlanSelectionContent> createState() => _PlanSelectionContentState();
+}
+
+class _PlanSelectionContentState extends State<PlanSelectionContent> {
+  bool yearly = false;
+  bool get showHeader => widget.showHeader;
+  Widget? get action => widget.action;
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -57,7 +72,32 @@ class PlanSelectionContent extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 18, 24, 10),
-            child: header,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                header,
+                const SizedBox(height: 12),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: false, label: Text('Monthly')),
+                    ButtonSegment(value: true, label: Text('Yearly (20% off)')),
+                  ],
+                  selected: {yearly},
+                  onSelectionChanged: (value) =>
+                      setState(() => yearly = value.single),
+                ),
+                if (yearly)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      r'Billed yearly: $28.70 — approximately $2.39/month.',
+                    ),
+                  ),
+                if (kDebugMode &&
+                    const bool.fromEnvironment('ENABLE_TEST_ENTITLEMENTS'))
+                  _TestPlanControls(onChanged: widget.onPlanChanged),
+              ],
+            ),
           ),
           Expanded(
             child: LayoutBuilder(
@@ -95,7 +135,7 @@ class PlanSelectionContent extends StatelessWidget {
                             context: context,
                             title: 'Premium',
                             subtitle: 'Advanced features\nfor complete safety.',
-                            price: '\$2.99',
+                            price: yearly ? '\$28.70' : '\$2.99',
                             features: const [
                               'Owner + 10 members',
                               'Yearly: \$28.70 (20% off)',
@@ -188,7 +228,7 @@ class PlanSelectionContent extends StatelessWidget {
                   ),
                 ),
                 TextSpan(
-                  text: ' / month',
+                  text: yearly && !selected ? ' / year' : ' / month',
                   style: TextStyle(
                     fontSize: 13,
                     color: isDark ? Colors.white60 : kLightMuted,
@@ -250,7 +290,11 @@ class PlanSelectionContent extends StatelessWidget {
                 ),
               ),
               child: Text(
-                selected ? 'Current Plan' : 'Upgrade Now',
+                selected
+                    ? 'Current Plan'
+                    : yearly
+                    ? 'Choose Yearly'
+                    : 'Upgrade Now',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
@@ -278,6 +322,55 @@ class PlanSelectionContent extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _TestPlanControls extends StatefulWidget {
+  const _TestPlanControls({this.onChanged});
+  final VoidCallback? onChanged;
+  @override
+  State<_TestPlanControls> createState() => _TestPlanControlsState();
+}
+
+class _TestPlanControlsState extends State<_TestPlanControls> {
+  bool busy = false;
+  @override
+  Widget build(BuildContext context) {
+    if (FirebaseAuth.instance.currentUser?.email != 'nihalafaq@gmail.com') {
+      return const SizedBox.shrink();
+    }
+    return Wrap(
+      spacing: 8,
+      children: [
+        for (final mode in ['free', 'premium'])
+          TextButton(
+            onPressed: busy
+                ? null
+                : () async {
+                    setState(() => busy = true);
+                    try {
+                      await FirebaseFunctions.instance
+                          .httpsCallable('setTestPlan')
+                          .call({'mode': mode});
+                      widget.onChanged?.call();
+                    } catch (_) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Test modes require the explicitly enabled local emulator.',
+                            ),
+                          ),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => busy = false);
+                    }
+                  },
+            child: Text('${mode.toUpperCase()} TEST MODE'),
+          ),
+      ],
     );
   }
 }

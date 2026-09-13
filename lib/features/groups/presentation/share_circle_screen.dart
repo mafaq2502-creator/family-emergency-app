@@ -14,6 +14,7 @@ import '../../../models/circle_invite.dart';
 import '../../../models/family_group.dart';
 import '../../../services/circle_join_service.dart';
 import '../../../services/group_service.dart';
+import '../../members/presentation/safety_users_screen.dart';
 
 class ShareCircleScreen extends StatefulWidget {
   const ShareCircleScreen({super.key, required this.group, this.joinService});
@@ -143,6 +144,20 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
     return LightPage(
       title: 'Invite Member',
       subtitle: widget.group.name,
+      actions: [
+        if (widget.group.isOwner)
+          IconButton(
+            tooltip: 'Invite User',
+            icon: const Icon(Icons.person_add_alt),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    InviteSafetyUserToCircleScreen(circleId: widget.group.id),
+              ),
+            ),
+          ),
+      ],
       child: viewerId == null
           ? const LightStateView(
               icon: Icons.lock_outline_rounded,
@@ -152,10 +167,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
           : StreamBuilder<FamilyGroup?>(
               stream: widget.joinService != null
                   ? Stream.value(widget.group)
-                  : _groupService.watchGroupForUser(
-                      widget.group.id,
-                      viewerId,
-                    ),
+                  : _groupService.watchGroupForUser(widget.group.id, viewerId),
               initialData: widget.group,
               builder: (context, groupSnapshot) {
                 final group = groupSnapshot.data;
@@ -170,11 +182,13 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
                   stream: _service.watchInvites(group.id),
                   builder: (context, inviteSnapshot) {
                     final invites = inviteSnapshot.data ?? const [];
-                    final selected = invites
+                    final selected =
+                        invites
                             .where((item) => item.id == _invite?.id)
                             .firstOrNull ??
                         _invite;
-                    final capacityInvites = selected != null &&
+                    final capacityInvites =
+                        selected != null &&
                             !invites.any((item) => item.id == selected.id)
                         ? [...invites, selected]
                         : invites;
@@ -253,9 +267,7 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
               subtitle: Text(
-                invite.isUsable
-                    ? 'Single-use invitation'
-                    : invite.status.name,
+                invite.isUsable ? 'Single-use invitation' : invite.status.name,
               ),
               trailing: const Icon(Icons.chevron_right_rounded),
             ),
@@ -336,9 +348,9 @@ class _ShareCircleScreenState extends State<ShareCircleScreen> {
               label: const Text('Revoke'),
             ),
             OutlinedButton.icon(
-            onPressed: _busy || (!usable && !_hasCapacity(group, invites))
-                ? null
-                : () => _generate(replace: usable),
+              onPressed: _busy || (!usable && !_hasCapacity(group, invites))
+                  ? null
+                  : () => _generate(replace: usable),
               icon: _busy
                   ? const SizedBox.square(
                       dimension: 16,

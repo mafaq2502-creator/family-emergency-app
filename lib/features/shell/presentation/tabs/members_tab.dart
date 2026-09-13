@@ -1,16 +1,11 @@
 part of '../family_shell.dart';
 
 extension _MembersTab on _HomeScreenState {
-  Widget _buildFamilyTab() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : kLightNavy;
-    final mutedColor = isDark ? Colors.white60 : kLightMuted;
-    final visibleGroups = _groups
-        .where((group) => _showOwnedCircles ? group.isOwner : !group.isOwner)
-        .toList();
-    return Scaffold(
+  Widget _buildFamilyTab() => DefaultTabController(
+    length: 2,
+    child: Scaffold(
       appBar: AppBar(
-        title: const Text('Family Circles'),
+        title: const Text('Family'),
         actions: [
           _notificationBell(),
           IconButton(
@@ -19,7 +14,26 @@ extension _MembersTab on _HomeScreenState {
             icon: Icon(Icons.settings_outlined, color: context.appPrimary),
           ),
         ],
+        bottom: const TabBar(
+          tabs: [
+            Tab(text: 'Circles'),
+            Tab(text: 'Users'),
+          ],
+        ),
       ),
+      body: TabBarView(
+        children: [_buildCirclesTab(), const SafetyUsersScreen(embedded: true)],
+      ),
+    ),
+  );
+  Widget _buildCirclesTab() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark ? Colors.white : kLightNavy;
+    final mutedColor = isDark ? Colors.white60 : kLightMuted;
+    final visibleGroups = _groups
+        .where((group) => _showOwnedCircles ? group.isOwner : !group.isOwner)
+        .toList();
+    return Scaffold(
       body: SafeArea(
         top: false,
         child: ListView(

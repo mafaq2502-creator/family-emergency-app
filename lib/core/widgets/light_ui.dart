@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import 'profile_image.dart';
 
 class LightPage extends StatelessWidget {
   const LightPage({
@@ -63,10 +64,16 @@ class AppAlertDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    icon: icon,
     title: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: title),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [?icon, title],
+          ),
+        ),
         const SizedBox(width: 8),
         IconButton(
           key: const Key('dialog-close'),
@@ -232,10 +239,12 @@ class LightAvatar extends StatelessWidget {
     required this.name,
     this.radius = 24,
     this.online,
+    this.photoUrl,
   });
   final String name;
   final double radius;
   final bool? online;
+  final String? photoUrl;
 
   @override
   Widget build(BuildContext context) => Stack(
@@ -243,6 +252,7 @@ class LightAvatar extends StatelessWidget {
     children: [
       CircleAvatar(
         radius: radius,
+        foregroundImage: ProfileImageData.provider(photoUrl),
         backgroundColor: context.appSuccessSurface,
         child: Text(
           name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase(),

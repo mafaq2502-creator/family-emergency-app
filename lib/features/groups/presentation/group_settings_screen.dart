@@ -312,9 +312,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                                   : _recipients.remove(member.userId),
                             ),
                       title: Text(member.displayName),
-                      subtitle: Text(
-                        '${member.relationship} • ${member.role.value}',
-                      ),
                     ),
                 ],
               );
@@ -337,9 +334,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   );
 
   Widget _unavailable(String message) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Circle Settings'),
-    ),
+    appBar: AppBar(title: const Text('Circle Settings')),
     body: LightStateView(
       icon: Icons.lock_outline_rounded,
       title: 'Settings unavailable',

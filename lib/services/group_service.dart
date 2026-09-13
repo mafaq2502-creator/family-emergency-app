@@ -1,4 +1,5 @@
 // ignore_for_file: prefer_initializing_formals
+import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -10,6 +11,13 @@ import '../models/family_group.dart';
 import '../models/circle_role.dart';
 
 class GroupService {
+  static final _unavailable = <String>{};
+  static final _invalidations = StreamController<void>.broadcast();
+  void invalidate(String userId, String groupId) {
+    _unavailable.add('$userId/$groupId');
+    _invalidations.add(null);
+  }
+
   GroupService({FirebaseFirestore? firestore, FirebaseFunctions? functions})
     : _firestore = firestore,
       _functions = functions;
@@ -19,7 +27,27 @@ class GroupService {
   FirebaseFunctions get _functionClient =>
       _functions ??= FirebaseFunctions.instance;
 
-  Stream<List<FamilyGroup>> watchGroups(User user) => _client
+  Stream<List<FamilyGroup>> watchGroups(User user) => Stream.multi((
+    controller,
+  ) {
+    List<FamilyGroup> latest = [];
+    void emit() => controller.add(
+      latest
+          .where((group) => !_unavailable.contains('${user.uid}/${group.id}'))
+          .toList(),
+    );
+    final changes = _invalidations.stream.listen((_) => emit());
+    final groups = _confirmedGroups(user).listen((value) {
+      latest = value;
+      emit();
+    }, onError: controller.addError);
+    controller.onCancel = () async {
+      await changes.cancel();
+      await groups.cancel();
+    };
+  });
+
+  Stream<List<FamilyGroup>> _confirmedGroups(User user) => _client
       .collection('groups')
       .where('memberIds', arrayContains: user.uid)
       .where('status', isEqualTo: 'active')
@@ -27,8 +55,15 @@ class GroupService {
       // A local batch can still be rejected by rules. Keep the last confirmed
       // list until the server acknowledges it (including metadata-only acks).
       .where((snapshot) => !snapshot.metadata.hasPendingWrites)
-      .map(
-        (snapshot) => snapshot.docs
+      .map((snapshot) {
+        if (!snapshot.metadata.isFromCache) {
+          _unavailable.removeWhere(
+            (key) =>
+                key.startsWith('${user.uid}/') &&
+                !snapshot.docs.any((doc) => key == '${user.uid}/${doc.id}'),
+          );
+        }
+        return snapshot.docs
             .map((doc) {
               final data = doc.data();
               final roles = Map<String, dynamic>.from(
@@ -40,27 +75,34 @@ class GroupService {
               });
             })
             .where((group) => group.isActive)
-            .toList(),
-      );
+            .toList();
+      });
 
   Stream<FamilyGroup?> watchGroupForUser(String groupId, String userId) =>
       _client.collection('groups').doc(groupId).snapshots().map((snapshot) {
         final data = snapshot.data();
-        if (!snapshot.exists || data == null) return null;
+        if (!snapshot.exists || data == null) {
+          invalidate(userId, groupId);
+          return null;
+        }
         final memberIds = _strings(data['memberIds']);
-        if (!memberIds.contains(userId)) return null;
+        if (!memberIds.contains(userId)) {
+          invalidate(userId, groupId);
+          return null;
+        }
         final roles = Map<String, dynamic>.from(data['roles'] as Map? ?? {});
         final group = FamilyGroup.fromMap(snapshot.id, {
           ...data,
           'role': roles[userId],
         });
+        if (!group.isActive) invalidate(userId, groupId);
         return group.isActive ? group : null;
       });
 
   Stream<List<CircleMembership>> watchMemberships(String groupId) => _client
       .collection('groups')
       .doc(groupId)
-      .collection('memberships')
+      .collection('publicMembers')
       .snapshots()
       .map((snapshot) {
         final memberships = snapshot.docs
@@ -83,7 +125,7 @@ class GroupService {
       _client
           .collection('groups')
           .doc(groupId)
-          .collection('memberships')
+          .collection('publicMembers')
           .doc(userId)
           .snapshots()
           .map((snapshot) {
@@ -107,9 +149,9 @@ class GroupService {
     final trimmedName = CircleNamePolicy.normalize(name);
     final validation = CircleNamePolicy.validate(trimmedName);
     if (validation != null) throw ArgumentError(validation);
-    final response = await _functionClient
-        .httpsCallable('createCircle')
-        .call({'name': trimmedName});
+    final response = await _functionClient.httpsCallable('createCircle').call({
+      'name': trimmedName,
+    });
     final data = Map<String, dynamic>.from(response.data as Map);
     return data['circleId'] as String;
   }

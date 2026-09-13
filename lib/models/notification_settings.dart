@@ -35,3 +35,12 @@ class NotificationSettings {
     'ownerMissedCheckInAlerts': ownerMissedCheckInAlerts,
   };
 }
+
+const safetyNotificationCategories = <String, String>{
+  'emergencyAlerts': 'Emergency / SOS',
+  'batteryAlerts': 'Battery',
+  'screenTimeAlerts': 'Screen Time',
+  'offlineAlerts': 'Device Offline',
+  'missedCheckInAlerts': 'Check-In',
+  'locationSharing': 'Location',
+};

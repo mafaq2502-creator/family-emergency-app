@@ -160,17 +160,19 @@ class _CircleMemberDetailScreenState extends State<CircleMemberDetailScreen> {
             ],
           ),
           const SizedBox(height: 22),
-          LightSettingRow(
-            icon: Icons.favorite_outline_rounded,
-            title: 'Relationship',
-            subtitle: member.relationship,
-          ),
+          if (member.userId == widget.viewerId)
+            LightSettingRow(
+              icon: Icons.favorite_outline_rounded,
+              title: 'Relationship',
+              subtitle: member.relationship,
+            ),
           const SizedBox(height: 9),
-          LightSettingRow(
-            icon: Icons.mail_outline_rounded,
-            title: 'Email',
-            subtitle: member.email ?? 'Not shared',
-          ),
+          if (member.userId == widget.viewerId)
+            LightSettingRow(
+              icon: Icons.mail_outline_rounded,
+              title: 'Email',
+              subtitle: member.email ?? 'Not shared',
+            ),
           const SizedBox(height: 9),
           MemberDeviceSection(
             group: group,
@@ -219,9 +221,7 @@ class _CircleMemberDetailScreenState extends State<CircleMemberDetailScreen> {
   );
 
   Widget _state(String title, String message) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Member Detail'),
-    ),
+    appBar: AppBar(title: const Text('Member Detail')),
     body: LightStateView(
       icon: Icons.person_off_rounded,
       title: title,

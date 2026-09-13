@@ -231,10 +231,11 @@ service cloud.firestore {
           'lastDailyCheckInLocalDate', 'lastSignInAt', 'activeCircleId',
           'circleIds', 'pendingJoinCircleId', 'pendingJoinInviteId',
           'ownedCircleIds', 'joinedCircleIds', 'planTier',
-          'subscriptionStatus',
+          'subscriptionStatus', 'safetyUpdatedAt',
           'createdAt', 'updatedAt'
         ]) &&
         (!('uid' in request.resource.data) || request.resource.data.uid == userId) &&
+        (resource == null ? !('safetyUpdatedAt' in request.resource.data) : request.resource.data.get('safetyUpdatedAt', null) == resource.data.get('safetyUpdatedAt', null)) &&
         (!('email' in request.resource.data) ||
           !('email' in request.auth.token) ||
           request.resource.data.email == request.auth.token.email) &&
@@ -746,6 +747,10 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
+      match /safetyUsers/{relationshipId} {
+        allow read: if signedIn() && request.auth.uid == userId;
+        allow write: if false;
+      }
       allow create: if signedIn() && request.auth.uid == userId &&
         validSelfProfile(userId);
       allow read: if signedIn() && request.auth.uid == userId;
@@ -819,7 +824,7 @@ service cloud.firestore {
       allow delete: if false;
 
       match /memberships/{userId} {
-        allow read: if isMember(groupId);
+        allow read: if isMember(groupId) && request.auth.uid == userId;
         allow create: if signedIn() &&
           request.resource.data.userId == userId &&
           request.resource.data.status == 'active' &&
@@ -849,7 +854,7 @@ service cloud.firestore {
       // Kept temporarily for the current UI while registered-user
       // memberships replace manually-created member records.
       match /members/{memberId} {
-        allow read: if isMember(groupId);
+        allow read: if isCircleManager(groupId);
         allow create, update, delete: if isCircleManager(groupId);
       }
 
@@ -917,11 +922,22 @@ service cloud.firestore {
 
     match /circleInvites/{inviteId} {
       allow update: if signedIn() && deletionRevokesInvite(resource.data.circleId);
-      allow get: if signedIn();
-      allow list: if signedIn() && isCircleManager(resource.data.circleId);
+      allow get: if signedIn() && (!('targetUserId' in resource.data) || resource.data.targetUserId == request.auth.uid || isCircleManager(resource.data.circleId));
+      allow list: if signedIn() && (isCircleManager(resource.data.circleId) || (request.auth.token.email_verified == true && resource.data.email == request.auth.token.email));
       allow create: if false;
       allow update: if false;
       allow delete: if false;
+    }
+
+    match /safetyInvites/{inviteId} {
+      allow read: if signedIn() && (resource.data.ownerId == request.auth.uid ||
+        (request.auth.token.email_verified == true && resource.data.email == request.auth.token.email));
+      allow write: if false;
+    }
+
+    match /groups/{groupId}/publicMembers/{userId} {
+      allow read: if isMember(groupId);
+      allow write: if false;
     }
 
     match /devicePairingRequests/{pairingId} {

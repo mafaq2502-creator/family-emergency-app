@@ -17,11 +17,13 @@
       <a id="store" href="https://play.google.com/store/apps/details?id=com.example.family_emergency_app">Get the Android app</a>
     </main>
     <script>
-      const code = new URLSearchParams(location.search).get('code') || '';
+      const params = new URLSearchParams(location.search);
+      const kind = params.has('safetyInvite') ? 'safetyInvite' : 'code';
+      const code = params.get(kind) || '';
       const valid = /^[A-HJ-NP-Z2-9]{24}$/.test(code);
       if (valid) {
-        location.href = `familyemergency://join?code=${encodeURIComponent(code)}`;
-        setTimeout(() => document.getElementById('store').click(), 1400);
+        location.href = `familyemergency://join?${kind}=${encodeURIComponent(code)}`;
+        document.querySelector('p').textContent = 'Open this link again after installing, and sign in with your invited email address.';
       } else {
         document.querySelector('p').textContent = 'This invitation link is invalid.';
       }

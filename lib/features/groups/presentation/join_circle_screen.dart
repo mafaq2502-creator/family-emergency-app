@@ -8,6 +8,7 @@ import '../../../models/circle_invite.dart';
 import '../../../models/circle_join_request.dart';
 import '../../../services/circle_join_service.dart';
 import 'qr_scanner_screen.dart';
+import '../../members/presentation/safety_users_screen.dart';
 
 class JoinCircleScreen extends StatefulWidget {
   const JoinCircleScreen({
@@ -130,6 +131,20 @@ class _JoinCircleScreenState extends State<JoinCircleScreen> {
 
   Widget _codeEntry() => Column(
     children: [
+      OutlinedButton.icon(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => Scaffold(
+              appBar: AppBar(title: const Text('Circle Invitations')),
+              body: const SafetyRequestsView(circle: true),
+            ),
+          ),
+        ),
+        icon: const Icon(Icons.mark_email_unread_outlined),
+        label: const Text('Incoming Circle Invitations'),
+      ),
+      const SizedBox(height: 12),
       const LightStateView(
         icon: Icons.mark_email_unread_outlined,
         title: 'Use a secure invitation',

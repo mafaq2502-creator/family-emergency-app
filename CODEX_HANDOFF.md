@@ -1,5 +1,35 @@
 # Family Emergency App — Codex Handoff
 
+## Safety Users and persistent navigation (2026-09-13)
+
+Status: **SOURCE IMPLEMENTED AND LOCAL VERIFICATION PASSES. PRODUCTION ACTIVATION PENDING.**
+
+- Implemented persistent authenticated nested navigation with one bottom bar,
+  natural child-route Android Back, and preserved Progress/Family/Home/Plan/Profile order.
+- Family now separates Circles from Users; Users contains Users List and Requests.
+  Personal Safety Users never automatically become Circle members.
+- Added verified-email personal invitations, pending/Connected lifecycle, five-user
+  Free active/reserved capacity enforcement, private details/preferences and owner
+  removal with atomic owned-Circle cleanup. Third-party Circles and target accounts
+  are protected. Re-invitation starts with fresh defaults.
+- Added direct Circle invitations from eligible connected Safety Users; existing
+  Share/QR capacity and plan enforcement remain authoritative.
+- Added deterministic removal/history events, per-target dispatch checks, email
+  adapter/outbox with honest missing-configuration reporting, and invitation routing.
+- Added public member projection and migration script. New rules protect private
+  membership identity fields; deploy projection/backfill before the new rules/app.
+- Added Monthly/Yearly selection, top-right dialog close positioning and explicit
+  emulator-only Free/Premium test controls for the specified verified test account.
+- Final verification: **313 Flutter tests pass; 63 combined Firebase rules/callable
+  integration tests pass; Flutter analyzer clean; Functions TypeScript passes;
+  diff whitespace check passes.** Emulator runtime used installed Node 24; deployed
+  Functions still target Node 20. Real email/FCM device delivery was not tested.
+- No APK/AAB/app build, production deployment, production migration, or real user
+  notification/email was performed. The prior APK remains the prior version.
+- Full 39-point report: `docs/SAFETY_USERS_IMPLEMENTATION_REPORT.md`.
+- Required deployment/email/test setup: `docs/SAFETY_USERS_DEPLOYMENT.md`.
+- Standing preference: do not build an APK or app bundle until separately requested.
+
 ## Phone, onboarding, navigation, and shared-control follow-up (2026-09-13)
 
 Status: **SOURCE COMPLETE, LOCAL VERIFICATION PASSES, AND APK BUILT.**
